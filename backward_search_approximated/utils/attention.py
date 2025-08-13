@@ -19,9 +19,6 @@ def custom_attention_forward(
 		raise NotImplementedError(
 			"Rotary positional embeddings are not supported in this function. Use the full attention module instead."
 		)
-	# print(f"q shape: {q.shape}, dtype: {q.dtype}")
-	# print(f"k shape: {k.shape}, dtype: {k.dtype}")
-	# print(f"v shape: {v.shape}, dtype: {v.dtype}")
 	if attention_module.cfg.dtype not in [torch.float32, torch.float64]:
 		# If using 16 bits, increase the precision to avoid numerical instabilities
 		q = q.to(torch.float32)
@@ -30,16 +27,12 @@ def custom_attention_forward(
 	
 	if precomputed_attention_scores is not None:
 		attn_scores_new = attention_module.calculate_attention_scores(q, k)
-		# print(f"attn_scores_new shape: {attn_scores_new.shape}, dtype: {attn_scores_new.dtype}")
 		if head is None:
 			attn_scores = precomputed_attention_scores
 		else:
 			attn_scores = precomputed_attention_scores[:, head:head+1, :, :]
-		# print(f"attn_scores shape: {attn_scores.shape}, dtype: {attn_scores.dtype}")
 		if query_position is not None:
 			if keyvalue_position is not None:
-				# print(f"query_position: {query_position}, keyvalue_position: {keyvalue_position}")
-				# print(f"Changing attn_score from {attn_scores[:, 0, query_position, keyvalue_position]} to {attn_scores_new[:, 0, 0, 0]}")
 				if head is None:
 					attn_scores[:, :, query_position, keyvalue_position] = attn_scores_new[:, :, 0, 0]
 				else:
@@ -64,12 +57,6 @@ def custom_attention_forward(
 	else:
 		attn_scores = attention_module.calculate_attention_scores(q, k)  # [batch, 1, query_pos, key_pos]
 
-	# print(f"attn_scores shape: {attn_scores.shape}, dtype: {attn_scores.dtype}")
-	# print(f"attn_scores_new shape: {attn_scores_new.shape}, dtype: {attn_scores_new.dtype}" if 'attn_scores_new' in locals() else "")
-	# print(f"q shape: {q.shape}, dtype: {q.dtype}")
-	# print(f"k shape: {k.shape}, dtype: {k.dtype}")
-	# print(f"v shape: {v.shape}, dtype: {v.dtype}")
-
 	if attention_module.cfg.positional_embedding_type == "alibi":
 		raise NotImplementedError(
 			"ALiBi positional embeddings are not supported in this function. Use the full attention module instead."
@@ -83,23 +70,16 @@ def custom_attention_forward(
 		attn_scores = attention_module.apply_causal_mask(attn_scores)
 
 	pattern = F.softmax(attn_scores, dim=-1)
-	# print(f"pattern shape: {pattern.shape}, dtype: {pattern.dtype}, pattern: {pattern}")
-	# print(pattern.shape, pattern.dtype)
 	pattern = torch.where(torch.isnan(pattern), torch.zeros_like(pattern), pattern)
 	pattern = pattern.to(v.device)
-	# print(f"pattern shape: {pattern.shape}, dtype: {pattern.dtype}, pattern: {pattern}")
-	# print(v.shape, pattern.shape, v.dtype, pattern.dtype)
 	z_head = attention_module.calculate_z_scores(v, pattern)  # [batch, pos, 1, d_head]
-	# print(f"z_head shape: {z_head.shape}, dtype: {z_head.dtype}")
 
 
 	z = torch.zeros((z_head.shape[0], z_head.shape[1], attention_module.cfg.n_heads, attention_module.cfg.d_head), device=z_head.device, dtype=z_head.dtype)
-	# print(f"z shape: {z.shape}, dtype: {z.dtype}")
 	if head is None:
 		z = z_head
 	else:
 		z[:, :, head, :] = z_head[:, :, 0, :]
-	# print(z[:,:,head], z.shape, z.dtype)
 	w = einops.rearrange(
 		attention_module.W_O, "head_index d_head d_model -> d_model (head_index d_head)"
 	).to(torch.float32)
@@ -111,5 +91,4 @@ def custom_attention_forward(
 
 	if query_position is not None:
 		out = out[:, 0]
-		# print(f"out shape after query_position: {out.shape}, dtype: {out.dtype}")
 	return out
