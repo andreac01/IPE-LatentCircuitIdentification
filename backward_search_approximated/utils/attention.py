@@ -2,7 +2,7 @@ import einops
 import torch
 import torch.nn.functional as F
 from transformer_lens.components.abstract_attention import AbstractAttention
-
+import matplotlib.pyplot as plt 
 
 def custom_attention_forward(
 	attention_module: AbstractAttention,
@@ -13,8 +13,9 @@ def custom_attention_forward(
 	precomputed_attention_scores: torch.Tensor = None,
 	query_position: int = None,
 	keyvalue_position: int = None,
+	plot_patterns: bool = False,
+	add_bias: bool = False,
 ) -> torch.Tensor:
-
 	if attention_module.cfg.positional_embedding_type == "rotary":
 		raise NotImplementedError(
 			"Rotary positional embeddings are not supported in this function. Use the full attention module instead."
@@ -74,6 +75,18 @@ def custom_attention_forward(
 	pattern = pattern.to(v.device)
 	z_head = attention_module.calculate_z_scores(v, pattern)  # [batch, pos, 1, d_head]
 
+	if plot_patterns:
+		for h in range(pattern.shape[1]):
+			plt.figure(figsize=(10, 5))
+			plt.imshow(pattern[0][h].detach().numpy(), cmap='viridis', aspect='auto', vmin=0, vmax=1)
+			plt.colorbar()
+			title = f'Head {h} Pattern' if head is None else f'Head {head} Pattern'
+			plt.title(title)
+			kv_pos = 'Key Position' if keyvalue_position is None else f'Key Position {keyvalue_position}'
+			q_pos = 'Query Position' if query_position is None else f'Query Position {query_position}'
+			plt.xlabel(kv_pos)
+			plt.ylabel(q_pos)
+			plt.show()
 
 	z = torch.zeros((z_head.shape[0], z_head.shape[1], attention_module.cfg.n_heads, attention_module.cfg.d_head), device=z_head.device, dtype=z_head.dtype)
 	if head is None:
@@ -86,9 +99,9 @@ def custom_attention_forward(
 	out = F.linear(
 		z.reshape(z.shape[0], z.shape[1], attention_module.cfg.d_head * attention_module.cfg.n_heads),
 		w,
+		attention_module.b_O.to(torch.float32) if add_bias else None
 	)
 	out = out.to(attention_module.cfg.dtype)
-
 	if query_position is not None:
 		out = out[:, 0]
 	return out

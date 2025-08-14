@@ -100,7 +100,7 @@ class ApproxNode(abc.ABC):
 		node_type = type(self)
 		layer = self.layer if self.layer is not None else -1
 		pos = self.position if self.position is not None else -1
-		patched_keyvalue_position = getattr(self, 'keyvalue_position', -1)
+		keyvalue_position = getattr(self, 'keyvalue_position', -1)
 		head = getattr(self, 'head', None)
 		head = head if head is not None else -1
 
@@ -108,7 +108,7 @@ class ApproxNode(abc.ABC):
 			layer,
 			pos,
 			type_order.get(node_type, 99),
-			patched_keyvalue_position,
+			keyvalue_position,
 			head
 		)
 
@@ -123,8 +123,9 @@ class ApproxNode(abc.ABC):
 		if (self.layer != other.layer or self.position != other.position or type(self) is not type(other)):
 			return False
 		if isinstance(self, ATTN_ApproxNode) and isinstance(other, ATTN_ApproxNode):
-			return self.head == other.head and self.position == other.position and self.patched_keyvalue_position == other.keyvalue_position and self.patch_keyvalue == other.patch_keyvalue and self.patch_query == other.patch_query
+			return self.head == other.head and self.position == other.position and self.keyvalue_position == other.keyvalue_position and self.patch_keyvalue == other.patch_keyvalue and self.patch_query == other.patch_query
 		return True
+		
 
 	def __hash__(self):
 		head_val = getattr(self, 'head', None)
@@ -143,19 +144,19 @@ class MLP_ApproxNode(ApproxNode):
 			if self.position is None:
 				return self.msg_cache[self.output_name].detach().clone()
 			else:
-				out = torch.zeros_like(self.msg_cache[self.input_name])
+				out = torch.zeros_like(self.msg_cache[self.input_name], device=self.msg_cache[self.input_name].device)
 				out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :].detach().clone()
 				return out
 		else:
 			if self.position is None:
 				residual = self.msg_cache[self.input_name].detach().clone() - message
 				residual = self.model.blocks[self.layer].ln2(residual)
-				return self.msg_cache[self.output_name].detach().clone() - self.model.blocks[self.layer].mlp.forward(residual, message)
+				return self.msg_cache[self.output_name].detach().clone() - self.model.blocks[self.layer].mlp.forward(residual)
 			else:
 				residual = self.msg_cache[self.input_name][:, self.position, :].detach().clone() - message[:, self.position, :]
 				residual = self.model.blocks[self.layer].ln2(residual)
-				out = torch.zeros_like(self.msg_cache[self.input_name])
-				out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :].detach().clone() - self.model.blocks[self.layer].mlp.forward(residual - message)
+				out = torch.zeros_like(self.msg_cache[self.input_name], device=self.msg_cache[self.input_name].device)
+				out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :].detach().clone() - self.model.blocks[self.layer].mlp.forward(residual)
 				return out
 
 
@@ -170,38 +171,40 @@ class MLP_ApproxNode(ApproxNode):
 			include_head: Whether to consider specific head nodes for ATTN.
 		Returns:
 			A list of potential previous nodes.
-   		"""
+		"""
 		prev_nodes = []
+		common_args = {"model": self.model, "msg_cache": self.msg_cache, "grad_cache": self.grad_cache}
 		if self.position is not None:
 			positions_to_iterate = range(self.position + 1)
 		else:
 			positions_to_iterate = [None]
 
-		# MLP nodes from previous layers
-		# ATTN nodes from previous layers
+		# MLP and ATTN nodes from previous layers
 		for l in range(self.layer):
-			prev_nodes.append(MLP_ApproxNode(layer=l, position=self.position))
+			prev_nodes.append(MLP_ApproxNode(layer=l, position=self.position, **common_args))
 			for p in positions_to_iterate:
 				if include_head:
-					prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, patched_keyvalue_position=p, patch_keyvalue=True, patch_query=False) for h in range(model_cfg.n_heads)])
+					prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=p, patch_keyvalue=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
 				else:
-					prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, patched_keyvalue_position=p, patch_keyvalue=True, patch_query=False))
+					prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=p, patch_keyvalue=True, patch_query=False, **common_args))
 			if include_head:
-				prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, patched_keyvalue_position=None, patch_keyvalue=False, patch_query=True) for h in range(model_cfg.n_heads)])
+				prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=None, patch_keyvalue=False, patch_query=True, **common_args) for h in range(model_cfg.n_heads)])
 			else:
-				prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, patched_keyvalue_position=None, patch_keyvalue=False, patch_query=True))
+				prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=None, patch_keyvalue=False, patch_query=True, **common_args))
+
 		# ATTN nodes from current layer
 		for p in positions_to_iterate:
 			if include_head:
-				prev_nodes.extend([ATTN_ApproxNode(layer=self.layer, head=h, position=self.position, patched_keyvalue_position=p, patch_keyvalue=True, patch_query=False) for h in range(model_cfg.n_heads)])
+				prev_nodes.extend([ATTN_ApproxNode(layer=self.layer, head=h, position=self.position, keyvalue_position=p, patch_keyvalue=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
 			else:
-				prev_nodes.append(ATTN_ApproxNode(layer=self.layer, head=None, position=self.position, patched_keyvalue_position=p, patch_keyvalue=True, patch_query=False))
+				prev_nodes.append(ATTN_ApproxNode(layer=self.layer, head=None, position=self.position, keyvalue_position=p, patch_keyvalue=True, patch_query=False, **common_args))
 		if include_head:
-			prev_nodes.extend([ATTN_ApproxNode(layer=self.layer, head=h, position=self.position, patched_keyvalue_position=None, patch_keyvalue=False, patch_query=True) for h in range(model_cfg.n_heads)])
+			prev_nodes.extend([ATTN_ApproxNode(layer=self.layer, head=h, position=self.position, keyvalue_position=None, patch_keyvalue=False, patch_query=True, **common_args) for h in range(model_cfg.n_heads)])
 		else:
-			prev_nodes.append(ATTN_ApproxNode(layer=self.layer, head=None, position=self.position, patched_keyvalue_position=None, patch_keyvalue=False, patch_query=True))
+			prev_nodes.append(ATTN_ApproxNode(layer=self.layer, head=None, position=self.position, keyvalue_position=None, patch_keyvalue=False, patch_query=True, **common_args))
+
 		# EMBED node
-		prev_nodes.append(EMBED_ApproxNode(layer=0, position=self.position))
+		prev_nodes.append(EMBED_ApproxNode(layer=0, position=self.position, **common_args))
 		# Remove duplicates
 		prev_nodes = list(set(prev_nodes))
 		return prev_nodes
@@ -226,6 +229,7 @@ class MLP_ApproxNode(ApproxNode):
 
 		with torch.enable_grad():
 			temp = self.position
+
 			self.position = None  # Temporarily set position to None for the forward pass
 			output = self.forward(message=None)
 			self.position = temp  # Restore the original position
@@ -243,21 +247,27 @@ class MLP_ApproxNode(ApproxNode):
 
 class ATTN_ApproxNode(ApproxNode):
 	"""Represents an Attention node (potentially a specific head) in the transformer."""
-	def __init__(self, model: HookedTransformer, layer: int, head: int = None, position: int = None, patched_keyvalue_position: int = None, parent= ApproxNode, children = set(), msg_cache = {}, grad_cache = {}, patch_query: bool = True, patch_keyvalue: bool = True):
+	def __init__(self, model: HookedTransformer, layer: int, head: int = None, position: int = None, keyvalue_position: int = None, parent= ApproxNode, children = set(), msg_cache = {}, grad_cache = {}, patch_query: bool = True, patch_keyvalue: bool = True, plot_patterns: bool = False):
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, grad_cache=grad_cache)
 		self.head = head
-		self.patched_keyvalue_position = patched_keyvalue_position
+		self.keyvalue_position = keyvalue_position
 		self.patch_keyvalue = patch_keyvalue
 		self.patch_query = patch_query
 		self.input_name = f"blocks.{layer}.hook_resid_pre"
-		self.output_name = f"blocks.{layer}.head.{head}.hook_out" if head is not None else f"blocks.{layer}.hook_attn_out"
+		output_name = f"blocks.{layer}.head.{head}" if head is not None else f"blocks.{layer}"
+		output_name += ".hook_attn_out" if keyvalue_position is None else f".kv.{keyvalue_position}.hook_attn_out"
+		self.output_name = output_name
 		self.attn_scores = f"blocks.{layer}.attn.hook_attn_scores"
+		self.plot_patterns = plot_patterns
 
-		if self.position is not None and self.patched_keyvalue_position is not None:
-			assert self.position >= self.patched_keyvalue_position, "query position must be greater than or equal to keyvalue position"
+		if self.position is not None and self.keyvalue_position is not None:
+			assert self.position >= self.keyvalue_position, "query position must be greater than or equal to keyvalue position"
+		if msg_cache.get(self.output_name, None) is not None:
+			assert msg_cache[self.input_name].shape == msg_cache[self.output_name].shape, "Input and output shapes must match"
 
 	def forward(self, message: Tensor) -> Tensor:
 		length = self.position+1 if self.position is not None else self.msg_cache[self.input_name].shape[1]
+		value_residual = self.msg_cache[self.input_name].detach().clone()
 		if message is None:
 			if self.output_name in self.msg_cache:
 				if self.position is None:
@@ -271,10 +281,7 @@ class ATTN_ApproxNode(ApproxNode):
 					query_residual = self.msg_cache[self.input_name].detach().clone()
 				else:
 					query_residual = self.msg_cache[self.input_name][:, self.position, :].detach().clone().unsqueeze(1)
-				if self.patched_keyvalue_position is None:
-					key_residual = self.msg_cache[self.input_name][:, :length].detach().clone()
-				else:
-					key_residual = self.msg_cache[self.input_name][:, self.patched_keyvalue_position, :].detach().clone().unsqueeze(1)
+				key_residual = self.msg_cache[self.input_name][:, :length].detach().clone()
 		else:
 			if self.patch_query:
 				if self.position is None:
@@ -289,20 +296,22 @@ class ATTN_ApproxNode(ApproxNode):
 					query_residual = self.msg_cache[self.input_name][:, self.position, :].detach().clone().unsqueeze(1)
 			
 			if self.patch_keyvalue:
-				if self.patched_keyvalue_position is None:
+				if self.keyvalue_position is None:
 					key_residual = self.msg_cache[self.input_name][:,:length].detach().clone() - message[:,:length]
+					value_residual = value_residual - message
 				else:
-					key_residual = self.msg_cache[self.input_name][:, self.patched_keyvalue_position, :].detach().clone() - message[:, self.patched_keyvalue_position, :]
+					key_residual = self.msg_cache[self.input_name][:, self.keyvalue_position, :].detach().clone() - message[:, self.keyvalue_position, :]
 					key_residual = key_residual.unsqueeze(1)
+					value_residual[:, self.keyvalue_position, :] = value_residual[:, self.keyvalue_position, :] - message[:, self.keyvalue_position, :]
 			else:
-				if self.patched_keyvalue_position is None:
+				if self.keyvalue_position is None:
 					key_residual = self.msg_cache[self.input_name][:,:length].detach().clone()
 				else:
-					key_residual = self.msg_cache[self.input_name][:, self.patched_keyvalue_position, :].detach().clone()
+					key_residual = self.msg_cache[self.input_name][:, self.keyvalue_position, :].detach().clone()
 					key_residual = key_residual
 
 		key_residual = self.model.blocks[self.layer].ln1(key_residual)
-		value_residual = self.model.blocks[self.layer].ln1(self.msg_cache[self.input_name].detach().clone())
+		value_residual = self.model.blocks[self.layer].ln1(value_residual)
 		query_residual = self.model.blocks[self.layer].ln1(query_residual)
 		if self.head is not None:
 			W_Q = self.model.blocks[self.layer].attn.W_Q[self.head].unsqueeze(0)
@@ -313,7 +322,12 @@ class ATTN_ApproxNode(ApproxNode):
 			b_V = self.model.blocks[self.layer].attn.b_V[self.head].unsqueeze(0)
 			query = torch.einsum('bsd,ndh->bsnh', query_residual, W_Q) + b_Q[None, None, :, :]
 			key = torch.einsum('bsd,ndh->bsnh', key_residual, W_K) + b_K[None, None, :, :]
-			value = torch.einsum('bsd,ndh->bsnh', value_residual, W_V) + b_V[None, None, :, :]
+			if self.keyvalue_position is not None:
+				v = torch.einsum('bd,ndh->bnh', value_residual[:, self.keyvalue_position, :], W_V) + b_V[None, None, :, :]
+				value = torch.zeros(v.shape[0], value_residual.shape[1], v.shape[2], v.shape[3], device=v.device)
+				value[:, self.keyvalue_position, :] = v
+			else:
+				value = torch.einsum('bsd,ndh->bsnh', value_residual, W_V) + b_V[None, None, :, :]
 		else:
 			W_Q = self.model.blocks[self.layer].attn.W_Q
 			W_K = self.model.blocks[self.layer].attn.W_K
@@ -323,7 +337,12 @@ class ATTN_ApproxNode(ApproxNode):
 			b_V = self.model.blocks[self.layer].attn.b_V
 			query = torch.einsum('bsd,ndh->bsnh', query_residual, W_Q) + b_Q[None, None, :, :]
 			key = torch.einsum('bsd,ndh->bsnh', key_residual, W_K) + b_K[None, None, :, :]
-			value = torch.einsum('bsd,ndh->bsnh', value_residual, W_V) + b_V[None, None, :, :]
+			if self.keyvalue_position is not None:
+				v = torch.einsum('bd,ndh->bnh', value_residual[:, self.keyvalue_position, :], W_V) + b_V[None, None, :, :]
+				value = torch.zeros(v.shape[0], value_residual.shape[1], v.shape[2], v.shape[3], device=v.device)
+				value[:, self.keyvalue_position, :] = v
+			else:
+				value = torch.einsum('bsd,ndh->bsnh', value_residual, W_V) + b_V[None, None, :, :]
 		out = custom_attention_forward(
 			attention_module=self.model.blocks[self.layer].attn,
 			head=self.head,
@@ -332,21 +351,26 @@ class ATTN_ApproxNode(ApproxNode):
 			v=value,
 			precomputed_attention_scores=self.msg_cache.get(self.attn_scores, None).detach().clone(),
 			query_position=self.position,
-			patched_keyvalue_position=self.patched_keyvalue_position,
+			keyvalue_position=self.keyvalue_position,
+			plot_patterns=self.plot_patterns
 		)
 		
-		if message is None:
-			self.msg_cache[self.output_name] = out
-			if self.position is not None:
-				resized_out = torch.zeros_like(self.msg_cache[self.input_name])
-				resized_out[:, self.position, :] = out[:, 0, :]
-				return resized_out
-			return out
+
 		if self.msg_cache.get(self.output_name, None) is None:
-			ATTN_ApproxNode(self.model, layer=self.layer, head=self.head, msg_cache=self.msg_cache, grad_cache=self.grad_cache).forward(message=None)
+			if self.position is None and message is None:
+				self.msg_cache[self.output_name] = out.detach().clone()
+			else:
+				ATTN_ApproxNode(self.model, layer=self.layer, head=self.head, msg_cache=self.msg_cache, grad_cache=self.grad_cache, keyvalue_position=self.keyvalue_position).forward(message=None)
+		if message is None:
+			if self.position is not None:
+				resized_out = torch.zeros_like(self.msg_cache[self.input_name], device=out.device)
+				resized_out[:, self.position, :] = out
+				return resized_out
+			self.msg_cache[self.output_name] = out.detach().clone()
+			return out
 		
 		if self.position is not None:
-			resized_out = torch.zeros_like(self.msg_cache[self.input_name])
+			resized_out = torch.zeros_like(self.msg_cache[self.input_name], device=out.device)
 			resized_out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :].detach().clone() - out
 			return resized_out
 		return self.msg_cache[self.output_name] - out
@@ -354,12 +378,12 @@ class ATTN_ApproxNode(ApproxNode):
 	def get_gradient(self) -> Tensor:
 		gradient_key = f"ATTN_ApproxNode(layer={self.layer}, head={self.head}, position={self.position}, patch_query={self.patch_query}, patch_keyvalue={self.patch_keyvalue})"
 		if self.grad_cache.get(gradient_key, None) is not None:
-			if self.patched_keyvalue_position is None and self.patch_keyvalue:
+			if self.keyvalue_position is None and self.patch_keyvalue:
 				return self.grad_cache[gradient_key].detach().clone()
 			gradient = self.grad_cache[gradient_key].detach().clone()
-			out = torch.zeros_like(gradient)
+			out = torch.zeros_like(gradient, device=gradient.device)
 			if self.patch_keyvalue:
-				out[:, self.patched_keyvalue_position, :] = gradient[:, self.patched_keyvalue_position, :]
+				out[:, self.keyvalue_position, :] = gradient[:, self.keyvalue_position, :]
 			if self.patch_query:
 				out[:, self.position, :] = gradient[:, self.position, :]
 			return out
@@ -367,12 +391,12 @@ class ATTN_ApproxNode(ApproxNode):
 		input_residual.requires_grad_(True)
 
 		with torch.enable_grad():
-			temp = self.patched_keyvalue_position
-			self.patched_keyvalue_position = None  # Temporarily set patched_keyvalue_position to None for the forward pass
+			temp = self.keyvalue_position
+			self.keyvalue_position = None  # Temporarily set keyvalue_position to None for the forward pass
 			output = self.forward(message=None)
-			self.patched_keyvalue_position = temp  # Restore the original patched_keyvalue_position
+			self.keyvalue_position = temp  # Restore the original keyvalue_position
 			if self.position is not None: #Derivative only with respect to the query position
-				temp = torch.zeros_like(output)
+				temp = torch.zeros_like(output, device=output.device)
 				temp[:, self.position, :] = output[:, self.position, :]
 				output = temp
 		
@@ -397,68 +421,69 @@ class ATTN_ApproxNode(ApproxNode):
 		Returns:
 			A list of potential previous nodes."""
 		prev_nodes = []
+		common_args = {"model": self.model, "msg_cache": self.msg_cache, "grad_cache": self.grad_cache}
 
 		# MLPs
 		for l in range(self.layer):
 			if self.patch_query:
-				prev_nodes.append(MLP_ApproxNode(layer=l, position=self.position))
-			if self.patch_keyvalue and (not self.patch_query or self.position != self.patched_keyvalue_position): # Note that if self.position is None than also self.patched_keyvalue_position is None
-				prev_nodes.append(MLP_ApproxNode(layer=l, position=self.patched_keyvalue_position))    
-	
- 		# EMBED node
+				prev_nodes.append(MLP_ApproxNode(layer=l, position=self.position, **common_args))
+			if self.patch_keyvalue and (not self.patch_query or self.position != self.keyvalue_position):
+				prev_nodes.append(MLP_ApproxNode(layer=l, position=self.keyvalue_position, **common_args))
+
+		# EMBED node
 		if self.patch_query:
-			prev_nodes.append(EMBED_ApproxNode(layer=0, position=self.position))
-		if self.patch_keyvalue and (not self.patch_query or self.position != self.patched_keyvalue_position):
-			prev_nodes.append(EMBED_ApproxNode(layer=0, position=self.patched_keyvalue_position))
-   
+			prev_nodes.append(EMBED_ApproxNode(layer=0, position=self.position, **common_args))
+		if self.patch_keyvalue and (not self.patch_query or self.position != self.keyvalue_position):
+			prev_nodes.append(EMBED_ApproxNode(layer=0, position=self.keyvalue_position, **common_args))
+
 		# ATTN nodes patching current query position
 		if self.patch_query:
 			for l in range(self.layer):
 				# prev ATTN query positions
 				if include_head:
-					prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, patched_keyvalue_position=None, patch_keyvalue=False, patch_query=True) for h in range(model_cfg.n_heads)])
+					prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=None, patch_keyvalue=False, patch_query=True, **common_args) for h in range(model_cfg.n_heads)])
 				else:
-					prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, patched_keyvalue_position=None, patch_keyvalue=False, patch_query=True))
-				
+					prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=None, patch_keyvalue=False, patch_query=True, **common_args))
+
 				# prev ATTN key-value positions
 				if self.position is not None:
-					for patched_keyvalue_position in range(self.position + 1):
+					for keyvalue_position in range(self.position + 1):
 						if include_head:
-							prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, patched_keyvalue_position=patched_keyvalue_position, patch_keyvalue=True, patch_query=False) for h in range(model_cfg.n_heads)])
+							prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=keyvalue_position, patch_keyvalue=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
 						else:
-							prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, patched_keyvalue_position=patched_keyvalue_position, patch_keyvalue=True, patch_query=False))
+							prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=keyvalue_position, patch_keyvalue=True, patch_query=False, **common_args))
 				else:
 					if include_head:
-						prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=None, patched_keyvalue_position=None, patch_keyvalue=True, patch_query=False) for h in range(model_cfg.n_heads)])
+						prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=None, keyvalue_position=None, patch_keyvalue=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
 					else:
-						prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=None, patched_keyvalue_position=None, patch_keyvalue=True, patch_query=False))
+						prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=None, keyvalue_position=None, patch_keyvalue=True, patch_query=False, **common_args))
 
 		# ATTN nodes patching current key-value position
 		if self.patch_keyvalue:
-			patched_keyvalue_positions = range(self.patched_keyvalue_position+1) if self.patched_keyvalue_position is not None else [None]
+			keyvalue_positions = range(self.keyvalue_position + 1) if self.keyvalue_position is not None else [None]
 			for l in range(self.layer):
 				# prev ATTN query positions
 				if include_head:
-					prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.patched_keyvalue_position, patched_keyvalue_position=None, patch_keyvalue=False, patch_query=True) for h in range(model_cfg.n_heads)])
+					prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.keyvalue_position, keyvalue_position=None, patch_keyvalue=False, patch_query=True, **common_args) for h in range(model_cfg.n_heads)])
 				else:
-					prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.patched_keyvalue_position, patched_keyvalue_position=None, patch_keyvalue=False, patch_query=True))
+					prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.keyvalue_position, keyvalue_position=None, patch_keyvalue=False, patch_query=True, **common_args))
 
-				# prev ATTN key-value positions				
-				for prev_keyvalue_position in patched_keyvalue_positions:
+				# prev ATTN key-value positions
+				for prev_keyvalue_position in keyvalue_positions:
 					if include_head:
-						prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.patched_keyvalue_position, patched_keyvalue_position=prev_keyvalue_position, patch_keyvalue=True, patch_query=False) for h in range(model_cfg.n_heads)])
+						prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.keyvalue_position, keyvalue_position=prev_keyvalue_position, patch_keyvalue=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
 					else:
-						prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.patched_keyvalue_position, patched_keyvalue_position=prev_keyvalue_position, patch_keyvalue=True, patch_query=False))
+						prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.keyvalue_position, keyvalue_position=prev_keyvalue_position, patch_keyvalue=True, patch_query=False, **common_args))
 
 		# Remove duplicates
 		prev_nodes = list(set(prev_nodes))
 		return prev_nodes
 
 	def __repr__(self):
-		return f"ATTN_ApproxNode(layer={self.layer}, head={self.head}, position={self.position}, patched_keyvalue_position={self.patched_keyvalue_position}, patch_query={self.patch_query}, patch_keyvalue={self.patch_keyvalue})"
+		return f"ATTN_ApproxNode(layer={self.layer}, head={self.head}, position={self.position}, keyvalue_position={self.keyvalue_position}, patch_query={self.patch_query}, patch_keyvalue={self.patch_keyvalue})"
 
 	def __hash__(self):
-		return hash((type(self).__name__, self.layer, self.head, self.position, self.patched_keyvalue_position, self.patch_query, self.patch_keyvalue))
+		return hash((type(self).__name__, self.layer, self.head, self.position, self.keyvalue_position, self.patch_query, self.patch_keyvalue))
 
 
 class EMBED_ApproxNode(ApproxNode):
@@ -466,15 +491,23 @@ class EMBED_ApproxNode(ApproxNode):
 	def __init__(self, model: HookedTransformer, layer: int = 0, position: int = None, parent= ApproxNode, children = set(), msg_cache = {}, grad_cache = {}):
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, grad_cache=grad_cache)
 		self.input_residual = "hook_embed"
+		self.output_residual = "hook_embed"
 
 	def forward(self, message: Tensor = None) -> Tensor:
 		embedding = self.msg_cache["hook_embed"].clone() #+ cache["hook_pos_embed"].clone()
 		if message is not None:
 			embedding = embedding - message
 		if self.position is not None:
-			embedding[:, :self.position, :] = torch.zeros_like(embedding[:, :self.position, :])
-			embedding[:, self.position + 1:, :] = torch.zeros_like(embedding[:, self.position + 1:, :])
+			embedding[:, :self.position, :] = torch.zeros_like(embedding[:, :self.position, :], device=embedding.device)
+			embedding[:, self.position + 1:, :] = torch.zeros_like(embedding[:, self.position + 1:, :], device=embedding.device)
 		return embedding
+
+	def get_gradient(self):
+		if self.position:
+			out = torch.zeros_like(self.msg_cache[self.input_residual], device=self.msg_cache[self.input_residual].device)
+			out[:, self.position,:] = torch.ones_like(out[:, self.position,:], device=out.device)
+			return out
+		return torch.ones_like(self.msg_cache[self.input_residual])
 
 
 	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, sequence_length: int, include_head: bool = False) -> list[ApproxNode]:
@@ -495,11 +528,11 @@ class FINAL_ApproxNode(ApproxNode):
 		self.output_name = f"blocks.{layer}.hook_resid_post"
 
 	def forward(self, message: Tensor = None) -> Tensor:
-		res = self.msg_cache[self.input_residual].clone()
+		res = self.msg_cache[self.input_residual].detach().clone()
 		if message is not None:
-			res = message
+			res = message.detach().clone()
 		if self.position is not None:
-			res_zeroed = torch.zeros_like(res)
+			res_zeroed = torch.zeros_like(res, device=res.device)
 			res_zeroed[:, self.position, :] = res[:, self.position, :]
 			res = res_zeroed
 		return res
@@ -510,7 +543,7 @@ class FINAL_ApproxNode(ApproxNode):
 			if self.position is None:
 				return self.grad_cache[gradient_key].detach().clone()
 			gradient = self.grad_cache[gradient_key].detach().clone()
-			out = torch.zeros_like(gradient)
+			out = torch.zeros_like(gradient, device=gradient.device)
 			out[:, self.position, :] = gradient[:, self.position, :]
 			return out
 		
@@ -544,32 +577,32 @@ class FINAL_ApproxNode(ApproxNode):
 			A list of potential previous nodes.
 		"""
 		prev_nodes = []
-	
-   
+		common_args = {"model": self.model, "msg_cache": self.msg_cache, "grad_cache": self.grad_cache}
+
 		for l in range(model_cfg.n_layers):
 			# MLPs
-			prev_nodes.append(MLP_ApproxNode(layer=l, position=self.position))
-			
+			prev_nodes.append(MLP_ApproxNode(layer=l, position=self.position, **common_args))
+
 			# ATTN query positions
 			if include_head:
-				prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, patched_keyvalue_position=None, position=self.position, patch_keyvalue=False, patch_query=True) for h in range(model_cfg.n_heads)])
+				prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, keyvalue_position=None, position=self.position, patch_keyvalue=False, patch_query=True, **common_args) for h in range(model_cfg.n_heads)])
 			else:
-				prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, patched_keyvalue_position=None, position=self.position, patch_keyvalue=False, patch_query=True))
-			
+				prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, keyvalue_position=None, position=self.position, patch_keyvalue=False, patch_query=True, **common_args))
+
 			# ATTN key-value positions
 			if self.position is not None:
-				for patched_keyvalue_position in range(self.position + 1):
+				for keyvalue_position in range(self.position + 1):
 					if include_head:
-						prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, patched_keyvalue_position=patched_keyvalue_position, patch_keyvalue=True, patch_query=False) for h in range(model_cfg.n_heads)])
+						prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=keyvalue_position, patch_keyvalue=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
 					else:
-						prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, patched_keyvalue_position=patched_keyvalue_position, patch_keyvalue=True, patch_query=False))
+						prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=keyvalue_position, patch_keyvalue=True, patch_query=False, **common_args))
 			else:
 				if include_head:
-					prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=None, patched_keyvalue_position=None, patch_keyvalue=True, patch_query=False) for h in range(model_cfg.n_heads)])
+					prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=None, keyvalue_position=None, patch_keyvalue=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
 				else:
-					prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, patched_keyvalue_position=None, patch_keyvalue=True, patch_query=False))
-		
-		prev_nodes.append(EMBED_ApproxNode(layer=0, position=self.position))
+					prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=None, patch_keyvalue=True, patch_query=False, **common_args))
+
+		prev_nodes.append(EMBED_ApproxNode(layer=0, position=self.position, **common_args))
 		# Remove duplicates
 		prev_nodes = list(set(prev_nodes))
 		return prev_nodes
