@@ -240,7 +240,7 @@ class MLP_ApproxNode(ApproxNode):
 			input_residual,
 			grad_outputs=grad_outputs,
 		)[0]
-		self.grad_cache[gradient_key] = -gradient
+		self.grad_cache[gradient_key] = gradient
 		return self.get_gradient()
 	
 
@@ -280,7 +280,10 @@ class ATTN_ApproxNode(ApproxNode):
 					query_residual = self.msg_cache[self.input_name].detach().clone()
 				else:
 					query_residual = self.msg_cache[self.input_name][:, self.position, :].detach().clone().unsqueeze(1)
-				key_residual = self.msg_cache[self.input_name][:, :length].detach().clone()
+				if self.keyvalue_position is None:
+					key_residual = self.msg_cache[self.input_name][:, :length].detach().clone()
+				else:
+					key_residual = self.msg_cache[self.input_name][:, self.keyvalue_position, :].detach().clone().unsqueeze(1)
 		else:
 			if self.patch_query:
 				if self.position is None:
@@ -464,7 +467,7 @@ class ATTN_ApproxNode(ApproxNode):
 			grad_outputs=grad_outputs,
 			allow_unused=True,
 		)[0]
-		self.grad_cache[gradient_key] = -gradient
+		self.grad_cache[gradient_key] = gradient
 		return self.get_gradient()
 
 

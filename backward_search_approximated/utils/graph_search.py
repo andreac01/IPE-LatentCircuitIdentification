@@ -105,6 +105,8 @@ def PathAttributionPatching(
 	root: ApproxNode,
 	ground_truth_tokens: list[int],
 	min_contribution: float = 0.5,
+	include_negative: bool = False,
+	return_all: bool = False,
 ) -> list[tuple[float, list[ApproxNode]]]:
 	"""
 	Performs a Breadth-First Search (BFS) starting from a node backwards to identify
@@ -118,13 +120,14 @@ def PathAttributionPatching(
 		start_node: The initial node to begin the backward search from (e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).
 		ground_truth_tokens: The reference tokens used for evaluating path contributions.
 		min_contribution: The minimum absolute contribution score required for a path to be considered valid.
+		include_negative: If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.
+		return_all: If True, return all evaluated paths regardless of their contribution score. The search will still be guided by min_contribution.
 	Returns:
 		A list of tuples containing the contribution score and the corresponding path, sorted by contribution in descending order.
 	"""
 	frontier = [root]
 	completed_paths = []
 	while frontier:
-		print(frontier)
 		cur_depth_frontier = []
 		# Expand all paths in the frontier looking for meaningful continuations
 		for node in tqdm(frontier):
@@ -138,18 +141,31 @@ def PathAttributionPatching(
 			# Get the meaningful candidates for expansion
 			for candidate in candidate_components:
 				candidate_path = get_path(candidate)
+				candidate_contribution = candidate.forward(message=None)
+				approx_contribution = torch.einsum('bsd,bsd->b', candidate_contribution, grad)
 				# EMBED is the base case
 				if candidate.__class__.__name__ == 'EMBED_ApproxNode':
-					contribution = evaluate_path(model, msg_cache, candidate_path, metric, ground_truth_tokens)
-					if contribution >= 0.1*min_contribution:
+					if return_all:
+						contribution = evaluate_path(model, msg_cache, candidate_path, metric, ground_truth_tokens)
 						completed_paths.append((contribution, candidate_path))
+					elif include_negative:
+						if abs(approx_contribution) >= min_contribution:
+							contribution = evaluate_path(model, msg_cache, candidate_path, metric, ground_truth_tokens)
+							completed_paths.append((contribution, candidate_path))
+					elif contribution >= min_contribution:
+						if approx_contribution >= min_contribution:
+							contribution = evaluate_path(model, msg_cache, candidate_path, metric, ground_truth_tokens)
+							completed_paths.append((contribution, candidate_path))
 				
 				# MLP requires to check the contribution of the whole component and of the individual layers
 				elif candidate.__class__.__name__ == 'MLP_ApproxNode' or candidate.__class__.__name__ == 'ATTN_ApproxNode':
 					candidate_contribution = candidate.forward(message=None)
 					approx_contribution = torch.einsum('bsd,bsd->b', candidate_contribution, grad)
 
-					if approx_contribution >= min_contribution:
+					if include_negative:
+						if abs(approx_contribution) >= min_contribution:
+							childrens.append(candidate)
+					elif approx_contribution >= min_contribution:
 						childrens.append(candidate)
 			cur_depth_frontier.extend(childrens)
 			node.children = childrens

@@ -14,7 +14,7 @@ def custom_attention_forward(
 	query_position: int = None,
 	keyvalue_position: int = None,
 	plot_patterns: bool = False,
-	add_bias: bool = True,
+	add_bias: bool = False,
 ) -> torch.Tensor:
 	if attention_module.cfg.positional_embedding_type == "rotary":
 		raise NotImplementedError(
@@ -28,10 +28,38 @@ def custom_attention_forward(
 	
 	if precomputed_attention_scores is not None:
 		attn_scores_new = attention_module.calculate_attention_scores(q, k)
+		if plot_patterns:
+			plt.figure(figsize=(10, 5))
+			plt.imshow(attn_scores_new[0][0].detach().numpy(), cmap='viridis', aspect='auto', vmin=0, vmax=1)
+			for i in range(attn_scores_new[0][0].shape[0]):
+				for j in range(attn_scores_new[0][0].shape[1]):
+					plt.text(j, i, f'{attn_scores_new[0,0][i,j].item():.2f}', ha='center', va='center', color='white')
+			plt.colorbar()
+			title = f'Head {head} Scores New' if head is not None else 'Pattern'
+			plt.title(title)
+			kv_pos = 'Key Position' if keyvalue_position is None else f'Key Position {keyvalue_position}'
+			q_pos = 'Query Position' if query_position is None else f'Query Position {query_position}'
+			plt.xlabel(kv_pos)
+			plt.ylabel(q_pos)
+			plt.show()
 		if head is None:
 			attn_scores = precomputed_attention_scores
 		else:
 			attn_scores = precomputed_attention_scores[:, head:head+1, :, :]
+			if plot_patterns:
+				plt.figure(figsize=(10, 5))
+				plt.imshow(attn_scores[0][0].detach().numpy(), cmap='viridis', aspect='auto', vmin=0, vmax=1)
+				for i in range(attn_scores[0][0].shape[0]):
+					for j in range(attn_scores[0][0].shape[1]):
+						plt.text(j, i, f'{attn_scores[0,0][i,j].item():.2f}', ha='center', va='center', color='white')
+				plt.colorbar()
+				title = f'Head {head} Scores Saved' if head is not None else 'Pattern'
+				plt.title(title)
+				kv_pos = 'Key Position' if keyvalue_position is None else f'Key Position {keyvalue_position}'
+				q_pos = 'Query Position' if query_position is None else f'Query Position {query_position}'
+				plt.xlabel(kv_pos)
+				plt.ylabel(q_pos)
+				plt.show()
 		if query_position is not None:
 			if keyvalue_position is not None:
 				if head is None:
@@ -49,7 +77,7 @@ def custom_attention_forward(
 			if head is None:
 				attn_scores[:, :, :, keyvalue_position] = attn_scores_new[:, :, :, 0]
 			else:
-				attn_scores[:, 0, :, keyvalue_position] = attn_scores_new[:, 0, 0, 0]
+				attn_scores[:, 0, :, keyvalue_position] = attn_scores_new[:, 0, :, 0]
 		else:
 			if head is None:
 				attn_scores[:, :, :, :] = attn_scores_new[:, :, :, :]
@@ -69,7 +97,20 @@ def custom_attention_forward(
 
 	if attn_scores.shape[-1] == attn_scores.shape[-2]:
 		attn_scores = attention_module.apply_causal_mask(attn_scores)
-
+	if plot_patterns:
+		plt.figure(figsize=(10, 5))
+		plt.imshow(attn_scores[0][0].detach().numpy(), cmap='viridis', aspect='auto', vmin=0, vmax=1)
+		for i in range(attn_scores[0][0].shape[0]):
+			for j in range(attn_scores[0][0].shape[1]):
+				plt.text(j, i, f'{attn_scores[0,0][i,j].item():.2f}', ha='center', va='center', color='white')
+		plt.colorbar()
+		title = f'Head {head} Modified Scores' if head is not None else 'Pattern'
+		plt.title(title)
+		kv_pos = 'Key Position' if keyvalue_position is None else f'Key Position {keyvalue_position}'
+		q_pos = 'Query Position' if query_position is None else f'Query Position {query_position}'
+		plt.xlabel(kv_pos)
+		plt.ylabel(q_pos)
+		plt.show()
 	pattern = F.softmax(attn_scores, dim=-1)
 	pattern = torch.where(torch.isnan(pattern), torch.zeros_like(pattern), pattern)
 	pattern = pattern.to(v.device)
@@ -79,6 +120,9 @@ def custom_attention_forward(
 		for h in range(pattern.shape[1]):
 			plt.figure(figsize=(10, 5))
 			plt.imshow(pattern[0][h].detach().numpy(), cmap='viridis', aspect='auto', vmin=0, vmax=1)
+			for i in range(pattern[0][h].shape[0]):
+				for j in range(pattern[0][h].shape[1]):
+					plt.text(j, i, f'{pattern[0][h][i,j].item():.2f}', ha='center', va='center', color='white')
 			plt.colorbar()
 			title = f'Head {h} Pattern' if head is None else f'Head {head} Pattern'
 			plt.title(title)
@@ -99,7 +143,7 @@ def custom_attention_forward(
 	out = F.linear(
 		z.reshape(z.shape[0], z.shape[1], attention_module.cfg.d_head * attention_module.cfg.n_heads),
 		w,
-		# attention_module.b_O.to(torch.float32) if add_bias else None
+		attention_module.b_O.to(torch.float32) if add_bias else None
 	)
 	out = out.to(attention_module.cfg.dtype)
 	if query_position is not None:
