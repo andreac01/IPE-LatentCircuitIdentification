@@ -14,7 +14,7 @@ def custom_attention_forward(
 	query_position: int = None,
 	keyvalue_position: int = None,
 	plot_patterns: bool = False,
-	add_bias: bool = False,
+	add_bias: bool = True,
 ) -> torch.Tensor:
 	if attention_module.cfg.positional_embedding_type == "rotary":
 		raise NotImplementedError(
@@ -52,7 +52,7 @@ def custom_attention_forward(
 				attn_scores[:, 0, :, keyvalue_position] = attn_scores_new[:, 0, 0, 0]
 		else:
 			if head is None:
-				attn_scores[:, :, :, :] = attn_scores_new[:, :, 0, :]
+				attn_scores[:, :, :, :] = attn_scores_new[:, :, :, :]
 			else:
 				attn_scores[:, 0, :, :] = attn_scores_new[:, 0, :, :]
 	else:
@@ -99,7 +99,7 @@ def custom_attention_forward(
 	out = F.linear(
 		z.reshape(z.shape[0], z.shape[1], attention_module.cfg.d_head * attention_module.cfg.n_heads),
 		w,
-		attention_module.b_O.to(torch.float32) if add_bias else None
+		# attention_module.b_O.to(torch.float32) if add_bias else None
 	)
 	out = out.to(attention_module.cfg.dtype)
 	if query_position is not None:

@@ -35,7 +35,7 @@ def compare_token_probability(clean_resid: Tensor,
 	prob_clean = torch.Tensor([clean_logits[i].softmax(dim=-1)[target_tokens[i]] for i in range(len(target_tokens))])
 	prob_corrupted = torch.Tensor([corrupted_logits[i].softmax(dim=-1)[target_tokens[i]] for i in range(len(target_tokens))])
 
-	return torch.mean(100*(prob_clean - prob_corrupted)/prob_clean).item()
+	return torch.mean(100*(prob_clean - prob_corrupted)/prob_clean)
 
 def compare_token_logit(clean_resid: Tensor,
 						corrupted_resid: Tensor,
@@ -75,7 +75,7 @@ def compare_token_logit(clean_resid: Tensor,
 	# Calculate the percentage difference
 	#print(f"Clean logits: {clean_logits.mean().item()}, Corrupted logits: {corrupted_logits.mean().item()}")
 	percentage_diffs = 100 * (clean_logits - corrupted_logits) / (torch.abs(clean_logits))
-	return torch.mean(percentage_diffs).item()
+	return torch.mean(percentage_diffs)
 
 def indirect_effect(clean_resid: Tensor,
 					corrupted_resid: Tensor,
@@ -126,8 +126,8 @@ def indirect_effect(clean_resid: Tensor,
 
 	if set_baseline: # Workaround for the fact that the score may be negative and is easier to have the metric centered
 		global baseline_score
-		baseline_score = indirect_effects.mean().item()
-	return torch.mean(indirect_effects).item() - baseline_score
+		baseline_score = indirect_effects.mean()
+	return torch.mean(indirect_effects) - baseline_score
 
 def logit_difference_counterfactual(clean_resid: Tensor,
                                    counterfactual_resid: Tensor, 

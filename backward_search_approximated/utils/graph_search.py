@@ -86,5 +86,75 @@ def breadth_first_search(
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
 
 
+def get_path_msg(path, message=None):
+	if len(path) == 0:
+		return message
+	message = path[0].forward(message=message)
+	return get_path_msg(path[1:], message=message)
 
+def get_path(node):
+	path = [node]
+	while path[-1].parent is not None:
+		path.append(path[-1].parent)
+	return path
+
+def PathAttributionPatching(
+	model: HookedTransformer,
+	msg_cache: dict,
+	metric: Callable,
+	root: ApproxNode,
+	ground_truth_tokens: list[int],
+	min_contribution: float = 0.5,
+) -> list[tuple[float, list[ApproxNode]]]:
+	"""
+	Performs a Breadth-First Search (BFS) starting from a node backwards to identify
+	the most significant paths reaching it from an EMBED_ApproxNode.
+
+	Args:
+		model: The transformer model used for evaluation.
+		cache: The activation cache containing intermediate activations.
+		metric: A function to evaluate the contribution or importance of a path.
+				(Assumes higher scores indicate greater importance based on evaluate_path behavior).
+		start_node: The initial node to begin the backward search from (e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).
+		ground_truth_tokens: The reference tokens used for evaluating path contributions.
+		min_contribution: The minimum absolute contribution score required for a path to be considered valid.
+	Returns:
+		A list of tuples containing the contribution score and the corresponding path, sorted by contribution in descending order.
+	"""
+	frontier = [root]
+	completed_paths = []
+	while frontier:
+		print(frontier)
+		cur_depth_frontier = []
+		# Expand all paths in the frontier looking for meaningful continuations
+		for node in tqdm(frontier):
+
+			grad = node.get_gradient()
+			
+			childrens = []
+
+			candidate_components = node.get_expansion_candidates(model.cfg, include_head=True)
+
+			# Get the meaningful candidates for expansion
+			for candidate in candidate_components:
+				candidate_path = get_path(candidate)
+				# EMBED is the base case
+				if candidate.__class__.__name__ == 'EMBED_ApproxNode':
+					contribution = evaluate_path(model, msg_cache, candidate_path, metric, ground_truth_tokens)
+					if contribution >= 0.1*min_contribution:
+						completed_paths.append((contribution, candidate_path))
+				
+				# MLP requires to check the contribution of the whole component and of the individual layers
+				elif candidate.__class__.__name__ == 'MLP_ApproxNode' or candidate.__class__.__name__ == 'ATTN_ApproxNode':
+					candidate_contribution = candidate.forward(message=None)
+					approx_contribution = torch.einsum('bsd,bsd->b', candidate_contribution, grad)
+
+					if approx_contribution >= min_contribution:
+						childrens.append(candidate)
+			cur_depth_frontier.extend(childrens)
+			node.children = childrens
+
+		frontier = cur_depth_frontier
+
+	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
 
