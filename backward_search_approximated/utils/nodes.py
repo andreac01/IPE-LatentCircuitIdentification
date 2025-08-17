@@ -11,14 +11,16 @@ from typing import Optional
 
 @total_ordering
 class ApproxNode(abc.ABC):
-	def __init__(self, model: HookedTransformer, layer: int, position: int = None, parent = None, children = set(), msg_cache = {}, grad_cache = {}):
+	def __init__(self, model: HookedTransformer, layer: int, input_name: str, output_name: str, msg_cache: dict, position: int = None, parent = None, children = set(), gradient = None):
 		self.model = model
 		self.layer = layer
 		self.position = position
 		self.parent= parent
 		self.children = children
 		self.msg_cache = msg_cache
-		self.grad_cache = grad_cache
+		self.gradient = gradient
+		self.input_name = input_name
+		self.output_name = output_name
 
 	def add_child(self, child: 'ApproxNode'):
 		"""Adds a node as a child of this node and sets its parent."""
@@ -36,8 +38,6 @@ class ApproxNode(abc.ABC):
 		Performs the forward pass for this specific node.
 
 		Args:
-			model: The transformer model.
-			cache: The activation cache from a forward pass.
 			message: The input to evaluate the indirect contribution for
 
 		Returns:
@@ -75,7 +75,7 @@ class ApproxNode(abc.ABC):
 		pass
 
 	@abc.abstractmethod
-	def get_gradient(self) -> Tensor:
+	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> Tensor:
 		"""
 		Returns the gradient of this node with respect to the output of the model.
 		Returns:
@@ -133,10 +133,8 @@ class ApproxNode(abc.ABC):
 
 class MLP_ApproxNode(ApproxNode):
 	"""Represents an MLP node in the transformer."""
-	def __init__(self, model: HookedTransformer, layer: int, position: int = None, parent: ApproxNode = None, children = set(), msg_cache = {}, grad_cache = {}):
-		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, grad_cache=grad_cache)
-		self.input_name = f"blocks.{layer}.hook_resid_mid"
-		self.output_name = f"blocks.{layer}.hook_mlp_out"
+	def __init__(self, model: HookedTransformer, layer: int, position: int = None, parent: ApproxNode = None, children = set(), msg_cache = {}, gradient = None):
+		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_mid", output_name=f"blocks.{layer}.hook_mlp_out")
 	
 
 	def forward(self, message: Tensor) -> Tensor:
@@ -173,7 +171,7 @@ class MLP_ApproxNode(ApproxNode):
 			A list of potential previous nodes.
 		"""
 		prev_nodes = []
-		common_args = {"model": self.model, "msg_cache": self.msg_cache, "grad_cache": self.grad_cache, "parent": self}
+		common_args = {"model": self.model, "msg_cache": self.msg_cache, "parent": self}
 		if self.position is not None:
 			positions_to_iterate = range(self.position + 1)
 		else:
@@ -215,17 +213,18 @@ class MLP_ApproxNode(ApproxNode):
 	def __hash__(self):
 		return hash((type(self).__name__, self.layer, self.position))
 	
-	def get_gradient(self, grad_outputs=None) -> Tensor:
-		gradient_key = f"MLP_ApproxNode(layer={self.layer})"
-		if self.grad_cache.get(gradient_key, None) is not None:
+	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> Tensor:
+		if self.gradient is not None and use_precomputed:
 			if self.position is None:
-				return self.grad_cache[gradient_key].detach().clone()
-			gradient = self.grad_cache[gradient_key].detach().clone()
-			out = torch.zeros_like(gradient)
-			out[:, self.position, :] = gradient[:, self.position, :]
+				return self.gradient.detach().clone()
+			gradient = self.gradient.detach().clone()
+			out = torch.zeros_like(self.msg_cache[self.input_name], device=gradient.device)
+			out[:, self.position, :] = gradient
 			return out
 
 		input_residual = self.msg_cache[self.input_name].detach().clone()
+		if self.position is not None:
+			input_residual = input_residual[:, self.position, :]
 		input_residual.requires_grad_(True)
 
 		with torch.enable_grad():
@@ -233,26 +232,32 @@ class MLP_ApproxNode(ApproxNode):
 			output = self.model.blocks[self.layer].mlp.forward(norm_res)
 		
 		if grad_outputs is None:
-			grad_outputs = self.parent.get_gradient() if self.parent is not None else torch.ones_like(input_residual)
-		
+			grad_outputs = self.parent.calculate_gradient(save=True, use_precomputed=True) if self.parent is not None else torch.ones_like(input_residual)
+	
+		if input_residual.shape != grad_outputs.shape:
+			grad_outputs = grad_outputs[:, self.position, :]
 		gradient = torch.autograd.grad(
 			output,
 			input_residual,
 			grad_outputs=grad_outputs,
 		)[0]
-		self.grad_cache[gradient_key] = gradient
-		return self.get_gradient()
+		if save:
+			self.gradient = gradient.detach().clone()
+		if self.position is not None:
+			out = torch.zeros_like(self.msg_cache[self.input_name], device=gradient.device)
+			out[:, self.position, :] = gradient.detach().clone()
+			return out
+		return gradient.detach().clone()
 	
 
 class ATTN_ApproxNode(ApproxNode):
 	"""Represents an Attention node (potentially a specific head) in the transformer."""
-	def __init__(self, model: HookedTransformer, layer: int, head: int = None, position: int = None, keyvalue_position: int = None, parent: ApproxNode = None, children = set(), msg_cache = {}, grad_cache = {}, patch_query: bool = True, patch_keyvalue: bool = True, plot_patterns: bool = False):
-		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, grad_cache=grad_cache)
+	def __init__(self, model: HookedTransformer, layer: int, head: int = None, position: int = None, keyvalue_position: int = None, parent: ApproxNode = None, children = set(), msg_cache = {}, gradient = None, patch_query: bool = True, patch_keyvalue: bool = True, plot_patterns: bool = False):
+		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_pre", output_name="")
 		self.head = head
 		self.keyvalue_position = keyvalue_position
 		self.patch_keyvalue = patch_keyvalue
 		self.patch_query = patch_query
-		self.input_name = f"blocks.{layer}.hook_resid_pre"
 		output_name = f"blocks.{layer}.head.{head}" if head is not None else f"blocks.{layer}"
 		output_name += ".hook_attn_out" if keyvalue_position is None else f".kv.{keyvalue_position}.hook_attn_out"
 		self.output_name = output_name
@@ -362,7 +367,7 @@ class ATTN_ApproxNode(ApproxNode):
 			if self.position is None and message is None:
 				self.msg_cache[self.output_name] = out.detach().clone()
 			else:
-				ATTN_ApproxNode(self.model, layer=self.layer, head=self.head, msg_cache=self.msg_cache, grad_cache=self.grad_cache, keyvalue_position=self.keyvalue_position).forward(message=None)
+				ATTN_ApproxNode(self.model, layer=self.layer, head=self.head, msg_cache=self.msg_cache, keyvalue_position=self.keyvalue_position).forward(message=None)
 		if message is None:
 			if self.position is not None:
 				resized_out = torch.zeros_like(self.msg_cache[self.input_name], device=out.device)
@@ -377,12 +382,11 @@ class ATTN_ApproxNode(ApproxNode):
 			return resized_out
 		return self.msg_cache[self.output_name] - out
 	
-	def get_gradient(self, grad_outputs=None) -> Tensor:
-		gradient_key = f"ATTN_ApproxNode(layer={self.layer}, head={self.head}, position={self.position}, keyvalue_position={self.keyvalue_position}, patchpatch_query={self.patch_query}, patch_keyvalue={self.patch_keyvalue})"
-		if self.grad_cache.get(gradient_key, None) is not None:
-			if self.keyvalue_position is None and self.patch_keyvalue:
-				return self.grad_cache[gradient_key].detach().clone()
-			gradient = self.grad_cache[gradient_key].detach().clone()
+	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> Tensor:
+		if self.gradient is not None and use_precomputed:
+			if self.position is None or self.keyvalue_position is None:
+				return self.gradient.detach().clone()
+			gradient = self.gradient.detach().clone()
 			out = torch.zeros_like(gradient, device=gradient.device)
 			if self.patch_keyvalue:
 				out[:, self.keyvalue_position, :] = gradient[:, self.keyvalue_position, :]
@@ -399,10 +403,10 @@ class ATTN_ApproxNode(ApproxNode):
 				query_residual = input_residual
 			else:
 				query_residual = input_residual[:, self.position, :].unsqueeze(1)
-			
-			key_residual = input_residual[:, :length]
-			if self.keyvalue_position is not None:
-				key_residual = key_residual[:, self.keyvalue_position, :].unsqueeze(1)
+			if self.keyvalue_position is None:
+				key_residual = input_residual[:, :length]
+			else:
+				key_residual = input_residual[:, self.keyvalue_position, :].unsqueeze(1)
 			value_residual = input_residual
 			if not self.patch_query:
 				query_residual = query_residual.detach() # detach from gradient computation
@@ -460,15 +464,16 @@ class ATTN_ApproxNode(ApproxNode):
 				resized_out = out
 
 		if grad_outputs is None:
-			grad_outputs = self.parent.get_gradient() if self.parent is not None else torch.ones_like(input_residual)
+			grad_outputs = self.parent.calculate_gradient(save=True, use_precomputed=True) if self.parent is not None else torch.ones_like(input_residual)
 		gradient = torch.autograd.grad(
 			resized_out,
 			input_residual,
 			grad_outputs=grad_outputs,
 			allow_unused=True,
 		)[0]
-		self.grad_cache[gradient_key] = gradient
-		return self.get_gradient()
+		if save:
+			self.gradient = gradient
+		return gradient
 
 
 	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, include_head: bool = False) -> list[ApproxNode]:
@@ -482,7 +487,7 @@ class ATTN_ApproxNode(ApproxNode):
 		Returns:
 			A list of potential previous nodes."""
 		prev_nodes = []
-		common_args = {"model": self.model, "msg_cache": self.msg_cache, "grad_cache": self.grad_cache, "parent": self}
+		common_args = {"model": self.model, "msg_cache": self.msg_cache, "parent": self}
 
 		# MLPs
 		for l in range(self.layer):
@@ -549,10 +554,8 @@ class ATTN_ApproxNode(ApproxNode):
 
 class EMBED_ApproxNode(ApproxNode):
 	"""Represents the embedding node in the transformer."""
-	def __init__(self, model: HookedTransformer, layer: int = 0, position: int = None, parent: ApproxNode = None, children = set(), msg_cache = {}, grad_cache = {}):
-		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, grad_cache=grad_cache)
-		self.input_name = "hook_embed"
-		self.output_name = "hook_embed"
+	def __init__(self, model: HookedTransformer, layer: int = 0, position: int = None, parent: ApproxNode = None, children = set(), msg_cache = {}, gradient = None):
+		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, gradient=gradient, input_name="hook_embed", output_name="hook_embed")
 
 	def forward(self, message: Tensor = None) -> Tensor:
 		embedding = self.msg_cache["hook_embed"].clone() #+ cache["hook_pos_embed"].clone()
@@ -563,12 +566,24 @@ class EMBED_ApproxNode(ApproxNode):
 			embedding[:, self.position + 1:, :] = torch.zeros_like(embedding[:, self.position + 1:, :], device=embedding.device)
 		return embedding
 
-	def get_gradient(self):
-		if self.position:
-			out = torch.zeros_like(self.msg_cache[self.input_name], device=self.msg_cache[self.input_name].device)
-			out[:, self.position,:] = torch.ones_like(out[:, self.position,:], device=out.device)
+	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False):
+		if self.gradient is not None and use_precomputed:
+			if self.position is None:
+				return self.gradient.detach().clone()
+			gradient = self.gradient.detach().clone()
+			out = torch.zeros_like(self.msg_cache[self.input_name], device=gradient.device)
+			out[:, self.position, :] = gradient[:, self.position, :]
 			return out
-		return -torch.ones_like(self.msg_cache[self.input_name])
+		if grad_outputs is None:
+			gradient = self.parent.calculate_gradient(grad_outputs, save=True, use_precomputed=True) if self.parent is not None else torch.ones_like(self.msg_cache[self.input_name])
+		else:
+			gradient = self.parent.calculate_gradient(grad_outputs, save=True, use_precomputed=False) if self.parent is not None else torch.ones_like(self.msg_cache[self.input_name])
+		if save:
+			if self.position is None:
+				self.gradient = gradient.detach().clone()
+			else:
+				self.gradient = gradient[:, self.position, :].detach().clone()
+		return gradient.detach().clone()
 
 
 	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, sequence_length: int, include_head: bool = False) -> list[ApproxNode]:
@@ -583,10 +598,8 @@ class EMBED_ApproxNode(ApproxNode):
 
 class FINAL_ApproxNode(ApproxNode):
 	"""Represents the final node in the transformer (This is a dummy node)."""
-	def __init__(self, model: HookedTransformer, layer: int, metric: callable = None, position: Optional[int] = None, parent: ApproxNode = None, children = set(), msg_cache = {}, grad_cache = {}):
-		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, grad_cache=grad_cache)
-		self.input_name = f"blocks.{layer}.hook_resid_post"
-		self.output_name = f"blocks.{layer}.hook_resid_post"
+	def __init__(self, model: HookedTransformer, layer: int, metric: callable = None, position: Optional[int] = None, parent: ApproxNode = None, children = set(), msg_cache = {}, gradient = None):
+		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_post", output_name=f"blocks.{layer}.hook_resid_post")
 		self.metric = metric
 	def forward(self, message: Tensor = None) -> Tensor:
 		res = self.msg_cache[self.input_name].detach().clone()
@@ -598,21 +611,13 @@ class FINAL_ApproxNode(ApproxNode):
 			res = res_zeroed
 		return res
 
-	def get_gradient(self, metric=None) -> Tensor:
+	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False, metric=None) -> Tensor:
+		if self.gradient is not None and use_precomputed:
+			return self.gradient.detach().clone()
 		if metric is None:
 			metric = self.metric
-		metric_name = getattr(metric, '__name__', metric.func.__name__) if metric else None
-		gradient_key = f"FINAL_ApproxNode(layer={self.layer}, metric={metric_name})"
-		if self.grad_cache.get(gradient_key, None) is not None:
-			if self.position is None:
-				return self.grad_cache[gradient_key].detach().clone()
-			gradient = self.grad_cache[gradient_key].detach().clone()
-			out = torch.zeros_like(gradient, device=gradient.device)
-			out[:, self.position, :] = gradient[:, self.position, :]
-			return out
-
 		if metric is None:
-			raise NotImplementedError("get_gradient(self, metric=None) requires to provide a metric either at initialization or as a parameter")
+			raise NotImplementedError("FINAL_ApproxNode.calculate_gradient() requires to provide a metric either at initialization or as a parameter")
 		input_residual = self.msg_cache[self.output_name].detach().clone()
 		input_residual.requires_grad_(True)
 		with torch.enable_grad():
@@ -624,8 +629,10 @@ class FINAL_ApproxNode(ApproxNode):
 			allow_unused=True
 		)[0]
 		
-		self.grad_cache[gradient_key] = -gradient
-		return self.get_gradient()
+		if save:
+			self.gradient = -gradient
+		return -gradient
+
 	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, include_head: bool = True) -> list[ApproxNode]:
 		"""
 		Returns a list of potential previous nodes that contribute to this FINAL node.
@@ -638,7 +645,7 @@ class FINAL_ApproxNode(ApproxNode):
 			A list of potential previous nodes.
 		"""
 		prev_nodes = []
-		common_args = {"model": self.model, "msg_cache": self.msg_cache, "grad_cache": self.grad_cache, "parent": self}
+		common_args = {"model": self.model, "msg_cache": self.msg_cache, "parent": self}
 
 		for l in range(model_cfg.n_layers):
 			# MLPs
