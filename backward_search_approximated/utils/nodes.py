@@ -6,7 +6,7 @@ from transformer_lens.HookedTransformerConfig import HookedTransformerConfig
 from backward_search_approximated.utils.attention import custom_attention_forward
 from functools import total_ordering
 from typing import Optional
-
+from copy import deepcopy
 
 
 @total_ordering
@@ -61,7 +61,7 @@ class ApproxNode(abc.ABC):
 	# 	pass
 
 	@abc.abstractmethod
-	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, include_head: bool = False) -> list['ApproxNode']:
+	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, include_head: bool = False, separate_kv: bool = False) -> list['ApproxNode']:
 		"""
 		Returns a list of *potential* previous nodes in the computational graph
 		that contribute to this node. These are not automatically set as the parent.
@@ -158,7 +158,7 @@ class MLP_ApproxNode(ApproxNode):
 				return out
 
 
-	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, include_head: bool = False) -> list[ApproxNode]:
+	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, include_head: bool = False, separate_kv: bool = False) -> list[ApproxNode]:
 		"""Returns a list of potential previous nodes that contribute to this MLP node.
 		Previous nodes are:
 			- MLP, EMBED and ATTN nodes in self.position from previous layers.
@@ -182,9 +182,17 @@ class MLP_ApproxNode(ApproxNode):
 			prev_nodes.append(MLP_ApproxNode(layer=l, position=self.position, **common_args))
 			for p in positions_to_iterate:
 				if include_head:
-					prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=p, patch_key=True, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+					if separate_kv:
+						prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=p, patch_key=True, patch_value=False, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+						prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=p, patch_key=False, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+					else:
+						prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=p, patch_key=True, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
 				else:
-					prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=p, patch_key=True, patch_value=True, patch_query=False, **common_args))
+					if separate_kv:
+						prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=p, patch_key=True, patch_value=False, patch_query=False, **common_args))
+						prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=p, patch_key=False, patch_value=True, patch_query=False, **common_args))
+					else:
+						prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=p, patch_key=True, patch_value=True, patch_query=False, **common_args))
 			if include_head:
 				prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=None,  patch_key=False, patch_value=False, patch_query=True, **common_args) for h in range(model_cfg.n_heads)])
 			else:
@@ -193,9 +201,17 @@ class MLP_ApproxNode(ApproxNode):
 		# ATTN nodes from current layer
 		for p in positions_to_iterate:
 			if include_head:
-				prev_nodes.extend([ATTN_ApproxNode(layer=self.layer, head=h, position=self.position, keyvalue_position=p, patch_key=True, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+				if separate_kv:
+					prev_nodes.extend([ATTN_ApproxNode(layer=self.layer, head=h, position=self.position, keyvalue_position=p, patch_key=True, patch_value=False, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+					prev_nodes.extend([ATTN_ApproxNode(layer=self.layer, head=h, position=self.position, keyvalue_position=p, patch_key=False, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+				else:
+					prev_nodes.extend([ATTN_ApproxNode(layer=self.layer, head=h, position=self.position, keyvalue_position=p, patch_key=True, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
 			else:
-				prev_nodes.append(ATTN_ApproxNode(layer=self.layer, head=None, position=self.position, keyvalue_position=p, patch_key=True, patch_value=True, patch_query=False, **common_args))
+				if separate_kv:
+					prev_nodes.append(ATTN_ApproxNode(layer=self.layer, head=None, position=self.position, keyvalue_position=p, patch_key=True, patch_value=False, patch_query=False, **common_args))
+					prev_nodes.append(ATTN_ApproxNode(layer=self.layer, head=None, position=self.position, keyvalue_position=p, patch_key=False, patch_value=True, patch_query=False, **common_args))
+				else:
+					prev_nodes.append(ATTN_ApproxNode(layer=self.layer, head=None, position=self.position, keyvalue_position=p, patch_key=True, patch_value=True, patch_query=False, **common_args))
 		if include_head:
 			prev_nodes.extend([ATTN_ApproxNode(layer=self.layer, head=h, position=self.position, keyvalue_position=None,  patch_key=False, patch_value=False, patch_query=True, **common_args) for h in range(model_cfg.n_heads)])
 		else:
@@ -481,7 +497,7 @@ class ATTN_ApproxNode(ApproxNode):
 		return gradient
 
 
-	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, include_head: bool = False) -> list[ApproxNode]:
+	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, include_head: bool = False, separate_kv: bool = False) -> list[ApproxNode]:
 		"""Returns a list of potential previous nodes that contribute to this ATTN node.
 		Previous nodes are:
 			- MLP, EMBED and ATTN nodes in self.position from previous layers if patch_query=True.
@@ -520,14 +536,30 @@ class ATTN_ApproxNode(ApproxNode):
 				if self.position is not None:
 					for keyvalue_position in range(self.position + 1):
 						if include_head:
-							prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=keyvalue_position, patch_key=True, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+							if separate_kv:
+								prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=keyvalue_position, patch_key=True, patch_value=False, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+								prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=keyvalue_position, patch_key=False, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+							else:
+								prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=keyvalue_position, patch_key=True, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
 						else:
-							prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=keyvalue_position, patch_key=True, patch_value=True, patch_query=False, **common_args))
+							if separate_kv:
+								prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=keyvalue_position, patch_key=True, patch_value=False, patch_query=False, **common_args))
+								prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=keyvalue_position, patch_key=False, patch_value=True, patch_query=False, **common_args))
+							else:
+								prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=keyvalue_position, patch_key=True, patch_value=True, patch_query=False, **common_args))
 				else:
 					if include_head:
-						prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=None, keyvalue_position=None, patch_key=True, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+						if separate_kv:
+							prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=None, keyvalue_position=None, patch_key=True, patch_value=False, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+							prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=None, keyvalue_position=None, patch_key=False, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+						else:
+							prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=None, keyvalue_position=None, patch_key=True, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
 					else:
-						prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=None, keyvalue_position=None, patch_key=True, patch_value=True, patch_query=False, **common_args))
+						if separate_kv:
+							prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=None, keyvalue_position=None, patch_key=True, patch_value=False, patch_query=False, **common_args))
+							prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=None, keyvalue_position=None, patch_key=False, patch_value=True, patch_query=False, **common_args))
+						else:
+							prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=None, keyvalue_position=None, patch_key=True, patch_value=True, patch_query=False, **common_args))
 
 		# ATTN nodes patching current key-value position
 		if self.patch_key or self.patch_value:
@@ -542,9 +574,17 @@ class ATTN_ApproxNode(ApproxNode):
 				# prev ATTN key-value positions
 				for prev_keyvalue_position in keyvalue_positions:
 					if include_head:
-						prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.keyvalue_position, keyvalue_position=prev_keyvalue_position, patch_key=True, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+						if separate_kv:
+							prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.keyvalue_position, keyvalue_position=prev_keyvalue_position, patch_key=True, patch_value=False, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+							prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.keyvalue_position, keyvalue_position=prev_keyvalue_position, patch_key=False, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+						else:
+							prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.keyvalue_position, keyvalue_position=prev_keyvalue_position, patch_key=True, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
 					else:
-						prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.keyvalue_position, keyvalue_position=prev_keyvalue_position, patch_key=True, patch_value=True, patch_query=False, **common_args))
+						if separate_kv:
+							prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.keyvalue_position, keyvalue_position=prev_keyvalue_position, patch_key=True, patch_value=False, patch_query=False, **common_args))
+							prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.keyvalue_position, keyvalue_position=prev_keyvalue_position, patch_key=False, patch_value=True, patch_query=False, **common_args))
+						else:
+							prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.keyvalue_position, keyvalue_position=prev_keyvalue_position, patch_key=True, patch_value=True, patch_query=False, **common_args))
 
 		# Remove duplicates
 		prev_nodes = list(set(prev_nodes))
@@ -583,6 +623,8 @@ class EMBED_ApproxNode(ApproxNode):
 			gradient = self.parent.calculate_gradient(grad_outputs, save=True, use_precomputed=True) if self.parent is not None else torch.ones_like(self.msg_cache[self.input_name])
 		else:
 			gradient = self.parent.calculate_gradient(grad_outputs, save=True, use_precomputed=False) if self.parent is not None else torch.ones_like(self.msg_cache[self.input_name])
+		gradient[:, :self.position, :] = torch.zeros_like(gradient[:, :self.position, :], device=gradient.device)
+		gradient[:, self.position + 1:, :] = torch.zeros_like(gradient[:, self.position + 1:, :], device=gradient.device)
 		if save:
 			if self.position is None:
 				self.gradient = gradient.detach().clone()
@@ -591,7 +633,7 @@ class EMBED_ApproxNode(ApproxNode):
 		return gradient.detach().clone()
 
 
-	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, sequence_length: int, include_head: bool = False) -> list[ApproxNode]:
+	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, sequence_length: int, include_head: bool = False, separate_kv: bool = False) -> list[ApproxNode]:
 		return []
 
 	def __repr__(self):
@@ -638,7 +680,7 @@ class FINAL_ApproxNode(ApproxNode):
 			self.gradient = -gradient
 		return -gradient
 
-	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, include_head: bool = True) -> list[ApproxNode]:
+	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, include_head: bool = True, separate_kv: bool = False) -> list[ApproxNode]:
 		"""
 		Returns a list of potential previous nodes that contribute to this FINAL node.
 		Previous nodes are:
@@ -666,14 +708,30 @@ class FINAL_ApproxNode(ApproxNode):
 			if self.position is not None:
 				for keyvalue_position in range(self.position + 1):
 					if include_head:
-						prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=keyvalue_position, patch_key=True, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+						if separate_kv:
+							prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=keyvalue_position, patch_key=True, patch_value=False, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+							prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=keyvalue_position, patch_key=False, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+						else:
+							prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=self.position, keyvalue_position=keyvalue_position, patch_key=True, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
 					else:
-						prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=keyvalue_position, patch_key=True, patch_value=True, patch_query=False, **common_args))
+						if separate_kv:
+							prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=keyvalue_position, patch_key=True, patch_value=False, patch_query=False, **common_args))
+							prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=keyvalue_position, patch_key=False, patch_value=True, patch_query=False, **common_args))
+						else:
+							prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=keyvalue_position, patch_key=True, patch_value=True, patch_query=False, **common_args))
 			else:
 				if include_head:
-					prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=None, keyvalue_position=None, patch_key=True, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+					if separate_kv:
+						prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=None, keyvalue_position=None, patch_key=True, patch_value=False, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+						prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=None, keyvalue_position=None, patch_key=False, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+					else:
+						prev_nodes.extend([ATTN_ApproxNode(layer=l, head=h, position=None, keyvalue_position=None, patch_key=True, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
 				else:
-					prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=None, patch_key=True, patch_value=True, patch_query=False, **common_args))
+					if separate_kv:
+						prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=None, keyvalue_position=None, patch_key=True, patch_value=False, patch_query=False, **common_args))
+						prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=None, keyvalue_position=None, patch_key=False, patch_value=True, patch_query=False, **common_args))
+					else:
+						prev_nodes.append(ATTN_ApproxNode(layer=l, head=None, position=self.position, keyvalue_position=None, patch_key=True, patch_value=True, patch_query=False, **common_args))
 
 		prev_nodes.append(EMBED_ApproxNode(layer=0, position=self.position, **common_args))
 		# Remove duplicates
