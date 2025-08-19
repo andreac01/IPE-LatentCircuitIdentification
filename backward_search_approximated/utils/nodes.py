@@ -6,21 +6,24 @@ from transformer_lens.HookedTransformerConfig import HookedTransformerConfig
 from backward_search_approximated.utils.attention import custom_attention_forward
 from functools import total_ordering
 from typing import Optional
-from copy import deepcopy
 
 
 @total_ordering
 class ApproxNode(abc.ABC):
-	def __init__(self, model: HookedTransformer, layer: int, input_name: str, output_name: str, msg_cache: dict, position: int = None, parent = None, children = set(), gradient = None):
+	def __init__(self, model: HookedTransformer, layer: int, input_name: str, output_name: str, position: int = None, msg_cache: dict = {}, cf_cache: dict = {}, parent = None, children = set(), gradient = None, patch_type = 'zero'):
 		self.model = model
 		self.layer = layer
 		self.position = position
 		self.parent= parent
 		self.children = children
 		self.msg_cache = msg_cache
+		self.cf_cache = cf_cache
 		self.gradient = gradient
 		self.input_name = input_name
 		self.output_name = output_name
+		self.patch_type = patch_type
+		if patch_type not in ['zero', 'counterfactual']:
+			raise ValueError(f"Unknown patch type: {patch_type}")
 
 	def add_child(self, child: 'ApproxNode'):
 		"""Adds a node as a child of this node and sets its parent."""
@@ -133,18 +136,26 @@ class ApproxNode(abc.ABC):
 
 class MLP_ApproxNode(ApproxNode):
 	"""Represents an MLP node in the transformer."""
-	def __init__(self, model: HookedTransformer, layer: int, position: int = None, parent: ApproxNode = None, children = set(), msg_cache = {}, gradient = None):
-		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_mid", output_name=f"blocks.{layer}.hook_mlp_out")
+	def __init__(self, model: HookedTransformer, layer: int, position: int = None, parent: ApproxNode = None, children = set(), msg_cache = {}, cf_cache = {}, gradient = None, patch_type = 'zero'):
+		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_mid", output_name=f"blocks.{layer}.hook_mlp_out")
 	
 
 	def forward(self, message: Tensor) -> Tensor:
 		if message is None:
-			if self.position is None:
-				return self.msg_cache[self.output_name].detach().clone()
-			else:
-				out = torch.zeros_like(self.msg_cache[self.input_name], device=self.msg_cache[self.input_name].device)
-				out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :].detach().clone()
-				return out
+			if self.patch_type == 'zero':
+				if self.position is None:
+					return self.msg_cache[self.output_name].detach().clone()
+				else:
+					out = torch.zeros_like(self.msg_cache[self.input_name], device=self.msg_cache[self.input_name].device)
+					out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :].detach().clone()
+					return out
+			elif self.patch_type == 'counterfactual':
+				if self.position is None:
+					return self.msg_cache[self.output_name].detach().clone() - self.cf_cache[self.output_name].detach().clone()
+				else:
+					out = torch.zeros_like(self.msg_cache[self.input_name], device=self.msg_cache[self.input_name].device)
+					out[:, self.position, :] =  self.msg_cache[self.output_name][:, self.position, :].detach().clone() - self.cf_cache[self.output_name][:, self.position, :].detach().clone()
+					return out
 		else:
 			if self.position is None:
 				residual = self.msg_cache[self.input_name].detach().clone() - message
@@ -171,7 +182,7 @@ class MLP_ApproxNode(ApproxNode):
 			A list of potential previous nodes.
 		"""
 		prev_nodes = []
-		common_args = {"model": self.model, "msg_cache": self.msg_cache, "parent": self}
+		common_args = {"model": self.model, "msg_cache": self.msg_cache, "cf_cache": self.cf_cache, "parent": self, "patch_type": self.patch_type}
 		if self.position is not None:
 			positions_to_iterate = range(self.position + 1)
 		else:
@@ -268,8 +279,8 @@ class MLP_ApproxNode(ApproxNode):
 
 class ATTN_ApproxNode(ApproxNode):
 	"""Represents an Attention node (potentially a specific head) in the transformer."""
-	def __init__(self, model: HookedTransformer, layer: int, head: int = None, position: int = None, keyvalue_position: int = None, parent: ApproxNode = None, children = set(), msg_cache = {}, gradient = None, patch_query: bool = True, patch_key: bool = True, patch_value: bool = True, plot_patterns: bool = False):
-		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_pre", output_name="")
+	def __init__(self, model: HookedTransformer, layer: int, head: int = None, position: int = None, keyvalue_position: int = None, parent: ApproxNode = None, children = set(), msg_cache = {}, cf_cache = {}, gradient = None, patch_query: bool = True, patch_key: bool = True, patch_value: bool = True, plot_patterns: bool = False, patch_type = 'zero'):
+		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, patch_type=patch_type, input_name=f"blocks.{layer}.hook_resid_pre", output_name="")
 		self.head = head
 		self.keyvalue_position = keyvalue_position
 		self.patch_key = patch_key
@@ -290,22 +301,41 @@ class ATTN_ApproxNode(ApproxNode):
 		length = self.position+1 if self.position is not None else self.msg_cache[self.input_name].shape[1]
 		value_residual = self.msg_cache[self.input_name].detach().clone()
 		if message is None:
-			if self.output_name in self.msg_cache:
-				if self.position is None:
-					return self.msg_cache[self.output_name].detach().clone()
+			if self.patch_type == 'zero':
+				if self.output_name in self.msg_cache:
+					if self.position is None:
+						return self.msg_cache[self.output_name].detach().clone()
+					else:
+						out = torch.zeros_like(self.msg_cache[self.input_name])
+						out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :].detach().clone()
+						return out
 				else:
-					out = torch.zeros_like(self.msg_cache[self.input_name])
-					out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :].detach().clone()
-					return out
-			else:
-				if self.position is None:
-					query_residual = self.msg_cache[self.input_name].detach().clone()
+					if self.position is None:
+						query_residual = self.msg_cache[self.input_name].detach().clone()
+					else:
+						query_residual = self.msg_cache[self.input_name][:, self.position, :].detach().clone().unsqueeze(1)
+					if self.keyvalue_position is None:
+						key_residual = self.msg_cache[self.input_name][:, :length].detach().clone()
+					else:
+						key_residual = self.msg_cache[self.input_name][:, self.keyvalue_position, :].detach().clone().unsqueeze(1)
+			if self.patch_type == 'counterfactual':
+				value_residual = self.cf_cache[self.input_name].detach().clone()
+				if self.output_name in self.cf_cache and self.output_name in self.msg_cache:
+					if self.position is None:
+						return self.msg_cache[self.output_name].detach().clone() - self.cf_cache[self.output_name].detach().clone()
+					else:
+						out = torch.zeros_like(self.msg_cache[self.input_name])
+						out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :].detach().clone() - self.cf_cache[self.output_name][:, self.position, :].detach().clone()
+						return out
 				else:
-					query_residual = self.msg_cache[self.input_name][:, self.position, :].detach().clone().unsqueeze(1)
-				if self.keyvalue_position is None:
-					key_residual = self.msg_cache[self.input_name][:, :length].detach().clone()
-				else:
-					key_residual = self.msg_cache[self.input_name][:, self.keyvalue_position, :].detach().clone().unsqueeze(1)
+					if self.position is None:
+						query_residual = self.cf_cache[self.input_name].detach().clone()
+					else:
+						query_residual = self.cf_cache[self.input_name][:, self.position, :].detach().clone().unsqueeze(1)
+					if self.keyvalue_position is None:
+						key_residual = self.cf_cache[self.input_name][:, :length].detach().clone()
+					else:
+						key_residual = self.cf_cache[self.input_name][:, self.keyvalue_position, :].detach().clone().unsqueeze(1)
 		else:
 			if self.patch_query:
 				if self.position is None:
@@ -387,20 +417,35 @@ class ATTN_ApproxNode(ApproxNode):
 			if self.position is None and message is None:
 				self.msg_cache[self.output_name] = out.detach().clone()
 			else:
-				ATTN_ApproxNode(self.model, layer=self.layer, head=self.head, msg_cache=self.msg_cache, keyvalue_position=self.keyvalue_position).forward(message=None)
+				ATTN_ApproxNode(self.model, layer=self.layer, head=self.head, msg_cache=self.msg_cache, cf_cache=self.cf_cache, keyvalue_position=self.keyvalue_position, patch_type='zero').forward(message=None)
+		if self.patch_type == 'counterfactual' and self.cf_cache.get(self.output_name, None) is None:
+			if self.position is None and message is None:
+				self.cf_cache[self.output_name] = out.detach().clone()
+			else:
+				ATTN_ApproxNode(self.model, layer=self.layer, head=self.head, msg_cache=self.cf_cache, cf_cache=self.cf_cache, keyvalue_position=self.keyvalue_position, patch_type='counterfactual').forward(message=None)
 		if message is None:
-			if self.position is not None:
-				resized_out = torch.zeros_like(self.msg_cache[self.input_name], device=out.device)
-				resized_out[:, self.position, :] = out
-				return resized_out
-			self.msg_cache[self.output_name] = out.detach().clone()
-			return out
+			if self.patch_type == 'zero':
+				if self.position is not None:
+					resized_out = torch.zeros_like(self.msg_cache[self.input_name], device=out.device)
+					resized_out[:, self.position, :] = out
+					return resized_out
+				self.msg_cache[self.output_name] = out.detach().clone()
+				return out
+			elif self.patch_type == 'counterfactual':
+				if self.position is not None:
+					resized_out = torch.zeros_like(self.msg_cache[self.input_name], device=out.device)
+					resized_out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :].detach().clone() - out
+					return resized_out
+				self.cf_cache[self.output_name] = out.detach().clone()
+				return self.msg_cache[self.output_name].detach().clone() - self.cf_cache[self.output_name].detach().clone()
+			else:
+				raise ValueError(f"Unknown patch type: {self.patch_type}")
 		
 		if self.position is not None:
 			resized_out = torch.zeros_like(self.msg_cache[self.input_name], device=out.device)
 			resized_out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :].detach().clone() - out
 			return resized_out
-		return self.msg_cache[self.output_name] - out
+		return self.msg_cache[self.output_name].detach().clone() - out
 	
 	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> Tensor:
 		if self.gradient is not None and use_precomputed:
@@ -508,7 +553,7 @@ class ATTN_ApproxNode(ApproxNode):
 		Returns:
 			A list of potential previous nodes."""
 		prev_nodes = []
-		common_args = {"model": self.model, "msg_cache": self.msg_cache, "parent": self}
+		common_args = {"model": self.model, "msg_cache": self.msg_cache, "parent": self, "patch_type": self.patch_type, "cf_cache": self.cf_cache}
 
 		# MLPs
 		for l in range(self.layer):
@@ -599,13 +644,19 @@ class ATTN_ApproxNode(ApproxNode):
 
 class EMBED_ApproxNode(ApproxNode):
 	"""Represents the embedding node in the transformer."""
-	def __init__(self, model: HookedTransformer, layer: int = 0, position: int = None, parent: ApproxNode = None, children = set(), msg_cache = {}, gradient = None):
-		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, gradient=gradient, input_name="hook_embed", output_name="hook_embed")
+	def __init__(self, model: HookedTransformer, layer: int = 0, position: int = None, parent: ApproxNode = None, children = set(), msg_cache = {}, cf_cache = {}, gradient = None, patch_type = 'zero'):
+		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name="hook_embed", output_name="hook_embed", patch_type=patch_type)
 
 	def forward(self, message: Tensor = None) -> Tensor:
-		embedding = self.msg_cache["hook_embed"].clone() #+ cache["hook_pos_embed"].clone()
-		if message is not None:
-			embedding = embedding - message
+		if message is None:
+			if self.patch_type == 'zero':
+				embedding = self.msg_cache["hook_embed"].detach().clone()
+			elif self.patch_type == 'counterfactual':
+				embedding = self.msg_cache["hook_embed"].detach().clone() - self.cf_cache["hook_embed"].detach().clone()
+			else:
+				raise ValueError(f"Unknown patch type: {self.patch_type}")
+		else:
+			embedding = self.msg_cache["hook_embed"].detach().clone() - message
 		if self.position is not None:
 			embedding[:, :self.position, :] = torch.zeros_like(embedding[:, :self.position, :], device=embedding.device)
 			embedding[:, self.position + 1:, :] = torch.zeros_like(embedding[:, self.position + 1:, :], device=embedding.device)
@@ -645,17 +696,23 @@ class EMBED_ApproxNode(ApproxNode):
 
 class FINAL_ApproxNode(ApproxNode):
 	"""Represents the final node in the transformer (This is a dummy node)."""
-	def __init__(self, model: HookedTransformer, layer: int, metric: callable = None, position: Optional[int] = None, parent: ApproxNode = None, children = set(), msg_cache = {}, gradient = None):
-		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_post", output_name=f"blocks.{layer}.hook_resid_post")
+	def __init__(self, model: HookedTransformer, layer: int, metric: callable = None, position: Optional[int] = None, parent: ApproxNode = None, children = set(), msg_cache = {}, cf_cache = {}, gradient = None, patch_type = 'zero'):
+		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_post", output_name=f"blocks.{layer}.hook_resid_post", patch_type=patch_type)
 		self.metric = metric
 	def forward(self, message: Tensor = None) -> Tensor:
-		res = self.msg_cache[self.input_name].detach().clone()
-		if message is not None:
+		if message is None:
+			if self.patch_type == 'zero':
+				res = self.msg_cache[self.input_name].detach().clone()
+			elif self.patch_type == 'counterfactual':
+				res = self.msg_cache[self.input_name].detach().clone() - self.cf_cache[self.input_name].detach().clone()
+			else:
+				raise ValueError(f"Unknown patch type: {self.patch_type}")
+		else:
 			res = message.detach().clone()
 		if self.position is not None:
 			res_zeroed = torch.zeros_like(res, device=res.device)
 			res_zeroed[:, self.position, :] = res[:, self.position, :]
-			res = res_zeroed
+			return res_zeroed
 		return res
 
 	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False, metric=None) -> Tensor:
@@ -692,7 +749,7 @@ class FINAL_ApproxNode(ApproxNode):
 			A list of potential previous nodes.
 		"""
 		prev_nodes = []
-		common_args = {"model": self.model, "msg_cache": self.msg_cache, "parent": self}
+		common_args = {"model": self.model, "msg_cache": self.msg_cache, "parent": self, "patch_type": self.patch_type, "cf_cache": self.cf_cache}
 
 		for l in range(model_cfg.n_layers):
 			# MLPs

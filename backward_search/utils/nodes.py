@@ -118,7 +118,7 @@ class Node(abc.ABC):
 			return NotImplemented
 		if (self.layer != other.layer or
 			self.position != other.position or
-			type(self) != type(other)):
+			type(self) is not type(other)):
 			return False
 		if isinstance(self, ATTN_Node) and isinstance(other, ATTN_Node):
 			return self.head == other.head and self.position == other.position and self.keyvalue_position == other.keyvalue_position and self.patch_keyvalue == other.patch_keyvalue and self.patch_query == other.patch_query
