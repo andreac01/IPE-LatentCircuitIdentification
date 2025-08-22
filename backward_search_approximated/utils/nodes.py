@@ -137,7 +137,7 @@ class ApproxNode(abc.ABC):
 class MLP_ApproxNode(ApproxNode):
 	"""Represents an MLP node in the transformer."""
 	def __init__(self, model: HookedTransformer, layer: int, position: int = None, parent: ApproxNode = None, children = set(), msg_cache = {}, cf_cache = {}, gradient = None, patch_type = 'zero'):
-		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_mid", output_name=f"blocks.{layer}.hook_mlp_out")
+		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_mid", output_name=f"blocks.{layer}.hook_mlp_out", patch_type=patch_type)
 	
 
 	def forward(self, message: Tensor) -> Tensor:
