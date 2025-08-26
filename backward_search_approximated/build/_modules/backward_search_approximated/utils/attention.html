@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>backward_search_approximated.utils.attention &#8212; IPE-Isolating Path Effects for Improving Latent Circuit Identification 0.0.1 documentation</title>
+    <title>backward_search_approximated.utils.attention &#8212; IPE 0.0.1 documentation</title>
   
   
   
@@ -112,7 +112,7 @@
   
   
   
-    <p class="title logo__title">IPE-Isolating Path Effects for Improving Latent Circuit Identification 0.0.1 documentation</p>
+    <p class="title logo__title">IPE 0.0.1 documentation</p>
   
 </a></div>
     
@@ -353,46 +353,33 @@
 	<span class="n">plot_patterns</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 	<span class="n">add_bias</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
-<span class="w">	</span><span class="sd">&quot;&quot;&quot;Computes a custom attention mechanism forward pass.</span>
-
-<span class="sd">		This function is designed to handle different configurations of attention,</span>
-<span class="sd">		including precomputed scores, specific position-based attention, and</span>
-<span class="sd">		optional plotting for visualization.</span>
-
-<span class="sd">		Args:</span>
-<span class="sd">			attention_module (AbstractAttention): The attention module being used.</span>
-<span class="sd">			head (int): The attention head to focus on.</span>
-<span class="sd">			q: The query tensor.</span>
-<span class="sd">			k: The key tensor.</span>
-<span class="sd">			v: The value tensor.</span>
-<span class="sd">			precomputed_attention_scores (torch.Tensor, optional): Precomputed attention scores.</span>
-<span class="sd">				Defaults to None.</span>
-<span class="sd">			query_position (int, optional): The specific query position for selective attention.</span>
-<span class="sd">				Defaults to None.</span>
-<span class="sd">			keyvalue_position (int, optional): The specific key/value position to attend to.</span>
-<span class="sd">				Defaults to None.</span>
-<span class="sd">			plot_patterns (bool, optional): Whether to plot the attention patterns.</span>
-<span class="sd">				Defaults to False.</span>
-<span class="sd">			add_bias (bool, optional): Whether to add a bias term to the attention scores.</span>
-<span class="sd">				Defaults to False.</span>
-
-<span class="sd">		Returns:</span>
-<span class="sd">			torch.Tensor: The output of the attention mechanism.</span>
-
-<span class="sd">		Raises:</span>
-<span class="sd">			ValueError: If precomputed scores are provided but dimensions are incorrect.</span>
-<span class="sd">			TypeError: If the attention module is not an instance of AbstractAttention.</span>
-
-<span class="sd">		Example:</span>
-<span class="sd">			&gt;&gt;&gt; import torch</span>
-<span class="sd">			&gt;&gt;&gt; from your_module import custom_attention_forward</span>
-<span class="sd">			&gt;&gt;&gt; class MockAttention:</span>
-<span class="sd">			...     pass</span>
-<span class="sd">			&gt;&gt;&gt; attn_module = MockAttention()</span>
-<span class="sd">			&gt;&gt;&gt; q = torch.rand(1, 10, 64)</span>
-<span class="sd">			&gt;&gt;&gt; k = torch.rand(1, 10, 64)</span>
-<span class="sd">			&gt;&gt;&gt; v = torch.rand(1, 10, 64)</span>
-<span class="sd">			&gt;&gt;&gt; output = custom_attention_forward(attn_module, 0, q, k, v)</span>
+<span class="w">	</span><span class="sd">&quot;&quot;&quot;	Performs a custom forward pass through an attention module for specific attention heads and positions.</span>
+<span class="sd">	This function implements a customizable attention mechanism that allows for:</span>
+<span class="sd">	- Computing attention for specific heads</span>
+<span class="sd">	- Computing attention for specific query/key positions</span>
+<span class="sd">	- Using precomputed attention scores</span>
+<span class="sd">	- Visualizing attention patterns</span>
+<span class="sd">	- Supporting different precision levels</span>
+<span class="sd">	Args:</span>
+<span class="sd">		attention_module (AbstractAttention): The attention module to use for calculations</span>
+<span class="sd">		head (int, optional): Specific attention head to compute. If None, computes for all heads</span>
+<span class="sd">		q (torch.Tensor): Query tensor</span>
+<span class="sd">		k (torch.Tensor): Key tensor  </span>
+<span class="sd">		v (torch.Tensor): Value tensor</span>
+<span class="sd">		precomputed_attention_scores (torch.Tensor, optional): Pre-calculated attention scores to use</span>
+<span class="sd">		query_position (int, optional): Specific query position to compute attention for</span>
+<span class="sd">		keyvalue_position (int, optional): Specific key/value position to compute attention for</span>
+<span class="sd">		plot_patterns (bool, default=False): Whether to plot attention patterns</span>
+<span class="sd">		add_bias (bool, default=False): Whether to add bias term in final linear projection</span>
+<span class="sd">	Returns:</span>
+<span class="sd">		torch.Tensor: Output tensor after attention computation</span>
+<span class="sd">	Notes:</span>
+<span class="sd">		- Does not support rotary positional embeddings, ALiBi, or relative positional bias</span>
+<span class="sd">		- Automatically handles precision conversion for numerical stability</span>
+<span class="sd">		- Applies causal masking when input sequence lengths match</span>
+<span class="sd">		- Can visualize attention patterns at different stages if plot_patterns=True</span>
+<span class="sd">	Raises:</span>
+<span class="sd">		NotImplementedError: If using unsupported positional embedding types</span>
 <span class="sd">	&quot;&quot;&quot;</span>
 	<span class="k">if</span> <span class="n">attention_module</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">positional_embedding_type</span> <span class="o">==</span> <span class="s2">&quot;rotary&quot;</span><span class="p">:</span>
 		<span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>

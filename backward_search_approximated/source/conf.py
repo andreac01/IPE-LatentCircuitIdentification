@@ -17,37 +17,58 @@ sys.path.insert(0, os.path.abspath('../../'))
 project = 'IPE'
 copyright = '2025, Andrea Cerutti. Released under the GNU General Public License v3.0'
 author = 'Andrea Cerutti'
-release = '0.0.1'  # Use a more specific release number
+release = '0.0.1'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.viewcode', # Adds links to source code
-    'sphinx.ext.intersphinx', # Links to other projects' docs
-    'sphinx_copybutton', # Adds a "copy" button to code blocks
-    'sphinx_design', # Adds components like cards and grids
+	'sphinx.ext.autodoc',       # Core library for autodoc
+	'sphinx.ext.autosummary',   # Create summary tables
+	'sphinx.ext.napoleon',      # Support for Google and NumPy style docstrings
+	'sphinx.ext.viewcode',      # Add links to highlighted source code
+	'sphinx.ext.intersphinx',   # Link to other projects' documentation
+	'sphinx_autodoc_typehints', # Automatically document typehints
+	'sphinx_copybutton',        # Add a "copy" button to code blocks
+	'sphinx_design',            # For UI components like cards and grids
 ]
 
 templates_path = ['_templates']
 exclude_patterns = []
 
-# -- Napoleon settings for Google/NumPy-style docstrings ---------------------
+# -- Autodoc & Autosummary settings ------------------------------------------
+autodoc_default_options = {
+	'members': True,
+	'undoc-members': True,
+	'private-members': False,
+	'special-members': '__init__',
+	'show-inheritance': True,
+}
+autosummary_generate = True  # Turn on sphinx.ext.autosummary
 
+# -- Napoleon settings for Google/NumPy-style docstrings ---------------------
 napoleon_google_docstring = True
-napoleon_numpy_docstring = False # Use False if you prefer Google-style
+napoleon_numpy_docstring = False
 napoleon_include_init_with_doc = True
-napoleon_use_admonition_for_examples = True # Renders examples in a nice admonition block
+napoleon_include_private_with_doc = False
+napoleon_include_special_with_doc = True
+napoleon_use_admonition_for_examples = True
+napoleon_use_admonition_for_notes = True
+napoleon_use_admonition_for_references = True
+napoleon_use_ivar = True
+napoleon_use_param = True
+napoleon_use_rtype = True
+napoleon_preprocess_types = True
+napoleon_type_aliases = None
+napoleon_attr_annotations = True
 
 # -- Intersphinx mapping -----------------------------------------------------
 # Link to other projects' documentation
 intersphinx_mapping = {
-    'python': ('https://docs.python.org/3', None),
-    'numpy': ('https://numpy.org/doc/stable/', None),
-    'scipy': ('https://docs.scipy.org/doc/scipy/', None),
-    'matplotlib': ('https://matplotlib.org/', None),
+	'python': ('https://docs.python.org/3', None),
+	'numpy': ('https://numpy.org/doc/stable/', None),
+	'scipy': ('https://docs.scipy.org/doc/scipy/', None),
+	'matplotlib': ('https://matplotlib.org/stable/', None),
 }
 
 # -- Options for HTML output -------------------------------------------------
@@ -57,30 +78,47 @@ html_theme = 'pydata_sphinx_theme'
 html_static_path = ['_static']
 
 # Set custom logo and favicon paths
-# You must have these files in your 'source/_static/' directory
 html_logo = "_static/logo.svg"
 html_favicon = "_static/favicon.ico"
 
 # Theme-specific options for PyData theme
 html_theme_options = {
-    "icon_links": [
-        {
-            "name": "GitHub",
-            "url": "https://github.com/your-username/your-repo",
-            "icon": "fab fa-github-square",
-            "type": "fontawesome",
-        }
-    ],
-    "navbar_align": "left",
-    "secondary_sidebar_items": ["page-toc"],
-    "footer_items": ["copyright", "last-updated"],
+	"logo": {
+		"text": "IPE Documentation",
+	},
+	"icon_links": [
+		{
+			"name": "GitHub",
+			"url": "https://github.com/your-username/your-repo", # TODO: Update this URL
+			"icon": "fab fa-github-square",
+			"type": "fontawesome",
+		}
+	],
+	"navbar_align": "left",
+	"navbar_end": ["theme-switcher", "navbar-icon-links"],
+	"secondary_sidebar_items": ["page-toc", "edit-this-page", "sourcelink"],
+	"footer_items": ["copyright", "last-updated"],
+	"show_toc_level": 2,
+	"use_edit_page_button": True,
 }
 
-# Set the syntax highlighting style for light and dark modes
-pygments_style = 'tango'
-pygments_dark_style = 'native'
-highlight_language = 'python'
+
+# Required for "edit-this-page" link
+html_context = {
+	"github_user": "your-username", # TODO: Update this
+	"github_repo": "your-repo",     # TODO: Update this
+	"github_version": "main",
+	"doc_path": "source",
+}
+
+# -- Syntax Highlighting settings --------------------------------------------
+# Use a style with good contrast for both light and dark modes.
+pygments_style = 'friendly'
+pygments_dark_style = 'monokai'
+highlight_language = 'python3'
+
 
 # -- Copybutton settings -----------------------------------------------------
-# Skip the dollar sign and other prompts when copying code
-copybutton_prompt_text = "$ "
+# Exclude prompts and output when copying code.
+copybutton_prompt_text = r">>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.\.\.: | {5,8}: "
+copybutton_prompt_is_regexp = True

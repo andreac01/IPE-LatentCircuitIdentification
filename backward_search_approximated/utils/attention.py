@@ -16,6 +16,34 @@ def custom_attention_forward(
 	plot_patterns: bool = False,
 	add_bias: bool = False,
 ) -> torch.Tensor:
+	"""	Performs a custom forward pass through an attention module for specific attention heads and positions.
+	This function implements a customizable attention mechanism that allows for:
+	- Computing attention for specific heads
+	- Computing attention for specific query/key positions
+	- Using precomputed attention scores
+	- Visualizing attention patterns
+	- Supporting different precision levels
+	Args:
+		attention_module (AbstractAttention): The attention module to use for calculations
+		head (int, optional): Specific attention head to compute. If None, computes for all heads
+		q (torch.Tensor): Query tensor
+		k (torch.Tensor): Key tensor  
+		v (torch.Tensor): Value tensor
+		precomputed_attention_scores (torch.Tensor, optional): Pre-calculated attention scores to use
+		query_position (int, optional): Specific query position to compute attention for
+		keyvalue_position (int, optional): Specific key/value position to compute attention for
+		plot_patterns (bool, default=False): Whether to plot attention patterns
+		add_bias (bool, default=False): Whether to add bias term in final linear projection
+	Returns:
+		torch.Tensor: Output tensor after attention computation
+	Notes:
+		- Does not support rotary positional embeddings, ALiBi, or relative positional bias
+		- Automatically handles precision conversion for numerical stability
+		- Applies causal masking when input sequence lengths match
+		- Can visualize attention patterns at different stages if plot_patterns=True
+	Raises:
+		NotImplementedError: If using unsupported positional embedding types
+	"""
 	if attention_module.cfg.positional_embedding_type == "rotary":
 		raise NotImplementedError(
 			"Rotary positional embeddings are not supported in this function. Use the full attention module instead."

@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>backward_search_approximated.utils.graph_search &#8212; IPE-Isolating Path Effects for Improving Latent Circuit Identification 0.0.1 documentation</title>
+    <title>backward_search_approximated.utils.graph_search &#8212; IPE 0.0.1 documentation</title>
   
   
   
@@ -112,7 +112,7 @@
   
   
   
-    <p class="title logo__title">IPE-Isolating Path Effects for Improving Latent Circuit Identification 0.0.1 documentation</p>
+    <p class="title logo__title">IPE 0.0.1 documentation</p>
   
 </a></div>
     
@@ -357,42 +357,56 @@
 
 
 
-<div class="viewcode-block" id="breadth_first_search">
-<a class="viewcode-back" href="../../../api/graph_search.html#backward_search_approximated.utils.graph_search.breadth_first_search">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">breadth_first_search</span><span class="p">(</span>
+
+<div class="viewcode-block" id="IsolatingPathEffect_BW">
+<a class="viewcode-back" href="../../../api/graph_search.html#backward_search_approximated.utils.graph_search.IsolatingPathEffect_BW">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">IsolatingPathEffect_BW</span><span class="p">(</span>
 	<span class="n">model</span><span class="p">:</span> <span class="n">HookedTransformer</span><span class="p">,</span>
-	<span class="n">cache</span><span class="p">:</span> <span class="n">ActivationCache</span><span class="p">,</span>
 	<span class="n">metric</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
-	<span class="n">start_node</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ApproxNode</span><span class="p">],</span>
-	<span class="n">ground_truth_tokens</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+	<span class="n">start_node</span><span class="p">:</span> <span class="n">ApproxNode</span><span class="p">,</span>
 	<span class="n">min_contribution</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
+	<span class="n">include_negative</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+	<span class="n">return_all</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+	<span class="n">counterfactual_cache</span><span class="p">:</span> <span class="n">ActivationCache</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">ApproxNode</span><span class="p">]]]:</span>
 <span class="w">	</span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">	Performs a Breadth-First Search (BFS) starting from a node backwards to identify</span>
 <span class="sd">	the most significant paths reaching it from an EMBED_ApproxNode.</span>
 
 <span class="sd">	Args:</span>
-<span class="sd">		model: The transformer model used for evaluation.</span>
-<span class="sd">		cache: The activation cache containing intermediate activations.</span>
+<span class="sd">		model: The transformer model used for evaluation. It should be an instance</span>
+<span class="sd">				of HookedTransformer, to ensure compatibility with cache and nodes</span>
+<span class="sd">				forward methods.</span>
 <span class="sd">		metric: A function to evaluate the contribution or importance of a path.</span>
+<span class="sd">				It must accept a single parameter corresponding to the corrupted</span>
+<span class="sd">				residual stream just before the final layer norm.</span>
 <span class="sd">				(Assumes higher scores indicate greater importance based on evaluate_path behavior).</span>
-<span class="sd">		start_node: The initial node to begin the backward search from (e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).</span>
+<span class="sd">		start_node: The initial node to begin the backward search from </span>
+<span class="sd">				(e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).</span>
 <span class="sd">		ground_truth_tokens: The reference tokens used for evaluating path contributions.</span>
 <span class="sd">		min_contribution: The minimum absolute contribution score required for a path to be considered valid.</span>
+<span class="sd">		include_negative: If True, include paths with negative contributions. </span>
+<span class="sd">				The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.</span>
+<span class="sd">		return_all: If True, return all evaluated complete paths regardless of </span>
+<span class="sd">				their contribution score. The search will still be guided by min_contribution.</span>
 <span class="sd">	Returns:</span>
-<span class="sd">		A list of tuples containing the contribution score and the corresponding path, sorted by contribution in descending order.</span>
+<span class="sd">		A list of tuples containing the contribution score and the corresponding path, </span>
+<span class="sd">		sorted by contribution in descending order.</span>
 <span class="sd">	&quot;&quot;&quot;</span>
-	<span class="n">last_node_contribution</span> <span class="o">=</span> <span class="n">evaluate_path</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">cache</span><span class="p">,</span> <span class="n">start_node</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">ground_truth_tokens</span><span class="p">)</span>
-	<span class="n">frontier</span> <span class="o">=</span> <span class="p">[(</span><span class="n">last_node_contribution</span><span class="p">,</span> <span class="n">start_node</span><span class="p">)]</span>
+	<span class="n">last_node_contribution</span> <span class="o">=</span> <span class="n">evaluate_path</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">[</span><span class="n">start_node</span><span class="p">],</span> <span class="n">metric</span><span class="p">)</span>
+	<span class="n">frontier</span> <span class="o">=</span> <span class="p">[(</span><span class="n">last_node_contribution</span><span class="p">,</span> <span class="p">[</span><span class="n">start_node</span><span class="p">])]</span>
 	<span class="n">completed_paths</span> <span class="o">=</span> <span class="p">[]</span>
 	<span class="k">while</span> <span class="n">frontier</span><span class="p">:</span>
-		<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">frontier</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
-			<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">frontier</span><span class="p">)</span><span class="si">}</span><span class="s2">)    Frontier: </span><span class="si">{</span><span class="n">frontier</span><span class="p">[:</span><span class="mi">100</span><span class="p">]</span><span class="si">}</span><span class="s2">... ](total </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">frontier</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+		<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">frontier</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+			<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;(total </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">frontier</span><span class="p">)</span><span class="si">}</span><span class="s2">)    Frontier: </span><span class="si">{</span><span class="n">frontier</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span><span class="si">}</span><span class="s2">... ]&quot;</span><span class="p">)</span>
 		<span class="k">else</span><span class="p">:</span>
-			<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">frontier</span><span class="p">)</span><span class="si">}</span><span class="s2">)    Frontier: </span><span class="si">{</span><span class="n">frontier</span><span class="si">}</span><span class="s2">(total </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">frontier</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+			<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;(total </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">frontier</span><span class="p">)</span><span class="si">}</span><span class="s2">)    Frontier: </span><span class="si">{</span><span class="n">frontier</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
+		<span class="c1"># Cur depth frontier contains a list of all the path continuations found in the current depth</span>
+		<span class="c1"># So all these paths have 1 more node than the paths in the frontier</span>
 		<span class="n">cur_depth_frontier</span> <span class="o">=</span> <span class="p">[]</span>
-		<span class="c1"># Expand all paths in the frontier looking for meaningful continuations</span>
+
+		<span class="c1"># For each incomplete path in the frontier, find all valuable continuations</span>
 		<span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">incomplete_path</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">frontier</span><span class="p">):</span>
 			
 			<span class="n">cur_path_start</span> <span class="o">=</span> <span class="n">incomplete_path</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
@@ -403,24 +417,37 @@
 
 			<span class="c1"># Get the meaningful candidates for expansion</span>
 			<span class="k">for</span> <span class="n">candidate</span> <span class="ow">in</span> <span class="n">candidate_components</span><span class="p">:</span>
-				<span class="c1"># EMBED is the base case</span>
+				<span class="c1"># EMBED is the base case, the path is complete and after evaluation can be added to the completed paths</span>
 				<span class="k">if</span> <span class="n">candidate</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;EMBED_ApproxNode&#39;</span><span class="p">:</span>
-					<span class="n">contribution</span> <span class="o">=</span> <span class="n">evaluate_path</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">cache</span><span class="p">,</span> <span class="p">[</span><span class="n">candidate</span><span class="p">]</span> <span class="o">+</span> <span class="n">incomplete_path</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">ground_truth_tokens</span><span class="p">)</span>
-					<span class="k">if</span> <span class="n">contribution</span> <span class="o">&gt;=</span> <span class="n">min_contribution</span><span class="p">:</span>
-						<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">contribution</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">) </span><span class="si">{</span><span class="p">[</span><span class="n">candidate</span><span class="p">]</span><span class="o">+</span><span class="n">incomplete_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+					<span class="c1"># If the candidate is </span>
+					<span class="k">if</span> <span class="n">counterfactual_cache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+						<span class="n">initial_message</span> <span class="o">=</span> <span class="n">counterfactual_cache</span><span class="p">[</span><span class="n">candidate</span><span class="o">.</span><span class="n">input_name</span><span class="p">]</span>
+					<span class="k">else</span><span class="p">:</span>
+						<span class="n">initial_message</span> <span class="o">=</span> <span class="kc">None</span>
+					<span class="n">contribution</span> <span class="o">=</span> <span class="n">evaluate_path</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">[</span><span class="n">candidate</span><span class="p">]</span> <span class="o">+</span> <span class="n">incomplete_path</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">initial_message</span><span class="p">)</span>
+					<span class="k">if</span> <span class="n">return_all</span><span class="p">:</span>
+						<span class="n">completed_paths</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">contribution</span><span class="p">,</span> <span class="p">[</span><span class="n">candidate</span><span class="p">]</span> <span class="o">+</span> <span class="n">incomplete_path</span><span class="p">))</span>
+					<span class="k">elif</span> <span class="n">include_negative</span><span class="p">:</span>
+						<span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">contribution</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">min_contribution</span><span class="p">:</span>
+							<span class="n">completed_paths</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">contribution</span><span class="p">,</span> <span class="p">[</span><span class="n">candidate</span><span class="p">]</span> <span class="o">+</span> <span class="n">incomplete_path</span><span class="p">))</span>
+					<span class="k">elif</span> <span class="n">contribution</span> <span class="o">&gt;=</span> <span class="n">min_contribution</span><span class="p">:</span>
 						<span class="n">completed_paths</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">contribution</span><span class="p">,</span> <span class="p">[</span><span class="n">candidate</span><span class="p">]</span> <span class="o">+</span> <span class="n">incomplete_path</span><span class="p">))</span>
 				
-				<span class="c1"># MLP requires to check the contribution of the whole component and of the individual layers</span>
+				<span class="c1"># ATTNs and MLPs are possible expansions of the current path to be added to the frontier</span>
 				<span class="k">elif</span> <span class="n">candidate</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;MLP_ApproxNode&#39;</span> <span class="ow">or</span> <span class="n">candidate</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;ATTN_ApproxNode&#39;</span><span class="p">:</span>
-					<span class="n">contribution</span> <span class="o">=</span> <span class="n">evaluate_path</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">cache</span><span class="p">,</span> <span class="p">[</span><span class="n">candidate</span><span class="p">]</span> <span class="o">+</span> <span class="n">incomplete_path</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">ground_truth_tokens</span><span class="p">)</span>
-					<span class="k">if</span> <span class="n">contribution</span> <span class="o">&gt;=</span> <span class="n">min_contribution</span><span class="p">:</span>
+					<span class="k">if</span> <span class="n">counterfactual_cache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+						<span class="n">initial_message</span> <span class="o">=</span> <span class="n">counterfactual_cache</span><span class="p">[</span><span class="n">candidate</span><span class="o">.</span><span class="n">input_name</span><span class="p">]</span>
+					<span class="k">else</span><span class="p">:</span>
+						<span class="n">initial_message</span> <span class="o">=</span> <span class="kc">None</span>
+					<span class="n">contribution</span> <span class="o">=</span> <span class="n">evaluate_path</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">[</span><span class="n">candidate</span><span class="p">]</span> <span class="o">+</span> <span class="n">incomplete_path</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">initial_message</span><span class="p">)</span>
+					<span class="k">if</span> <span class="n">include_negative</span><span class="p">:</span>
+						<span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">contribution</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">min_contribution</span><span class="p">:</span>
+							<span class="n">cur_path_continuations</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">contribution</span><span class="p">,</span> <span class="p">[</span><span class="n">candidate</span><span class="p">]</span> <span class="o">+</span> <span class="n">incomplete_path</span><span class="p">))</span>
+					<span class="k">elif</span> <span class="n">contribution</span> <span class="o">&gt;=</span> <span class="n">min_contribution</span><span class="p">:</span>
 						<span class="n">cur_path_continuations</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">contribution</span><span class="p">,</span> <span class="p">[</span><span class="n">candidate</span><span class="p">]</span> <span class="o">+</span> <span class="n">incomplete_path</span><span class="p">))</span>
-			<span class="c1"># Sort the current path continuations by contribution and take the top-k		</span>
-			<span class="n">cur_path_continuations</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-			<span class="c1"># Expand the frontier meaning with the sofound meaningful components</span>
 			<span class="n">cur_depth_frontier</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">cur_path_continuations</span><span class="p">)</span>
-		<span class="c1"># Limit the number of paths in the frontier to avoid memory issues</span>
+		<span class="c1"># Sort the frontier just for visualization purposes</span>
 		<span class="n">frontier</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">cur_depth_frontier</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
 	<span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">completed_paths</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
@@ -478,11 +505,12 @@
 	<span class="n">completed_paths</span> <span class="o">=</span> <span class="p">[]</span>
 	<span class="k">while</span> <span class="n">frontier</span><span class="p">:</span>
 		<span class="n">cur_depth_frontier</span> <span class="o">=</span> <span class="p">[]</span>
+		<span class="nb">print</span><span class="p">(</span><span class="n">frontier</span><span class="p">)</span>
 		<span class="c1"># Expand all paths in the frontier looking for meaningful continuations</span>
 		<span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">frontier</span><span class="p">):</span>
 
-			<span class="n">grad</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get_gradient</span><span class="p">()</span>
-			
+			<span class="n">grad</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">calculate_gradient</span><span class="p">(</span><span class="n">use_precomputed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
 			<span class="n">childrens</span> <span class="o">=</span> <span class="p">[]</span>
 
 			<span class="n">candidate_components</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get_expansion_candidates</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">cfg</span><span class="p">,</span> <span class="n">include_head</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -501,16 +529,12 @@
 						<span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">approx_contribution</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">min_contribution</span><span class="p">:</span>
 							<span class="n">contribution</span> <span class="o">=</span> <span class="n">evaluate_path</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">msg_cache</span><span class="p">,</span> <span class="n">candidate_path</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">ground_truth_tokens</span><span class="p">)</span>
 							<span class="n">completed_paths</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">contribution</span><span class="p">,</span> <span class="n">candidate_path</span><span class="p">))</span>
-					<span class="k">elif</span> <span class="n">contribution</span> <span class="o">&gt;=</span> <span class="n">min_contribution</span><span class="p">:</span>
-						<span class="k">if</span> <span class="n">approx_contribution</span> <span class="o">&gt;=</span> <span class="n">min_contribution</span><span class="p">:</span>
-							<span class="n">contribution</span> <span class="o">=</span> <span class="n">evaluate_path</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">msg_cache</span><span class="p">,</span> <span class="n">candidate_path</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">ground_truth_tokens</span><span class="p">)</span>
-							<span class="n">completed_paths</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">contribution</span><span class="p">,</span> <span class="n">candidate_path</span><span class="p">))</span>
+					<span class="k">elif</span> <span class="n">approx_contribution</span> <span class="o">&gt;=</span> <span class="n">min_contribution</span><span class="p">:</span>
+						<span class="n">contribution</span> <span class="o">=</span> <span class="n">evaluate_path</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">msg_cache</span><span class="p">,</span> <span class="n">candidate_path</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">ground_truth_tokens</span><span class="p">)</span>
+						<span class="n">completed_paths</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">contribution</span><span class="p">,</span> <span class="n">candidate_path</span><span class="p">))</span>
 				
 				<span class="c1"># MLP requires to check the contribution of the whole component and of the individual layers</span>
 				<span class="k">elif</span> <span class="n">candidate</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;MLP_ApproxNode&#39;</span> <span class="ow">or</span> <span class="n">candidate</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;ATTN_ApproxNode&#39;</span><span class="p">:</span>
-					<span class="n">candidate_contribution</span> <span class="o">=</span> <span class="n">candidate</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">message</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
-					<span class="n">approx_contribution</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;bsd,bsd-&gt;b&#39;</span><span class="p">,</span> <span class="n">candidate_contribution</span><span class="p">,</span> <span class="n">grad</span><span class="p">)</span>
-
 					<span class="k">if</span> <span class="n">include_negative</span><span class="p">:</span>
 						<span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">approx_contribution</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">min_contribution</span><span class="p">:</span>
 							<span class="n">childrens</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">candidate</span><span class="p">)</span>
@@ -565,7 +589,7 @@
 
   <p class="copyright">
     
-      © Copyright 2025, Andrea Cerutti.
+      © Copyright 2025, Andrea Cerutti. Released under the GNU General Public License v3.0.
       <br/>
     
   </p>

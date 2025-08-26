@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d75fae25" />
     <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
   
@@ -44,7 +44,7 @@
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
-    <script src="../_static/copybutton.js?v=a56c686a"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
     <script src="../_static/design-tabs.js?v=f930bc37"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'api/metrics';</script>
     <link rel="index" title="Index" href="../genindex.html" />
@@ -115,7 +115,7 @@
   
   
   
-    <p class="title logo__title">IPE 0.0.1 documentation</p>
+    <p class="title logo__title">IPE Documentation</p>
   
 </a></div>
     
@@ -356,10 +356,11 @@
 <span id="metrics-module"></span><h1>Metrics Module<a class="headerlink" href="#module-backward_search_approximated.utils.metrics" title="Link to this heading">#</a></h1>
 <dl class="py function">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.metrics.compare_token_logit">
-<span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.metrics.</span></span><span class="sig-name descname"><span class="pre">compare_token_logit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clean_resid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">corrupted_resid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">HookedTransformer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_tokens</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="../_modules/backward_search_approximated/utils/metrics.html#compare_token_logit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.metrics.compare_token_logit" title="Link to this definition">#</a></dt>
+<span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.metrics.</span></span><span class="sig-name descname"><span class="pre">compare_token_logit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clean_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">corrupted_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_tokens</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/metrics.html#compare_token_logit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.metrics.compare_token_logit" title="Link to this definition">#</a></dt>
 <dd><p>Compute the difference of logits for the target token as a percentage
 between the clean and corrupted model based on the final residuals.
 This implementation is optimized for transformerlens HookedTransformer.
+:type clean_resid: <span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>
 :param clean_resid: torch.Tensor, shape (batch, seq_len, d_model)</p>
 <blockquote>
 <div><p>The final residual stream of the clean model.</p>
@@ -367,16 +368,19 @@ This implementation is optimized for transformerlens HookedTransformer.
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>corrupted_resid</strong> – torch.Tensor, shape (batch, seq_len, d_model)
+<li><p><strong>corrupted_resid</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – torch.Tensor, shape (batch, seq_len, d_model)
 The final residual stream of the corrupted model.</p></li>
-<li><p><strong>model</strong> – HookedTransformer
+<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code></span>) – HookedTransformer
 The hooked transformer model.</p></li>
-<li><p><strong>target_tokens</strong> – list of int
+<li><p><strong>target_tokens</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>]</span>) – list of int
 The indexes of the target tokens.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><dl class="simple">
 <dt>float</dt><dd><p>The percentage difference in logits for the target token.</p>
 </dd>
 </dl>
@@ -387,9 +391,10 @@ The indexes of the target tokens.</p></li>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.metrics.compare_token_probability">
-<span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.metrics.</span></span><span class="sig-name descname"><span class="pre">compare_token_probability</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clean_resid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">corrupted_resid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">HookedTransformer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_tokens</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="../_modules/backward_search_approximated/utils/metrics.html#compare_token_probability"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.metrics.compare_token_probability" title="Link to this definition">#</a></dt>
+<span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.metrics.</span></span><span class="sig-name descname"><span class="pre">compare_token_probability</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clean_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">corrupted_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_tokens</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/metrics.html#compare_token_probability"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.metrics.compare_token_probability" title="Link to this definition">#</a></dt>
 <dd><p>Compute the difference of predicting the target token in probability
 between the clean and corrupted model based on the final residuals.
+:type clean_resid: <span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>
 :param clean_resid: torch.Tensor, shape (batch, seq_len, d_model)</p>
 <blockquote>
 <div><p>The final residual stream of the clean model.</p>
@@ -397,16 +402,19 @@ between the clean and corrupted model based on the final residuals.
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>corrupted_resid</strong> – torch.Tensor, shape (batch, seq_len, d_model)
+<li><p><strong>corrupted_resid</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – torch.Tensor, shape (batch, seq_len, d_model)
 The final residual stream of the corrupted model.</p></li>
-<li><p><strong>model</strong> – HookedTransformer
+<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code></span>) – HookedTransformer
 The hooked transformer model.</p></li>
-<li><p><strong>target_tokens</strong> – list of int
+<li><p><strong>target_tokens</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>]</span>) – list of int
 The indexes of the target tokens.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><dl class="simple">
 <dt>float</dt><dd><p>The difference in probability of predicting the target token.</p>
 </dd>
 </dl>
@@ -417,10 +425,11 @@ The indexes of the target tokens.</p></li>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.metrics.indirect_effect">
-<span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.metrics.</span></span><span class="sig-name descname"><span class="pre">indirect_effect</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clean_resid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">corrupted_resid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">HookedTransformer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clean_targets</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">corrupt_targets</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_ablation_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">set_baseline</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="../_modules/backward_search_approximated/utils/metrics.html#indirect_effect"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.metrics.indirect_effect" title="Link to this definition">#</a></dt>
+<span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.metrics.</span></span><span class="sig-name descname"><span class="pre">indirect_effect</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clean_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">corrupted_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clean_targets</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">corrupt_targets</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_ablation_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">set_baseline</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/metrics.html#indirect_effect"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.metrics.indirect_effect" title="Link to this definition">#</a></dt>
 <dd><p>Compute the difference of logits for the target token as a percentage
 between the clean and corrupted model based on the final residuals.
 This implementation is optimized for transformerlens HookedTransformer.
+:type clean_resid: <span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>
 :param clean_resid: torch.Tensor, shape (batch, seq_len, d_model)</p>
 <blockquote>
 <div><p>The final residual stream of the clean model.</p>
@@ -428,16 +437,19 @@ This implementation is optimized for transformerlens HookedTransformer.
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>corrupted_resid</strong> – torch.Tensor, shape (batch, seq_len, d_model)
+<li><p><strong>corrupted_resid</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – torch.Tensor, shape (batch, seq_len, d_model)
 The final residual stream of the corrupted model.</p></li>
-<li><p><strong>model</strong> – HookedTransformer
+<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code></span>) – HookedTransformer
 The hooked transformer model.</p></li>
 <li><p><strong>target_tokens</strong> – list of int
 The indexes of the target tokens.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><dl class="simple">
 <dt>float</dt><dd><p>The percentage difference in logits for the target token.</p>
 </dd>
 </dl>
@@ -448,9 +460,10 @@ The indexes of the target tokens.</p></li>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.metrics.kl_divergence">
-<span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.metrics.</span></span><span class="sig-name descname"><span class="pre">kl_divergence</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clean_resid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">corrupted_resid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">HookedTransformer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="../_modules/backward_search_approximated/utils/metrics.html#kl_divergence"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.metrics.kl_divergence" title="Link to this definition">#</a></dt>
+<span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.metrics.</span></span><span class="sig-name descname"><span class="pre">kl_divergence</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clean_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">corrupted_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_token</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/metrics.html#kl_divergence"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.metrics.kl_divergence" title="Link to this definition">#</a></dt>
 <dd><p>Compute the Kullback-Leibler divergence between the probability distributions
 of the clean and corrupted model based on the final residuals.
+:type clean_resid: <span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>
 :param clean_resid: torch.Tensor, shape (batch, seq_len, d_model)</p>
 <blockquote>
 <div><p>The final residual stream of the clean model.</p>
@@ -458,14 +471,17 @@ of the clean and corrupted model based on the final residuals.
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>corrupted_resid</strong> – torch.Tensor, shape (batch, seq_len, d_model)
+<li><p><strong>corrupted_resid</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – torch.Tensor, shape (batch, seq_len, d_model)
 The final residual stream of the corrupted model.</p></li>
-<li><p><strong>model</strong> – HookedTransformer
+<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code></span>) – HookedTransformer
 The hooked transformer model.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><dl class="simple">
 <dt>float</dt><dd><p>The Kullback-Leibler divergence.</p>
 </dd>
 </dl>
@@ -476,30 +492,33 @@ The hooked transformer model.</p></li>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.metrics.logit_difference_counterfactual">
-<span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.metrics.</span></span><span class="sig-name descname"><span class="pre">logit_difference_counterfactual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clean_resid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">counterfactual_resid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">HookedTransformer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_tokens</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">counterfactual_tokens</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_ablation_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="../_modules/backward_search_approximated/utils/metrics.html#logit_difference_counterfactual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.metrics.logit_difference_counterfactual" title="Link to this definition">#</a></dt>
+<span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.metrics.</span></span><span class="sig-name descname"><span class="pre">logit_difference_counterfactual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clean_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">counterfactual_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_tokens</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">counterfactual_tokens</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_ablation_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/metrics.html#logit_difference_counterfactual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.metrics.logit_difference_counterfactual" title="Link to this definition">#</a></dt>
 <dd><p>Compute logit difference: y’ - y between correct answer y (clean) and y’ (counterfactual)
 This function can handle both explicit counterfactual comparison and ablation-based comparison.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>clean_resid</strong> – torch.Tensor, shape (batch, seq_len, d_model)
+<li><p><strong>clean_resid</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – torch.Tensor, shape (batch, seq_len, d_model)
 The final residual stream of the clean model.</p></li>
-<li><p><strong>counterfactual_resid</strong> – torch.Tensor, shape (batch, seq_len, d_model)
+<li><p><strong>counterfactual_resid</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – torch.Tensor, shape (batch, seq_len, d_model)
 The final residual stream of the counterfactual model (or ablated model).</p></li>
-<li><p><strong>model</strong> – HookedTransformer
+<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code></span>) – HookedTransformer
 The hooked transformer model.</p></li>
-<li><p><strong>target_tokens</strong> – list of int
+<li><p><strong>target_tokens</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>]</span>) – list of int
 The indexes of the target tokens for the clean model.</p></li>
-<li><p><strong>counterfactual_tokens</strong> – Optional[list of int]
+<li><p><strong>counterfactual_tokens</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>]]</span>) – Optional[list of int]
 The indexes of the target tokens for the counterfactual model.
 Required when use_ablation_mode=False.</p></li>
-<li><p><strong>use_ablation_mode</strong> – bool
+<li><p><strong>use_ablation_mode</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – bool
 If True, uses ablation-based comparison (counterfactual_resid is ablated version).
 If False, uses explicit counterfactual comparison.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><dl class="simple">
 <dt>float</dt><dd><p>The logit difference: y’ - y</p>
 </dd>
 </dl>
@@ -564,6 +583,31 @@ If False, uses explicit counterfactual comparison.</p></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.metrics.logit_difference_counterfactual"><code class="docutils literal notranslate"><span class="pre">logit_difference_counterfactual()</span></code></a></li>
 </ul>
   </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/your-username/your-repo/edit/main/source/api/metrics.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/api/metrics.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
 
 </div></div>
               

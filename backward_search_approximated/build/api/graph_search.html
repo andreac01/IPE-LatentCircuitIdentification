@@ -30,7 +30,7 @@
   <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d75fae25" />
     <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
   
@@ -44,7 +44,7 @@
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
-    <script src="../_static/copybutton.js?v=a56c686a"></script>
+    <script src="../_static/copybutton.js?v=30646c52"></script>
     <script src="../_static/design-tabs.js?v=f930bc37"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'api/graph_search';</script>
     <link rel="index" title="Index" href="../genindex.html" />
@@ -115,7 +115,7 @@
   
   
   
-    <p class="title logo__title">IPE 0.0.1 documentation</p>
+    <p class="title logo__title">IPE Documentation</p>
   
 </a></div>
     
@@ -355,49 +355,64 @@
   <section id="module-backward_search_approximated.utils.graph_search">
 <span id="graph-search-module"></span><h1>Graph Search Module<a class="headerlink" href="#module-backward_search_approximated.utils.graph_search" title="Link to this heading">#</a></h1>
 <dl class="py function">
-<dt class="sig sig-object py" id="backward_search_approximated.utils.graph_search.PathAttributionPatching">
-<span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.graph_search.</span></span><span class="sig-name descname"><span class="pre">PathAttributionPatching</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">HookedTransformer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg_cache</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><span class="pre">dict</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.13)"><span class="pre">Callable</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">root</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="nodes.html#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><span class="pre">ApproxNode</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">ground_truth_tokens</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_contribution</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_negative</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_all</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.13)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="nodes.html#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><span class="pre">ApproxNode</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/backward_search_approximated/utils/graph_search.html#PathAttributionPatching"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.graph_search.PathAttributionPatching" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="backward_search_approximated.utils.graph_search.IsolatingPathEffect_BW">
+<span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.graph_search.</span></span><span class="sig-name descname"><span class="pre">IsolatingPathEffect_BW</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_contribution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_negative</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_all</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">counterfactual_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/graph_search.html#IsolatingPathEffect_BW"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.graph_search.IsolatingPathEffect_BW" title="Link to this definition">#</a></dt>
 <dd><p>Performs a Breadth-First Search (BFS) starting from a node backwards to identify
 the most significant paths reaching it from an EMBED_ApproxNode.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>model</strong> – The transformer model used for evaluation.</p></li>
-<li><p><strong>cache</strong> – The activation cache containing intermediate activations.</p></li>
-<li><p><strong>metric</strong> – A function to evaluate the contribution or importance of a path.
+<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code></span>) – The transformer model used for evaluation. It should be an instance
+of HookedTransformer, to ensure compatibility with cache and nodes
+forward methods.</p></li>
+<li><p><strong>metric</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Callable</span></code></a></span>) – A function to evaluate the contribution or importance of a path.
+It must accept a single parameter corresponding to the corrupted
+residual stream just before the final layer norm.
 (Assumes higher scores indicate greater importance based on evaluate_path behavior).</p></li>
-<li><p><strong>start_node</strong> – The initial node to begin the backward search from (e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).</p></li>
+<li><p><strong>start_node</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="nodes.html#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a></span>) – The initial node to begin the backward search from
+(e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).</p></li>
 <li><p><strong>ground_truth_tokens</strong> – The reference tokens used for evaluating path contributions.</p></li>
-<li><p><strong>min_contribution</strong> – The minimum absolute contribution score required for a path to be considered valid.</p></li>
-<li><p><strong>include_negative</strong> – If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.</p></li>
-<li><p><strong>return_all</strong> – If True, return all evaluated paths regardless of their contribution score. The search will still be guided by min_contribution.</p></li>
+<li><p><strong>min_contribution</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span>) – The minimum absolute contribution score required for a path to be considered valid.</p></li>
+<li><p><strong>include_negative</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – If True, include paths with negative contributions.
+The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.</p></li>
+<li><p><strong>return_all</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – If True, return all evaluated complete paths regardless of
+their contribution score. The search will still be guided by min_contribution.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A list of tuples containing the contribution score and the corresponding path, sorted by contribution in descending order.</p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference internal" href="nodes.html#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a>]]]</span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A list of tuples containing the contribution score and the corresponding path,
+sorted by contribution in descending order.</p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="backward_search_approximated.utils.graph_search.breadth_first_search">
-<span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.graph_search.</span></span><span class="sig-name descname"><span class="pre">breadth_first_search</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">HookedTransformer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ActivationCache</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.13)"><span class="pre">Callable</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_node</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="nodes.html#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><span class="pre">ApproxNode</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ground_truth_tokens</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_contribution</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.5</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.13)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="nodes.html#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><span class="pre">ApproxNode</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/backward_search_approximated/utils/graph_search.html#breadth_first_search"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.graph_search.breadth_first_search" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="backward_search_approximated.utils.graph_search.PathAttributionPatching">
+<span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.graph_search.</span></span><span class="sig-name descname"><span class="pre">PathAttributionPatching</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg_cache</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">root</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ground_truth_tokens</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_contribution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_negative</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_all</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/graph_search.html#PathAttributionPatching"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.graph_search.PathAttributionPatching" title="Link to this definition">#</a></dt>
 <dd><p>Performs a Breadth-First Search (BFS) starting from a node backwards to identify
 the most significant paths reaching it from an EMBED_ApproxNode.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>model</strong> – The transformer model used for evaluation.</p></li>
+<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code></span>) – The transformer model used for evaluation.</p></li>
 <li><p><strong>cache</strong> – The activation cache containing intermediate activations.</p></li>
-<li><p><strong>metric</strong> – A function to evaluate the contribution or importance of a path.
+<li><p><strong>metric</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Callable</span></code></a></span>) – A function to evaluate the contribution or importance of a path.
 (Assumes higher scores indicate greater importance based on evaluate_path behavior).</p></li>
 <li><p><strong>start_node</strong> – The initial node to begin the backward search from (e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).</p></li>
-<li><p><strong>ground_truth_tokens</strong> – The reference tokens used for evaluating path contributions.</p></li>
-<li><p><strong>min_contribution</strong> – The minimum absolute contribution score required for a path to be considered valid.</p></li>
+<li><p><strong>ground_truth_tokens</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>]</span>) – The reference tokens used for evaluating path contributions.</p></li>
+<li><p><strong>min_contribution</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span>) – The minimum absolute contribution score required for a path to be considered valid.</p></li>
+<li><p><strong>include_negative</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.</p></li>
+<li><p><strong>return_all</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – If True, return all evaluated paths regardless of their contribution score. The search will still be guided by min_contribution.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A list of tuples containing the contribution score and the corresponding path, sorted by contribution in descending order.</p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference internal" href="nodes.html#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a>]]]</span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A list of tuples containing the contribution score and the corresponding path, sorted by contribution in descending order.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -466,13 +481,38 @@ the most significant paths reaching it from an EMBED_ApproxNode.</p>
   </div>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.graph_search.IsolatingPathEffect_BW"><code class="docutils literal notranslate"><span class="pre">IsolatingPathEffect_BW()</span></code></a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.graph_search.PathAttributionPatching"><code class="docutils literal notranslate"><span class="pre">PathAttributionPatching()</span></code></a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.graph_search.breadth_first_search"><code class="docutils literal notranslate"><span class="pre">breadth_first_search()</span></code></a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.graph_search.evaluate_path"><code class="docutils literal notranslate"><span class="pre">evaluate_path()</span></code></a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.graph_search.get_path"><code class="docutils literal notranslate"><span class="pre">get_path()</span></code></a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.graph_search.get_path_msg"><code class="docutils literal notranslate"><span class="pre">get_path_msg()</span></code></a></li>
 </ul>
   </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/your-username/your-repo/edit/main/source/api/graph_search.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/api/graph_search.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
 
 </div></div>
               
