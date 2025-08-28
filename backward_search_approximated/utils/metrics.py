@@ -10,20 +10,26 @@ def compare_token_probability(clean_resid: Tensor,
 								corrupted_resid: Tensor,
 								model: HookedTransformer,
 								target_tokens: List[int]) -> Tensor:
-	""" Compute the difference of predicting the target token in probability
-		between the clean and corrupted model based on the final residuals.
-		args:
-			clean_resid: torch.Tensor, shape (batch, seq_len, d_model)
-				The final residual stream of the clean model.
-			corrupted_resid: torch.Tensor, shape (batch, seq_len, d_model)
-				The final residual stream of the corrupted model.
-			model: HookedTransformer
-				The hooked transformer model.
-			target_tokens: list of int
-				The indexes of the target tokens.
-		returns:
-			float
-				The difference in probability of predicting the target token.
+	"""
+	Compute the difference in the probability of predicting the target token
+	between the clean and corrupted model based on the final residuals. 
+	This probability is returned as a percentage of the clean model's probability.
+
+	Args:
+		clean_resid (torch.Tensor): 
+			The final residual stream of the clean model.
+			Shape: (batch, seq_len, d_model).
+		corrupted_resid (torch.Tensor): 
+			The final residual stream of the corrupted model.
+			Shape: (batch, seq_len, d_model).
+		model (HookedTransformer): 
+			The hooked transformer model.
+		target_tokens (List[int]): 
+			The indexes of the target tokens.
+
+	Returns:
+		float: 
+			The difference in probability of predicting the target token.
 	"""
 	# Get logits for the last token
 	clean_resid = model.ln_final(clean_resid)
@@ -41,22 +47,28 @@ def compare_token_logit(clean_resid: Tensor,
 						corrupted_resid: Tensor,
 						model: HookedTransformer,
 						target_tokens: List[int]) -> Tensor:
-	""" Compute the difference of logits for the target token as a percentage
-		between the clean and corrupted model based on the final residuals.
-		This implementation is optimized for transformerlens HookedTransformer.
-		args:
-			clean_resid: torch.Tensor, shape (batch, seq_len, d_model)
-				The final residual stream of the clean model.
-			corrupted_resid: torch.Tensor, shape (batch, seq_len, d_model)
-				The final residual stream of the corrupted model.
-			model: HookedTransformer
-				The hooked transformer model.
-			target_tokens: list of int
-				The indexes of the target tokens.
-		returns:
-			float
-				The percentage difference in logits for the target token.
 	"""
+	Compute the difference in logits for the target token as a percentage
+	between the clean and corrupted model based on the final residuals.
+	This implementation is optimized for transformerlens HookedTransformer.
+
+	Args:
+		clean_resid (torch.Tensor): 
+			The final residual stream of the clean model.
+			Shape: (batch, seq_len, d_model).
+		corrupted_resid (torch.Tensor): 
+			The final residual stream of the corrupted model.
+			Shape: (batch, seq_len, d_model).
+		model (HookedTransformer): 
+			The hooked transformer model.
+		target_tokens (List[int]): 
+			The indexes of the target tokens.
+
+	Returns:
+		torch.Tensor: 
+			The percentage difference in logits for the target token.
+	"""
+	
 	# Get the unembedding weights and bias
 	W_U = model.W_U
 	b_U = model.b_U
@@ -85,21 +97,24 @@ def indirect_effect(clean_resid: Tensor,
      				verbose = False,
 					use_ablation_mode = True,
     				set_baseline = False) -> Tensor:
-	""" Compute the difference of logits for the target token as a percentage
-		between the clean and corrupted model based on the final residuals.
-		This implementation is optimized for transformerlens HookedTransformer.
-		args:
-			clean_resid: torch.Tensor, shape (batch, seq_len, d_model)
-				The final residual stream of the clean model.
-			corrupted_resid: torch.Tensor, shape (batch, seq_len, d_model)
-				The final residual stream of the corrupted model.
-			model: HookedTransformer
-				The hooked transformer model.
-			target_tokens: list of int
-				The indexes of the target tokens.
-		returns:
-			float
-				The percentage difference in logits for the target token.
+	"""
+	Compute the indirect effect as a percentage difference in logits for the target tokens
+	between the clean and corrupted model based on the final residuals.
+
+	Args:
+		clean_resid (torch.Tensor): The final residual stream of the clean model.
+			Shape: (batch, seq_len, d_model).
+		corrupted_resid (torch.Tensor): The final residual stream of the corrupted model.
+			Shape: (batch, seq_len, d_model).
+		model (HookedTransformer): The hooked transformer model.
+		clean_targets (List[int]): The indexes of the target tokens for the clean model.
+		corrupt_targets (List[int]): The indexes of the target tokens for the corrupted model.
+		verbose (bool, optional): If True, prints intermediate values for debugging. Default is False.
+		use_ablation_mode (bool, optional): If True, uses ablation-based comparison. Default is True.
+		set_baseline (bool, optional): If True, sets the baseline score for centering the metric. Default is False.
+
+	Returns:
+		torch.Tensor: The indirect effect as a percentage difference in logits for the target tokens.
 	"""
 
 	# Get the final residual stream for the last token
@@ -135,27 +150,31 @@ def logit_difference_counterfactual(clean_resid: Tensor,
                                    target_tokens: List[int],
                                    counterfactual_tokens: Optional[List[int]] = None,
                                    use_ablation_mode: bool = False) -> Tensor:
-	""" Compute logit difference: y' - y between correct answer y (clean) and y' (counterfactual)
-		This function can handle both explicit counterfactual comparison and ablation-based comparison.
-		
-		args:
-			clean_resid: torch.Tensor, shape (batch, seq_len, d_model)
-				The final residual stream of the clean model.
-			counterfactual_resid: torch.Tensor, shape (batch, seq_len, d_model)
-				The final residual stream of the counterfactual model (or ablated model).
-			model: HookedTransformer
-				The hooked transformer model.
-			target_tokens: list of int
-				The indexes of the target tokens for the clean model.
-			counterfactual_tokens: Optional[list of int]
-				The indexes of the target tokens for the counterfactual model.
-				Required when use_ablation_mode=False.
-			use_ablation_mode: bool
-				If True, uses ablation-based comparison (counterfactual_resid is ablated version).
-				If False, uses explicit counterfactual comparison.
-		returns:
-			float
-				The logit difference: y' - y
+	"""
+	Compute logit difference: y' - y between the correct answer y (clean) and y' (counterfactual).
+	This function supports both explicit counterfactual comparison and ablation-based comparison.
+
+	Args:
+		clean_resid (torch.Tensor): 
+			The final residual stream of the clean model.
+			Shape: (batch, seq_len, d_model).
+		counterfactual_resid (torch.Tensor): 
+			The final residual stream of the counterfactual model (or ablated model).
+			Shape: (batch, seq_len, d_model).
+		model (HookedTransformer): 
+			The hooked transformer model.
+		target_tokens (List[int]): 
+			The indexes of the target tokens for the clean model.
+		counterfactual_tokens (Optional[List[int]]): 
+			The indexes of the target tokens for the counterfactual model.
+			Required when use_ablation_mode is False.
+		use_ablation_mode (bool): 
+			If True, uses ablation-based comparison (counterfactual_resid is the ablated version).
+			If False, uses explicit counterfactual comparison.
+
+	Returns:
+		float: 
+			The logit difference: y' - y.
 	"""
 	# Get the unembedding weights and bias
 	W_U = model.W_U
@@ -186,34 +205,3 @@ def logit_difference_counterfactual(clean_resid: Tensor,
 	logit_diffs = counterfactual_logits - clean_logits
 	return torch.mean(logit_diffs).item()
 
-# TODO: check if this is correct
-def kl_divergence(clean_resid: Tensor,
-					corrupted_resid: Tensor,
-					model: HookedTransformer,
-					target_token: int) -> Tensor:
-	""" Compute the Kullback-Leibler divergence between the probability distributions
-		of the clean and corrupted model based on the final residuals.
-		args:
-			clean_resid: torch.Tensor, shape (batch, seq_len, d_model)
-				The final residual stream of the clean model.
-			corrupted_resid: torch.Tensor, shape (batch, seq_len, d_model)
-				The final residual stream of the corrupted model.
-			model: HookedTransformer
-				The hooked transformer model.
-		returns:
-			float
-				The Kullback-Leibler divergence.
-	"""
-	# Get logits for the last token	
-	clean_resid = model.ln_final(clean_resid)
-	corrupted_resid = model.ln_final(corrupted_resid)
-	clean_logits = model.unembed(clean_resid)[:, -1, :]
-	corrupted_logits = model.unembed(corrupted_resid)[:, -1, :]
-
-	# Convert logits to probability distributions using softmax
-	prob_clean = F.softmax(clean_logits, dim=-1)
-	prob_corrupted = F.softmax(corrupted_logits, dim=-1)
-
-	# Compute KL divergence
-	kl_div = F.kl_div(torch.log(prob_corrupted), prob_clean, reduction='batchmean')
-	return kl_div.item()

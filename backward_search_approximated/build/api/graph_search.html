@@ -180,7 +180,7 @@
           
           
           
-          <a href="https://github.com/your-username/your-repo" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
+          <a href="https://github.com/andreac01/IPE-LatentCircuitIdentification.git" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
             <span class="sr-only">GitHub</span></a>
         </li>
 </ul></div>
@@ -273,7 +273,7 @@
           
           
           
-          <a href="https://github.com/your-username/your-repo" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
+          <a href="https://github.com/andreac01/IPE-LatentCircuitIdentification.git" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
             <span class="sr-only">GitHub</span></a>
         </li>
 </ul></div>
@@ -362,21 +362,20 @@ the most significant paths reaching it from an EMBED_ApproxNode.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code></span>) – The transformer model used for evaluation. It should be an instance
-of HookedTransformer, to ensure compatibility with cache and nodes
-forward methods.</p></li>
-<li><p><strong>metric</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Callable</span></code></a></span>) – A function to evaluate the contribution or importance of a path.
-It must accept a single parameter corresponding to the corrupted
-residual stream just before the final layer norm.
-(Assumes higher scores indicate greater importance based on evaluate_path behavior).</p></li>
-<li><p><strong>start_node</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="nodes.html#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a></span>) – The initial node to begin the backward search from
-(e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).</p></li>
-<li><p><strong>ground_truth_tokens</strong> – The reference tokens used for evaluating path contributions.</p></li>
-<li><p><strong>min_contribution</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span>) – The minimum absolute contribution score required for a path to be considered valid.</p></li>
-<li><p><strong>include_negative</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – If True, include paths with negative contributions.
-The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.</p></li>
-<li><p><strong>return_all</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – If True, return all evaluated complete paths regardless of
-their contribution score. The search will still be guided by min_contribution.</p></li>
+<li><p><strong>model</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>) – The transformer model used for evaluation. It should be an instance
+of HookedTransformer, to ensure compatibility with cache and nodes forward methods.</p></li>
+<li><p><strong>metric</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Callable</span></code>) – <dl class="simple">
+<dt>A function to evaluate the contribution or importance of the path.</dt><dd><p>It must accept three parameters:
+- The output of the last node in the path.
+- The output of the last node when the path is removed
+- The model itself</p>
+</dd>
+</dl>
+</p></li>
+<li><p><strong>start_node</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code>) – The initial node to begin the backward search from (e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).</p></li>
+<li><p><strong>min_contribution</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">0.5</span></code>) – The minimum absolute contribution score required for a path to be considered valid.</p></li>
+<li><p><strong>include_negative</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#False" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code></a>) – If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.</p></li>
+<li><p><strong>return_all</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#False" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code></a>) – If True, return all evaluated complete paths regardless of their contribution score. The search will still be guided by min_contribution.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
@@ -397,15 +396,18 @@ the most significant paths reaching it from an EMBED_ApproxNode.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code></span>) – The transformer model used for evaluation.</p></li>
-<li><p><strong>cache</strong> – The activation cache containing intermediate activations.</p></li>
-<li><p><strong>metric</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Callable</span></code></a></span>) – A function to evaluate the contribution or importance of a path.
-(Assumes higher scores indicate greater importance based on evaluate_path behavior).</p></li>
-<li><p><strong>start_node</strong> – The initial node to begin the backward search from (e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).</p></li>
-<li><p><strong>ground_truth_tokens</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>]</span>) – The reference tokens used for evaluating path contributions.</p></li>
-<li><p><strong>min_contribution</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span>) – The minimum absolute contribution score required for a path to be considered valid.</p></li>
-<li><p><strong>include_negative</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.</p></li>
-<li><p><strong>return_all</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – If True, return all evaluated paths regardless of their contribution score. The search will still be guided by min_contribution.</p></li>
+<li><p><strong>model</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>) – The transformer model used for evaluation.</p></li>
+<li><p><strong>msg_cache</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ActivationCache</span></code>) – The activation cache containing intermediate activations.</p></li>
+<li><p><strong>metric</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Callable</span></code>) – <dl class="simple">
+<dt>A function to evaluate the contribution or importance of the path.</dt><dd><p>It must accept a single parameter corresponding to the corrupted residual stream just before the final layer norm.</p>
+</dd>
+</dl>
+</p></li>
+<li><p><strong>root</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code>) – The initial node to begin the backward search from (e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).</p></li>
+<li><p><strong>ground_truth_tokens</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a> of <a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>) – The reference tokens used for evaluating path contributions.</p></li>
+<li><p><strong>min_contribution</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">0.5</span></code>) – The minimum absolute contribution score required for a path to be considered valid.</p></li>
+<li><p><strong>include_negative</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#False" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code></a>) – If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.</p></li>
+<li><p><strong>return_all</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#False" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code></a>) – If True, return all evaluated paths regardless of their contribution score. The search will still be guided by min_contribution threshold.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
@@ -420,17 +422,66 @@ the most significant paths reaching it from an EMBED_ApproxNode.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.graph_search.evaluate_path">
 <span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.graph_search.</span></span><span class="sig-name descname"><span class="pre">evaluate_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">correct_tokens</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/graph_search.html#evaluate_path"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.graph_search.evaluate_path" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
+<dd><p>Evaluates the contribution of a given path by executing the forward methods of each node in the path and then applying the provided metric function to the final output.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>) – The transformer model used for evaluation.</p></li>
+<li><p><strong>cache</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ActivationCache</span></code>) – The activation cache containing intermediate activations.</p></li>
+<li><p><strong>path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a> of <code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code>) – The sequence of nodes representing the path to be evaluated.</p></li>
+<li><p><strong>metric</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Callable</span></code>) – A function to evaluate the contribution or importance of the path.
+It must accept three parameters:
+- The output of the last node in the path.
+- The output of the last node when the path is removed
+- The model itself</p></li>
+<li><p><strong>correct_tokens</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a> of <a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>) – The reference tokens used for evaluating path contributions.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The contribution score of the path as determined by the metric function.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)">float</a></p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.graph_search.get_path">
 <span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.graph_search.</span></span><span class="sig-name descname"><span class="pre">get_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/graph_search.html#get_path"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.graph_search.get_path" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
+<dd><p>Constructs the path from the given node back to the root by following parent links.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>node</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code>) – The node from which to start constructing the path.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The sequence of nodes representing the path from the root to the given node.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)">list</a> of <a class="reference internal" href="nodes.html#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode">ApproxNode</a></p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.graph_search.get_path_msg">
 <span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.graph_search.</span></span><span class="sig-name descname"><span class="pre">get_path_msg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/graph_search.html#get_path_msg"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.graph_search.get_path_msg" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
+<dd><p>Recursively computes the message by applying the forward method of each node in the path.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a> of <code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code>) – The sequence of nodes representing the path.</p></li>
+<li><p><strong>message</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">torch.Tensor</span></code>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Initial message to be passed to the first node in the path.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The final message after applying all nodes in the path.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>torch.Tensor</p>
+</dd>
+</dl>
+</dd></dl>
 
 </section>
 
@@ -493,7 +544,7 @@ the most significant paths reaching it from an EMBED_ApproxNode.</p>
 
   
   <div class="tocsection editthispage">
-    <a href="https://github.com/your-username/your-repo/edit/main/source/api/graph_search.rst">
+    <a href="https://github.com/acerutti/https://github.com/andreac01/IPE-LatentCircuitIdentification.git/edit/main/source/api/graph_search.rst">
       <i class="fa-solid fa-pencil"></i>
       
       

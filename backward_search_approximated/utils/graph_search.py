@@ -9,6 +9,24 @@ from typing import Callable
 
 
 def evaluate_path(model, cache, path, metric, correct_tokens):
+	"""
+	Evaluates the contribution of a given path by executing the forward methods of each node in the path and then applying the provided metric function to the final output.
+	
+	Args:
+		model (HookedTransformer): The transformer model used for evaluation.
+		cache (ActivationCache): The activation cache containing intermediate activations.
+		path (list of ApproxNode): The sequence of nodes representing the path to be evaluated.
+		metric (Callable): A function to evaluate the contribution or importance of the path.
+			It must accept three parameters:
+			- The output of the last node in the path.
+			- The output of the last node when the path is removed
+			- The model itself
+		correct_tokens (list of int): The reference tokens used for evaluating path contributions.
+	
+	Returns:
+		float: 
+			The contribution score of the path as determined by the metric function.
+	"""
 	message = None
 	if len(path) == 0:
 		return message
@@ -34,21 +52,23 @@ def IsolatingPathEffect_BW(
 	the most significant paths reaching it from an EMBED_ApproxNode.
 
 	Args:
-		model: The transformer model used for evaluation. It should be an instance
-				of HookedTransformer, to ensure compatibility with cache and nodes
-				forward methods.
-		metric: A function to evaluate the contribution or importance of a path.
-				It must accept a single parameter corresponding to the corrupted
-				residual stream just before the final layer norm.
-				(Assumes higher scores indicate greater importance based on evaluate_path behavior).
-		start_node: The initial node to begin the backward search from 
-				(e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).
-		ground_truth_tokens: The reference tokens used for evaluating path contributions.
-		min_contribution: The minimum absolute contribution score required for a path to be considered valid.
-		include_negative: If True, include paths with negative contributions. 
-				The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.
-		return_all: If True, return all evaluated complete paths regardless of 
-				their contribution score. The search will still be guided by min_contribution.
+		model (HookedTransformer): 
+			The transformer model used for evaluation. It should be an instance
+			of HookedTransformer, to ensure compatibility with cache and nodes forward methods.
+		metric (Callable): 
+			A function to evaluate the contribution or importance of the path.
+				It must accept three parameters:
+				- The output of the last node in the path.
+				- The output of the last node when the path is removed
+				- The model itself
+		start_node (ApproxNode): 
+			The initial node to begin the backward search from (e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).
+		min_contribution (float, default=0.5):
+			The minimum absolute contribution score required for a path to be considered valid.
+		include_negative (bool, default=False): 
+			If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.
+		return_all (bool, default=False): 
+			If True, return all evaluated complete paths regardless of their contribution score. The search will still be guided by min_contribution.
 	Returns:
 		A list of tuples containing the contribution score and the corresponding path, 
 		sorted by contribution in descending order.
@@ -114,12 +134,35 @@ def IsolatingPathEffect_BW(
 
 
 def get_path_msg(path, message=None):
+	"""
+	Recursively computes the message by applying the forward method of each node in the path.
+
+	Args:
+		path (list of ApproxNode): 
+			The sequence of nodes representing the path.
+		message (torch.Tensor, default=None):
+			Initial message to be passed to the first node in the path.
+
+	Returns:
+		torch.Tensor:
+			The final message after applying all nodes in the path.
+	"""
 	if len(path) == 0:
 		return message
 	message = path[0].forward(message=message)
 	return get_path_msg(path[1:], message=message)
 
 def get_path(node):
+	"""
+	Constructs the path from the given node back to the root by following parent links.
+
+	Args:
+		node (ApproxNode): The node from which to start constructing the path.
+	
+	Returns:
+		list of ApproxNode:
+			The sequence of nodes representing the path from the root to the given node.
+	"""
 	path = [node]
 	while path[-1].parent is not None:
 		path.append(path[-1].parent)
@@ -140,15 +183,23 @@ def PathAttributionPatching(
 	the most significant paths reaching it from an EMBED_ApproxNode.
 
 	Args:
-		model: The transformer model used for evaluation.
-		cache: The activation cache containing intermediate activations.
-		metric: A function to evaluate the contribution or importance of a path.
-				(Assumes higher scores indicate greater importance based on evaluate_path behavior).
-		start_node: The initial node to begin the backward search from (e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).
-		ground_truth_tokens: The reference tokens used for evaluating path contributions.
-		min_contribution: The minimum absolute contribution score required for a path to be considered valid.
-		include_negative: If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.
-		return_all: If True, return all evaluated paths regardless of their contribution score. The search will still be guided by min_contribution.
+		model (HookedTransformer): 
+			The transformer model used for evaluation.
+		msg_cache (ActivationCache): 
+			The activation cache containing intermediate activations.
+		metric (Callable):
+			A function to evaluate the contribution or importance of the path.
+				It must accept a single parameter corresponding to the corrupted residual stream just before the final layer norm.
+		root (ApproxNode): 
+			The initial node to begin the backward search from (e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).
+		ground_truth_tokens (list of int): 
+			The reference tokens used for evaluating path contributions.
+		min_contribution (float, default=0.5): 
+			The minimum absolute contribution score required for a path to be considered valid.
+		include_negative (bool, default=False): 
+			If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.
+		return_all (bool, default=False): 
+			If True, return all evaluated paths regardless of their contribution score. The search will still be guided by min_contribution threshold.
 	Returns:
 		A list of tuples containing the contribution score and the corresponding path, sorted by contribution in descending order.
 	"""

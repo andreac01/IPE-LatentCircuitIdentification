@@ -180,7 +180,7 @@
           
           
           
-          <a href="https://github.com/your-username/your-repo" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
+          <a href="https://github.com/andreac01/IPE-LatentCircuitIdentification.git" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
             <span class="sr-only">GitHub</span></a>
         </li>
 </ul></div>
@@ -273,7 +273,7 @@
           
           
           
-          <a href="https://github.com/your-username/your-repo" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
+          <a href="https://github.com/andreac01/IPE-LatentCircuitIdentification.git" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
             <span class="sr-only">GitHub</span></a>
         </li>
 </ul></div>
@@ -357,34 +357,25 @@
 <dl class="py function">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.metrics.compare_token_logit">
 <span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.metrics.</span></span><span class="sig-name descname"><span class="pre">compare_token_logit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clean_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">corrupted_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_tokens</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/metrics.html#compare_token_logit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.metrics.compare_token_logit" title="Link to this definition">#</a></dt>
-<dd><p>Compute the difference of logits for the target token as a percentage
+<dd><p>Compute the difference in logits for the target token as a percentage
 between the clean and corrupted model based on the final residuals.
-This implementation is optimized for transformerlens HookedTransformer.
-:type clean_resid: <span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>
-:param clean_resid: torch.Tensor, shape (batch, seq_len, d_model)</p>
-<blockquote>
-<div><p>The final residual stream of the clean model.</p>
-</div></blockquote>
+This implementation is optimized for transformerlens HookedTransformer.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>corrupted_resid</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – torch.Tensor, shape (batch, seq_len, d_model)
-The final residual stream of the corrupted model.</p></li>
-<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code></span>) – HookedTransformer
-The hooked transformer model.</p></li>
-<li><p><strong>target_tokens</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>]</span>) – list of int
-The indexes of the target tokens.</p></li>
+<li><p><strong>clean_resid</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">torch.Tensor</span></code>) – The final residual stream of the clean model.
+Shape: (batch, seq_len, d_model).</p></li>
+<li><p><strong>corrupted_resid</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">torch.Tensor</span></code>) – The final residual stream of the corrupted model.
+Shape: (batch, seq_len, d_model).</p></li>
+<li><p><strong>model</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>) – The hooked transformer model.</p></li>
+<li><p><strong>target_tokens</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">List[int]</span></code>) – The indexes of the target tokens.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The percentage difference in logits for the target token.</p>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p><dl class="simple">
-<dt>float</dt><dd><p>The percentage difference in logits for the target token.</p>
-</dd>
-</dl>
-</p>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>torch.Tensor</p>
 </dd>
 </dl>
 </dd></dl>
@@ -392,33 +383,25 @@ The indexes of the target tokens.</p></li>
 <dl class="py function">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.metrics.compare_token_probability">
 <span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.metrics.</span></span><span class="sig-name descname"><span class="pre">compare_token_probability</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clean_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">corrupted_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_tokens</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/metrics.html#compare_token_probability"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.metrics.compare_token_probability" title="Link to this definition">#</a></dt>
-<dd><p>Compute the difference of predicting the target token in probability
+<dd><p>Compute the difference in the probability of predicting the target token
 between the clean and corrupted model based on the final residuals.
-:type clean_resid: <span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>
-:param clean_resid: torch.Tensor, shape (batch, seq_len, d_model)</p>
-<blockquote>
-<div><p>The final residual stream of the clean model.</p>
-</div></blockquote>
+This probability is returned as a percentage of the clean model’s probability.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>corrupted_resid</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – torch.Tensor, shape (batch, seq_len, d_model)
-The final residual stream of the corrupted model.</p></li>
-<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code></span>) – HookedTransformer
-The hooked transformer model.</p></li>
-<li><p><strong>target_tokens</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>]</span>) – list of int
-The indexes of the target tokens.</p></li>
+<li><p><strong>clean_resid</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">torch.Tensor</span></code>) – The final residual stream of the clean model.
+Shape: (batch, seq_len, d_model).</p></li>
+<li><p><strong>corrupted_resid</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">torch.Tensor</span></code>) – The final residual stream of the corrupted model.
+Shape: (batch, seq_len, d_model).</p></li>
+<li><p><strong>model</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>) – The hooked transformer model.</p></li>
+<li><p><strong>target_tokens</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">List[int]</span></code>) – The indexes of the target tokens.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The difference in probability of predicting the target token.</p>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p><dl class="simple">
-<dt>float</dt><dd><p>The difference in probability of predicting the target token.</p>
-</dd>
-</dl>
-</p>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)">float</a></p>
 </dd>
 </dl>
 </dd></dl>
@@ -426,66 +409,28 @@ The indexes of the target tokens.</p></li>
 <dl class="py function">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.metrics.indirect_effect">
 <span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.metrics.</span></span><span class="sig-name descname"><span class="pre">indirect_effect</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clean_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">corrupted_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clean_targets</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">corrupt_targets</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_ablation_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">set_baseline</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/metrics.html#indirect_effect"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.metrics.indirect_effect" title="Link to this definition">#</a></dt>
-<dd><p>Compute the difference of logits for the target token as a percentage
-between the clean and corrupted model based on the final residuals.
-This implementation is optimized for transformerlens HookedTransformer.
-:type clean_resid: <span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>
-:param clean_resid: torch.Tensor, shape (batch, seq_len, d_model)</p>
-<blockquote>
-<div><p>The final residual stream of the clean model.</p>
-</div></blockquote>
+<dd><p>Compute the indirect effect as a percentage difference in logits for the target tokens
+between the clean and corrupted model based on the final residuals.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>corrupted_resid</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – torch.Tensor, shape (batch, seq_len, d_model)
-The final residual stream of the corrupted model.</p></li>
-<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code></span>) – HookedTransformer
-The hooked transformer model.</p></li>
-<li><p><strong>target_tokens</strong> – list of int
-The indexes of the target tokens.</p></li>
+<li><p><strong>clean_resid</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">torch.Tensor</span></code>) – The final residual stream of the clean model.
+Shape: (batch, seq_len, d_model).</p></li>
+<li><p><strong>corrupted_resid</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">torch.Tensor</span></code>) – The final residual stream of the corrupted model.
+Shape: (batch, seq_len, d_model).</p></li>
+<li><p><strong>model</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>) – The hooked transformer model.</p></li>
+<li><p><strong>clean_targets</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">List[int]</span></code>) – The indexes of the target tokens for the clean model.</p></li>
+<li><p><strong>corrupt_targets</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">List[int]</span></code>) – The indexes of the target tokens for the corrupted model.</p></li>
+<li><p><strong>verbose</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>, <em>optional</em>) – If True, prints intermediate values for debugging. Default is False.</p></li>
+<li><p><strong>use_ablation_mode</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>, <em>optional</em>) – If True, uses ablation-based comparison. Default is True.</p></li>
+<li><p><strong>set_baseline</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>, <em>optional</em>) – If True, sets the baseline score for centering the metric. Default is False.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The indirect effect as a percentage difference in logits for the target tokens.</p>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p><dl class="simple">
-<dt>float</dt><dd><p>The percentage difference in logits for the target token.</p>
-</dd>
-</dl>
-</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="backward_search_approximated.utils.metrics.kl_divergence">
-<span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.metrics.</span></span><span class="sig-name descname"><span class="pre">kl_divergence</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clean_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">corrupted_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_token</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/metrics.html#kl_divergence"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.metrics.kl_divergence" title="Link to this definition">#</a></dt>
-<dd><p>Compute the Kullback-Leibler divergence between the probability distributions
-of the clean and corrupted model based on the final residuals.
-:type clean_resid: <span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>
-:param clean_resid: torch.Tensor, shape (batch, seq_len, d_model)</p>
-<blockquote>
-<div><p>The final residual stream of the clean model.</p>
-</div></blockquote>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>corrupted_resid</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – torch.Tensor, shape (batch, seq_len, d_model)
-The final residual stream of the corrupted model.</p></li>
-<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code></span>) – HookedTransformer
-The hooked transformer model.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p><dl class="simple">
-<dt>float</dt><dd><p>The Kullback-Leibler divergence.</p>
-</dd>
-</dl>
-</p>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>torch.Tensor</p>
 </dd>
 </dl>
 </dd></dl>
@@ -493,36 +438,28 @@ The hooked transformer model.</p></li>
 <dl class="py function">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.metrics.logit_difference_counterfactual">
 <span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.metrics.</span></span><span class="sig-name descname"><span class="pre">logit_difference_counterfactual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clean_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">counterfactual_resid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_tokens</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">counterfactual_tokens</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_ablation_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/metrics.html#logit_difference_counterfactual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.metrics.logit_difference_counterfactual" title="Link to this definition">#</a></dt>
-<dd><p>Compute logit difference: y’ - y between correct answer y (clean) and y’ (counterfactual)
-This function can handle both explicit counterfactual comparison and ablation-based comparison.</p>
+<dd><p>Compute logit difference: y’ - y between the correct answer y (clean) and y’ (counterfactual).
+This function supports both explicit counterfactual comparison and ablation-based comparison.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>clean_resid</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – torch.Tensor, shape (batch, seq_len, d_model)
-The final residual stream of the clean model.</p></li>
-<li><p><strong>counterfactual_resid</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – torch.Tensor, shape (batch, seq_len, d_model)
-The final residual stream of the counterfactual model (or ablated model).</p></li>
-<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code></span>) – HookedTransformer
-The hooked transformer model.</p></li>
-<li><p><strong>target_tokens</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>]</span>) – list of int
-The indexes of the target tokens for the clean model.</p></li>
-<li><p><strong>counterfactual_tokens</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>]]</span>) – Optional[list of int]
-The indexes of the target tokens for the counterfactual model.
-Required when use_ablation_mode=False.</p></li>
-<li><p><strong>use_ablation_mode</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – bool
-If True, uses ablation-based comparison (counterfactual_resid is ablated version).
+<li><p><strong>clean_resid</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">torch.Tensor</span></code>) – The final residual stream of the clean model.
+Shape: (batch, seq_len, d_model).</p></li>
+<li><p><strong>counterfactual_resid</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">torch.Tensor</span></code>) – The final residual stream of the counterfactual model (or ablated model).
+Shape: (batch, seq_len, d_model).</p></li>
+<li><p><strong>model</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>) – The hooked transformer model.</p></li>
+<li><p><strong>target_tokens</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">List[int]</span></code>) – The indexes of the target tokens for the clean model.</p></li>
+<li><p><strong>counterfactual_tokens</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Optional[List[int]]</span></code>) – The indexes of the target tokens for the counterfactual model.
+Required when use_ablation_mode is False.</p></li>
+<li><p><strong>use_ablation_mode</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>) – If True, uses ablation-based comparison (counterfactual_resid is the ablated version).
 If False, uses explicit counterfactual comparison.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The logit difference: y’ - y.</p>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p><dl class="simple">
-<dt>float</dt><dd><p>The logit difference: y’ - y</p>
-</dd>
-</dl>
-</p>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)">float</a></p>
 </dd>
 </dl>
 </dd></dl>
@@ -579,7 +516,6 @@ If False, uses explicit counterfactual comparison.</p></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.metrics.compare_token_logit"><code class="docutils literal notranslate"><span class="pre">compare_token_logit()</span></code></a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.metrics.compare_token_probability"><code class="docutils literal notranslate"><span class="pre">compare_token_probability()</span></code></a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.metrics.indirect_effect"><code class="docutils literal notranslate"><span class="pre">indirect_effect()</span></code></a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.metrics.kl_divergence"><code class="docutils literal notranslate"><span class="pre">kl_divergence()</span></code></a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.metrics.logit_difference_counterfactual"><code class="docutils literal notranslate"><span class="pre">logit_difference_counterfactual()</span></code></a></li>
 </ul>
   </nav></div>
@@ -588,7 +524,7 @@ If False, uses explicit counterfactual comparison.</p></li>
 
   
   <div class="tocsection editthispage">
-    <a href="https://github.com/your-username/your-repo/edit/main/source/api/metrics.rst">
+    <a href="https://github.com/acerutti/https://github.com/andreac01/IPE-LatentCircuitIdentification.git/edit/main/source/api/metrics.rst">
       <i class="fa-solid fa-pencil"></i>
       
       

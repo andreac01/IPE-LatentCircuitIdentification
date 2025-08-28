@@ -41,34 +41,39 @@ class ApproxNode(abc.ABC):
 		patch_type (str, default='zero'): 
 			Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
 
-	Args:
-		model (HookedTransformer): 
-			The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
-		layer (int): 
-			Layer index in the transformer. Embedding layer is assumed to be layer 0.
-		position (int, default=None): 
-			Token position if position-specific, else None. None is equivalent to all positions.
-		parent (ApproxNode, default=None): 
-			Parent node in the next node in the path. The parent is a successor in the computational graph.
-		children (set, default=set()): 
-			Set of child nodes. A child is a predecessor in the computational graph.
-		msg_cache (dict): 
-			Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
-		cf_cache (dict, default={}): 
-			Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-		gradient (Tensor, default=None): 
-			Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
-		input_name (str): 
-			Input activation name. This is the name associated to the cache entry corresponding to the input of this node.
-		output_name (str): 
-			Output activation name. This is the name associated to the cache entry corresponding to the output of this node.
-		patch_type (str, default='zero'): 
-			Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
-	
 	Notes:
 		This is an abstract base class that should not be instantiated directly. Concrete implementations should inherit from this class and implement the required abstract methods.
 	"""
 	def __init__(self, model: HookedTransformer, layer: int, msg_cache: dict, input_name: str, output_name: str, position: int = None, cf_cache: dict = {}, parent = None, children: set = set(), gradient: Tensor = None, patch_type: str = 'zero'):
+		"""	 Initializes an ApproxNode instance.
+
+		Args:
+			model (HookedTransformer): 
+				The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
+			layer (int): 
+				Layer index in the transformer. Embedding layer is assumed to be layer 0.
+			position (int, default=None): 
+				Token position if position-specific, else None. None is equivalent to all positions.
+			parent (ApproxNode, default=None): 
+				Parent node in the next node in the path. The parent is a successor in the computational graph.
+			children (set, default=set()): 
+				Set of child nodes. A child is a predecessor in the computational graph.
+			msg_cache (dict): 
+				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
+			cf_cache (dict, default={}): 
+				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
+			gradient (Tensor, default=None): 
+				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
+			input_name (str): 
+				Input activation name. This is the name associated to the cache entry corresponding to the input of this node.
+			output_name (str): 
+				Output activation name. This is the name associated to the cache entry corresponding to the output of this node.
+			patch_type (str, default='zero'): 
+				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
+		Returns:
+			ApproxNode:
+				An instance of ApproxNode.
+	"""
 		self.model = model
 		self.layer = layer
 		self.position = position
@@ -133,8 +138,7 @@ class ApproxNode(abc.ABC):
 				A tensor representing the effect of the message on the output of the node.
 				In simpler terms, it represents the message caused by passing the input message through this node.
 
-		Notes
-		-----
+		Notes:
 		- If a position is specified the output will be zero for all other positions.
 		- The method assumes that the msg_cache and cf_cache contain the necessary activations.
 		- When message is None, the method will cache the output in msg_cache or cf_cache if not already present.
@@ -295,29 +299,32 @@ class MLP_ApproxNode(ApproxNode):
 			Output activation name. This is the name associated to the cache entry corresponding to the output of this node.
 		patch_type (str, default='zero'): 
 			Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
-	
-	Args:
-		model (HookedTransformer): 
-			The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
-		layer (int): 
-			Layer index in the transformer. Embedding layer is assumed to be layer 0.
-		position (int, default=None): 
-			Token position if position-specific, else None. None is equivalent to all positions.
-		parent (ApproxNode, default=None): 
-			Parent node in the next node in the path. The parent is a successor in the computational graph.
-		children (set, default=set()): 
-			Set of child nodes. A child is a predecessor in the computational graph.
-		msg_cache (dict): 
-			Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
-		cf_cache (dict, default={}): 
-			Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-		gradient (Tensor, default=None): 
-			Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
-		patch_type (str, default='zero'): 
-			Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
-
 	"""
 	def __init__(self, model: HookedTransformer, layer: int, position: int = None, parent: ApproxNode = None, children = set(), msg_cache = {}, cf_cache = {}, gradient = None, patch_type = 'zero'):
+		"""Initializes an MLP_ApproxNode instance.
+		Args:
+			model (HookedTransformer): 
+				The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
+			layer (int): 
+				Layer index in the transformer. Embedding layer is assumed to be layer 0.
+			position (int, default=None): 
+				Token position if position-specific, else None. None is equivalent to all positions.
+			parent (ApproxNode, default=None): 
+				Parent node in the next node in the path. The parent is a successor in the computational graph.
+			children (set, default=set()): 
+				Set of child nodes. A child is a predecessor in the computational graph.
+			msg_cache (dict): 
+				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
+			cf_cache (dict, default={}): 
+				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
+			gradient (Tensor, default=None): 
+				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
+			patch_type (str, default='zero'): 
+				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
+		Returns:
+			self (MLP_ApproxNode):
+				The initialized MLP_ApproxNode instance.
+		"""
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_mid", output_name=f"blocks.{layer}.hook_mlp_out", patch_type=patch_type)
 	
 
@@ -341,8 +348,7 @@ class MLP_ApproxNode(ApproxNode):
 			Tensor:
 				A tensor representing the effect of the message on the output of the node.
 
-		Notes
-		-----
+		Notes:
 		- If a position is specified the output will be zero for all other positions.
 		- The method assumes that the msg_cache and cf_cache contain the necessary activations.
 		- When message is None, the method will cache the output in msg_cache or cf_cache if not already present.
@@ -381,7 +387,7 @@ class MLP_ApproxNode(ApproxNode):
 		output of this node. 
 		Previous nodes of an MLP are:
 			- MLP, EMBED and ATTN nodes in self.position from previous layers.
-			- ATTN nodes in all previous positions from current layers.
+			- ATTN nodes in self.position from current layers.
 		ATTN nodes are always patched both in query and key-value positions separately.
 		Args:
 
@@ -397,6 +403,9 @@ class MLP_ApproxNode(ApproxNode):
 		Returns:
 			list of ApproxNode:
 				The list of all predecessor nodes infuencing the input of this node.
+		
+		Notes:
+			- If self.position is None, only non-position-specific previous nodes are considered.
 		"""
 		prev_nodes = []
 		common_args = {"model": self.model, "msg_cache": self.msg_cache, "cf_cache": self.cf_cache, "parent": self, "patch_type": self.patch_type}
@@ -526,7 +535,8 @@ class MLP_ApproxNode(ApproxNode):
 	
 
 class ATTN_ApproxNode(ApproxNode):
-	"""Represents an Attention node (potentially a specific head) in the transformer.
+	"""Represents an Attention node (potentially a specific head) in the transformer model.
+
 	Attributes:
 		model (HookedTransformer): 
 			The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
@@ -565,43 +575,47 @@ class ATTN_ApproxNode(ApproxNode):
 			Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
 		plot_patterns (bool, default=False):
 			Whether to plot the attention patterns when calculating the forward pass. This is useful for debugging purposes but also to visualize the changes in the attention patterns when patching specific positions.
-		
-	
-	Args:
-		model (HookedTransformer): 
-			The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
-		layer (int): 
-			Layer index in the transformer. Embedding layer is assumed to be layer 0.
-		head (int, default=None):
-			Attention head index if head-specific, else None. None is equivalent to all heads. When an head is specified the contribution of the is considered, particularly the bias term which is not head-specific is not included. Therefore the output of an ATTN node is equal to the output of all the heads plus the bias term. If head is None the whole attention output is considered.
-		position (int, default=None): 
-			Token position if position-specific, else None. None is equivalent to all positions.
-		keyvalue_position (int, default=None):
-			Key/Value token position if position-specific, else None. None is equivalent to all positions.
-			If keyvalue_position is specified, the node represents the contribution of the attention head when the value residual strams of all other positions are zeroed out. This is equivalent to attending only to a single position, but scaling the output by the attention score of that position.
-		patch_key (bool, default=True):
-			Whether to patch the key projection of the attention head. If False, the key projection is not patched and the message is only removed from the query and/or value projections.
-		patch_value (bool, default=True):
-			Whether to patch the value projection of the attention head. If False, the value projection is not patched and the message is only removed from the query and/or key projections.
-		patch_query (bool, default=True):
-			Whether to patch the query projection of the attention head. If False, the query projection is not patched and the message is only removed from the key and/or value projections.
-		parent (ApproxNode, default=None): 
-			Parent node in the next node in the path. The parent is a successor in the computational graph.
-		children (set, default=set()): 
-			Set of child nodes. A child is a predecessor in the computational graph.
-		msg_cache (dict): 
-			Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
-		cf_cache (dict, default={}): 
-			Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-		gradient (Tensor, default=None): 
-			Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
-		patch_type (str, default='zero'): 
-			Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
-		plot_patterns (bool, default=False):
-			Whether to plot the attention patterns when calculating the forward pass. This is useful for debugging purposes but also to visualize the changes in the attention patterns when patching specific positions.
-
 	"""
 	def __init__(self, model: HookedTransformer, layer: int, head: int = None, position: int = None, keyvalue_position: int = None, parent: ApproxNode = None, children = set(), msg_cache = {}, cf_cache = {}, gradient = None, patch_query: bool = True, patch_key: bool = True, patch_value: bool = True, plot_patterns: bool = False, patch_type = 'zero'):
+		"""Initializes an ATTN_ApproxNode instance.
+
+		Args:
+			model (HookedTransformer): 
+				The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
+			layer (int): 
+				Layer index in the transformer. Embedding layer is assumed to be layer 0.
+			head (int, default=None):
+				Attention head index if head-specific, else None. None is equivalent to all heads. When an head is specified the contribution of the is considered, particularly the bias term which is not head-specific is not included. Therefore the output of an ATTN node is equal to the output of all the heads plus the bias term. If head is None the whole attention output is considered.
+			position (int, default=None): 
+				Token position if position-specific, else None. None is equivalent to all positions.
+			keyvalue_position (int, default=None):
+				Key/Value token position if position-specific, else None. None is equivalent to all positions.
+				If keyvalue_position is specified, the node represents the contribution of the attention head when the value residual strams of all other positions are zeroed out. This is equivalent to attending only to a single position, but scaling the output by the attention score of that position.
+			patch_key (bool, default=True):
+				Whether to patch the key projection of the attention head. If False, the key projection is not patched and the message is only removed from the query and/or value projections.
+			patch_value (bool, default=True):
+				Whether to patch the value projection of the attention head. If False, the value projection is not patched and the message is only removed from the query and/or key projections.
+			patch_query (bool, default=True):
+				Whether to patch the query projection of the attention head. If False, the query projection is not patched and the message is only removed from the key and/or value projections.
+			parent (ApproxNode, default=None): 
+				Parent node in the next node in the path. The parent is a successor in the computational graph.
+			children (set, default=set()): 
+				Set of child nodes. A child is a predecessor in the computational graph.
+			msg_cache (dict): 
+				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
+			cf_cache (dict, default={}): 
+				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
+			gradient (Tensor, default=None): 
+				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
+			patch_type (str, default='zero'): 
+				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
+			plot_patterns (bool, default=False):
+				Whether to plot the attention patterns when calculating the forward pass. This is useful for debugging purposes but also to visualize the changes in the attention patterns when patching specific positions.
+		
+		Returns:
+			self (ATTN_ApproxNode):
+				The initialized ATTN_ApproxNode instance.
+		"""
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, patch_type=patch_type, input_name=f"blocks.{layer}.hook_resid_pre", output_name="")
 		self.head = head
 		self.keyvalue_position = keyvalue_position
@@ -640,8 +654,7 @@ class ATTN_ApproxNode(ApproxNode):
 				A tensor representing the effect of the message on the output of the node.
 				In simpler terms, it represents the message caused by passing the input message through this node.
 
-		Notes
-		-----
+		Notes:
 		- If a position is specified the output will be zero for all other positions.
 		- The method assumes that the msg_cache and cf_cache contain the necessary activations.
 		- When message is None, the method will cache the output in msg_cache or cf_cache if not already present.
@@ -935,6 +948,9 @@ class ATTN_ApproxNode(ApproxNode):
 		Returns:
 			list of ApproxNode:
 				The list of all predecessor nodes infuencing the input of this node.
+
+		Notes:
+			- If self.position is None, only non-position-specific previous nodes are considered.
 		"""	
 		prev_nodes = []
 		common_args = {"model": self.model, "msg_cache": self.msg_cache, "parent": self, "patch_type": self.patch_type, "cf_cache": self.cf_cache}
@@ -1020,18 +1036,105 @@ class ATTN_ApproxNode(ApproxNode):
 		return prev_nodes
 
 	def __repr__(self):
+		"""String representation of the ATTN_ApproxNode instance.
+		Includes layer, head, position, keyvalue_position, and patching options.
+		
+		Returns:
+			str:
+				A string representation of the ATTN_ApproxNode instance.
+		"""
 		return f"ATTN_ApproxNode(layer={self.layer}, head={self.head}, position={self.position}, keyvalue_position={self.keyvalue_position}, patch_query={self.patch_query}, patch_key={self.patch_key}, patch_value={self.patch_value})"
 
 	def __hash__(self):
+		"""Hash function for the ATTN_ApproxNode instance.
+		
+		Returns:
+			int:
+				A hash value based on the layer, head, position, keyvalue_position, and patching options.
+		"""
 		return hash((type(self).__name__, self.layer, self.head, self.position, self.keyvalue_position, self.patch_query, self.patch_key, self.patch_value))
 
 
 class EMBED_ApproxNode(ApproxNode):
-	"""Represents the embedding node in the transformer."""
+	"""Represents the embedding node in the transformer. This is almost a dummy node, as it only serves as the starting point for paths that begin at the input embeddings. This classes uses cached activations from the model to provide an interface consistent with other node types.	
+
+	Attributes:
+		model (HookedTransformer): 
+			The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
+		layer (int): 
+			Layer index in the transformer. Embedding layer is assumed to be layer 0.
+		position (int, default=None): 
+			Token position if position-specific, else None. None is equivalent to all positions.
+		parent (ApproxNode, default=None): 
+			Parent node in the next node in the path. The parent is a successor in the computational graph.
+		children (set, default=set()): 
+			Set of child nodes. A child is a predecessor in the computational graph.
+		msg_cache (dict): 
+			Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
+		cf_cache (dict, default={}): 
+			Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
+		gradient (Tensor, default=None): 
+			Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
+		input_name (str): 
+			Input activation name. This is the name associated to the cache entry corresponding to the input of this node.
+		output_name (str): 
+			Output activation name. This is the name associated to the cache entry corresponding to the output of this node.
+		patch_type (str, default='zero'): 
+			Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
+	"""
 	def __init__(self, model: HookedTransformer, layer: int = 0, position: int = None, parent: ApproxNode = None, children = set(), msg_cache = {}, cf_cache = {}, gradient = None, patch_type = 'zero'):
+		"""Initializes the EMBED_ApproxNode instance.
+		Args:
+			model (HookedTransformer): 
+				The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
+			layer (int): 
+				Layer index in the transformer. Embedding layer is assumed to be layer 0.
+			position (int, default=None): 
+				Token position if position-specific, else None. None is equivalent to all positions.
+			parent (ApproxNode, default=None): 
+				Parent node in the next node in the path. The parent is a successor in the computational graph.
+			children (set, default=set()): 
+				Set of child nodes. A child is a predecessor in the computational graph.
+			msg_cache (dict): 
+				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
+			cf_cache (dict, default={}): 
+				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
+			gradient (Tensor, default=None): 
+				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
+			patch_type (str, default='zero'): 
+				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
+		Returns:
+			self (EMBED_ApproxNode):
+				An instance of the EMBED_ApproxNode class.
+		"""		
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name="hook_embed", output_name="hook_embed", patch_type=patch_type)
 
 	def forward(self, message: Tensor = None) -> Tensor:
+		"""
+		Calculate the effect of the message on the output of the node. 
+		
+		The effect is calculated indirectly as the difference between the normal output of the component and the 
+		one obtained when the message is removed from the input of the node.
+		On the other hand, if message is None the behavior depends on the patch_type:
+		- 'zero': returns the normal output of the component
+		- 'counterfactual': returns the difference between the normal output and the counterfactual output of the component
+
+		Args:
+
+			message (Tensor of shape (batch_size, seq_len, d_model), default=None):
+				The message whose effect on the node need to be evaluated. If None, returns the normal 
+				output or the difference between normal and counterfactual output depending on patch_type.
+			
+		Returns:
+			Tensor:
+				A tensor representing the effect of the message on the output of the node.
+				In simpler terms, it represents the message caused by passing the input message through this node.
+
+		Notes:
+			- If a position is specified the output will be zero for all other positions.
+			- The method assumes that the msg_cache and cf_cache contain the necessary activations.
+			- When message is None, the method will cache the output in msg_cache or cf_cache if not already present.
+		"""
 		if message is None:
 			if self.patch_type == 'zero':
 				embedding = self.msg_cache["hook_embed"].detach().clone()
@@ -1047,6 +1150,31 @@ class EMBED_ApproxNode(ApproxNode):
 		return embedding
 
 	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False):
+		"""
+		Calculates the gradient of the node's input with respect to the final output.
+		By default the gradient is calculated propagating backwards from the parent node if present,
+		or assuming a gradient of ones if self has no parent. When 'grad_outputs' is specified, it is used instead of the parent's gradient.
+
+		Args:
+			grad_outputs : Tensor, optional (default=None)
+				Usually the gradient to propagate backwards in this particular case it is never used.
+			
+			save : bool, optional (default=True)
+				Whether to save the computed gradient in self.gradient. The gradient can be reused
+				later by setting use_precomputed to True.
+			
+			use_precomputed : bool, optional (default=False)
+				Whether to use the precomputed gradient if available. The precoputed gradient is stored whenever
+				save is True.
+		
+		Returns:
+			gradient : Tensor
+				A tensor representing the gradient of the output with respect to the input
+				of this node, passing trough the path from final node to the current one.
+		
+		Notes:
+			- Given that the EMBED node is a dummy node, the gradient is simply the one provided or the one from the parent node. The only modification is to zero out the gradient for positions not equal to self.position if specified.
+		"""
 		if self.gradient is not None and use_precomputed:
 			if self.position is None:
 				return self.gradient.detach().clone()
@@ -1069,21 +1197,131 @@ class EMBED_ApproxNode(ApproxNode):
 
 
 	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, sequence_length: int, include_head: bool = False, separate_kv: bool = False) -> list[ApproxNode]:
+		"""
+		Returns the list of predecessors nodes in the computational graph whose outputs influence the
+		output of this node. 
+		Given that this is an EMBED node, there are no predecessors, so the method returns an empty list.
+		Args:
+
+			model_cfg (HookedTransformerConfig):
+				The configuration of the transformer model. It is used to determine the number of heads and other model parameters.
+
+			include_head (bool, default=False):
+				Whether to consider specific head nodes for ATTN.
+
+			separate_kv (bool, default=False):
+				Whether to consider key and value positions separately for ATTN nodes 
+		
+		Returns:
+			list of ApproxNode:
+				The list of all predecessor, which is always empty for EMBED nodes.
+		"""	
 		return []
 
 	def __repr__(self):
+		"""String representation of the EMBED_ApproxNode instance.
+		Includes layer and position.
+
+		Returns:
+			str:
+				A string representation of the EMBED_ApproxNode instance.
+		"""
 		return f"EMBED_ApproxNode(layer={self.layer}, position={self.position})"
 
 	def __hash__(self):
+		"""Hash function for the EMBED_ApproxNode instance.
+		Returns:
+			int:
+				A hash value based on the layer and position.
+		"""
 		return hash((type(self).__name__, self.layer, self.position))
 
 
 class FINAL_ApproxNode(ApproxNode):
-	"""Represents the final node in the transformer (This is a dummy node)."""
+	"""Represents the final node in the transformer. This is almost a dummy node, as it only serves as the final point for paths that begin at the input embeddings. This classes uses cached activations from the model to provide an interface consistent with other node types.
+
+	Attributes:
+		model (HookedTransformer): 
+			The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
+		layer (int): 
+			Layer index in the transformer. Embedding layer is assumed to be layer 0.
+		position (int, default=None): 
+			Token position if position-specific, else None. None is equivalent to all positions.
+		parent (ApproxNode, default=None): 
+			Parent node in the next node in the path. The parent is a successor in the computational graph.
+		children (set, default=set()): 
+			Set of child nodes. A child is a predecessor in the computational graph.
+		msg_cache (dict): 
+			Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
+		cf_cache (dict, default={}): 
+			Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
+		gradient (Tensor, default=None): 
+			Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
+		input_name (str): 
+			Input activation name. This is the name associated to the cache entry corresponding to the input of this node.
+		output_name (str): 
+			Output activation name. This is the name associated to the cache entry corresponding to the output of this node.
+		patch_type (str, default='zero'): 
+			Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
+	"""
 	def __init__(self, model: HookedTransformer, layer: int, metric: callable = None, position: Optional[int] = None, parent: ApproxNode = None, children = set(), msg_cache = {}, cf_cache = {}, gradient = None, patch_type = 'zero'):
+		"""Initializes the FINAL_ApproxNode instance.
+		
+		Args:
+			model (HookedTransformer): 
+				The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
+			layer (int): 
+				Layer index in the transformer. Embedding layer is assumed to be layer 0.
+			metric (callable):
+				A callable that takes as input a tensor of shape (batch_size, seq_len, d_model) and returns a scalar tensor.
+				It is used to compute the gradient of the output with respect to the input of this node.
+			position (int, default=None): 
+				Token position if position-specific, else None. None is equivalent to all positions.
+			parent (ApproxNode, default=None): 
+				Parent node in the next node in the path. The parent is a successor in the computational graph.
+			children (set, default=set()): 
+				Set of child nodes. A child is a predecessor in the computational graph.
+			msg_cache (dict): 
+				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
+			cf_cache (dict, default={}): 
+				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
+			gradient (Tensor, default=None): 
+				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
+			patch_type (str, default='zero'): 
+				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
+		
+		Returns:
+			self (FINAL_ApproxNode):
+				An instance of the FINAL_ApproxNode class.
+		"""
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_post", output_name=f"blocks.{layer}.hook_resid_post", patch_type=patch_type)
 		self.metric = metric
 	def forward(self, message: Tensor = None) -> Tensor:
+		"""
+		Calculate the effect of the message on the output of the node. 
+		
+		The effect is calculated indirectly as the difference between the normal output of the component and the 
+		one obtained when the message is removed from the input of the node.
+		On the other hand, if message is None the behavior depends on the patch_type:
+		- 'zero': returns the normal output of the component
+		- 'counterfactual': returns the difference between the normal output and the counterfactual output of the component
+
+		Args:
+
+			message (Tensor of shape (batch_size, seq_len, d_model), default=None):
+				The message whose effect on the node need to be evaluated. If None, returns the normal 
+				output or the difference between normal and counterfactual output depending on patch_type.
+			
+		Returns:
+			Tensor:
+				A tensor representing the effect of the message on the output of the node.
+				In simpler terms, it represents the message caused by passing the input message through this node.
+
+		Notes:
+			- If a position is specified the output will be zero for all other positions.
+			- The method assumes that the msg_cache and cf_cache contain the necessary activations.
+			- When message is None, the method will cache the output in msg_cache or cf_cache if not already present.
+		"""
 		if message is None:
 			if self.patch_type == 'zero':
 				res = self.msg_cache[self.input_name].detach().clone()
@@ -1100,6 +1338,33 @@ class FINAL_ApproxNode(ApproxNode):
 		return res
 
 	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False, metric=None) -> Tensor:
+		"""
+		Calculates the gradient of the node's input with respect to the final output.
+		By default the gradient is calculated propagating backwards from the parent node if present,
+		or assuming a gradient of ones if self has no parent. When 'grad_outputs' is specified, it is used instead of the parent's gradient.
+
+		Args:
+			grad_outputs : Tensor, optional (default=None)
+				Usually the gradient to propagate backwards in this particular case it is never used.
+			
+			save : bool, optional (default=True)
+				Whether to save the computed gradient in self.gradient. The gradient can be reused
+				later by setting use_precomputed to True.
+			
+			use_precomputed : bool, optional (default=False)
+				Whether to use the precomputed gradient if available. The precoputed gradient is stored whenever
+				save is True.
+			
+			metric : callable, optional (default=None)
+				A callable that takes as input a tensor of shape (batch_size, seq_len, d_model) and returns a scalar tensor.
+				It is used to compute the gradient of the output with respect to the input of this node.
+				If None, uses the metric provided at initialization. If neither is provided, raises an error.
+		
+		Returns:
+			gradient : Tensor
+				A tensor representing the gradient of the output with respect to the input
+				of this node, passing trough the path from final node to the current one.
+		"""
 		if self.gradient is not None and use_precomputed:
 			return self.gradient.detach().clone()
 		if metric is None:
@@ -1123,14 +1388,26 @@ class FINAL_ApproxNode(ApproxNode):
 
 	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, include_head: bool = True, separate_kv: bool = False) -> list[ApproxNode]:
 		"""
-		Returns a list of potential previous nodes that contribute to this FINAL node.
-		Previous nodes are:
-			- MLP, EMBED and ATTN nodes in self.position from all layers.
+		Returns the list of predecessors nodes in the computational graph whose outputs influence the output of this node. 
+		For the FINAL node, these are all MLP, EMBED and ATTN nodes from all layers.
+
 		Args:
-			model_cfg: The configuration of the transformer model.
-			include_head: Whether to consider specific head nodes for ATTN.
+
+			model_cfg (HookedTransformerConfig):
+				The configuration of the transformer model. It is used to determine the number of heads and other model parameters.
+
+			include_head (bool, default=False):
+				Whether to consider specific head nodes for ATTN.
+
+			separate_kv (bool, default=False):
+				Whether to consider key and value positions separately for ATTN nodes 
+		
 		Returns:
-			A list of potential previous nodes.
+			list of ApproxNode:
+				The list of all nodes.
+		
+		Notes:
+			- If self.position is None, only non-position-specific previous nodes are considered.
 		"""
 		prev_nodes = []
 		common_args = {"model": self.model, "msg_cache": self.msg_cache, "parent": self, "patch_type": self.patch_type, "cf_cache": self.cf_cache}
@@ -1180,8 +1457,19 @@ class FINAL_ApproxNode(ApproxNode):
 		return prev_nodes
 
 	def __repr__(self):
+		"""Returns a string representation of the FINAL_ApproxNode instance.
+		Includes layer and position if specified.
+		Returns:
+			str:
+				A string representation of the FINAL_ApproxNode instance.
+		"""
 		pos_str = f", position={self.position}" if self.position is not None else ""
 		return f"FINAL_ApproxNode(layer={self.layer}{pos_str})"
 
 	def __hash__(self):
+		"""Hash function for the FINAL_ApproxNode instance.
+		Returns:
+			int:
+				A hash value based on the layer and position.
+		"""
 		return hash((type(self).__name__, self.layer, self.position)) 

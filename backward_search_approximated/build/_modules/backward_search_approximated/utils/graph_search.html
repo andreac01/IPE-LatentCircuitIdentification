@@ -29,7 +29,7 @@
   <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d75fae25" />
     <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-design.min.css?v=95c83b7e" />
   
@@ -43,7 +43,7 @@
     <script src="../../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
-    <script src="../../../_static/copybutton.js?v=a56c686a"></script>
+    <script src="../../../_static/copybutton.js?v=30646c52"></script>
     <script src="../../../_static/design-tabs.js?v=f930bc37"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = '_modules/backward_search_approximated/utils/graph_search';</script>
     <link rel="index" title="Index" href="../../../genindex.html" />
@@ -112,7 +112,7 @@
   
   
   
-    <p class="title logo__title">IPE 0.0.1 documentation</p>
+    <p class="title logo__title">IPE Documentation</p>
   
 </a></div>
     
@@ -177,7 +177,7 @@
           
           
           
-          <a href="https://github.com/your-username/your-repo" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
+          <a href="https://github.com/andreac01/IPE-LatentCircuitIdentification.git" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
             <span class="sr-only">GitHub</span></a>
         </li>
 </ul></div>
@@ -268,7 +268,7 @@
           
           
           
-          <a href="https://github.com/your-username/your-repo" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
+          <a href="https://github.com/andreac01/IPE-LatentCircuitIdentification.git" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
             <span class="sr-only">GitHub</span></a>
         </li>
 </ul></div>
@@ -346,6 +346,24 @@
 <div class="viewcode-block" id="evaluate_path">
 <a class="viewcode-back" href="../../../api/graph_search.html#backward_search_approximated.utils.graph_search.evaluate_path">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">evaluate_path</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">cache</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">correct_tokens</span><span class="p">):</span>
+<span class="w">	</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	Evaluates the contribution of a given path by executing the forward methods of each node in the path and then applying the provided metric function to the final output.</span>
+<span class="sd">	</span>
+<span class="sd">	Args:</span>
+<span class="sd">		model (HookedTransformer): The transformer model used for evaluation.</span>
+<span class="sd">		cache (ActivationCache): The activation cache containing intermediate activations.</span>
+<span class="sd">		path (list of ApproxNode): The sequence of nodes representing the path to be evaluated.</span>
+<span class="sd">		metric (Callable): A function to evaluate the contribution or importance of the path.</span>
+<span class="sd">			It must accept three parameters:</span>
+<span class="sd">			- The output of the last node in the path.</span>
+<span class="sd">			- The output of the last node when the path is removed</span>
+<span class="sd">			- The model itself</span>
+<span class="sd">		correct_tokens (list of int): The reference tokens used for evaluating path contributions.</span>
+<span class="sd">	</span>
+<span class="sd">	Returns:</span>
+<span class="sd">		float: </span>
+<span class="sd">			The contribution score of the path as determined by the metric function.</span>
+<span class="sd">	&quot;&quot;&quot;</span>
 	<span class="n">message</span> <span class="o">=</span> <span class="kc">None</span>
 	<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
 		<span class="k">return</span> <span class="n">message</span>
@@ -374,21 +392,23 @@
 <span class="sd">	the most significant paths reaching it from an EMBED_ApproxNode.</span>
 
 <span class="sd">	Args:</span>
-<span class="sd">		model: The transformer model used for evaluation. It should be an instance</span>
-<span class="sd">				of HookedTransformer, to ensure compatibility with cache and nodes</span>
-<span class="sd">				forward methods.</span>
-<span class="sd">		metric: A function to evaluate the contribution or importance of a path.</span>
-<span class="sd">				It must accept a single parameter corresponding to the corrupted</span>
-<span class="sd">				residual stream just before the final layer norm.</span>
-<span class="sd">				(Assumes higher scores indicate greater importance based on evaluate_path behavior).</span>
-<span class="sd">		start_node: The initial node to begin the backward search from </span>
-<span class="sd">				(e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).</span>
-<span class="sd">		ground_truth_tokens: The reference tokens used for evaluating path contributions.</span>
-<span class="sd">		min_contribution: The minimum absolute contribution score required for a path to be considered valid.</span>
-<span class="sd">		include_negative: If True, include paths with negative contributions. </span>
-<span class="sd">				The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.</span>
-<span class="sd">		return_all: If True, return all evaluated complete paths regardless of </span>
-<span class="sd">				their contribution score. The search will still be guided by min_contribution.</span>
+<span class="sd">		model (HookedTransformer): </span>
+<span class="sd">			The transformer model used for evaluation. It should be an instance</span>
+<span class="sd">			of HookedTransformer, to ensure compatibility with cache and nodes forward methods.</span>
+<span class="sd">		metric (Callable): </span>
+<span class="sd">			A function to evaluate the contribution or importance of the path.</span>
+<span class="sd">				It must accept three parameters:</span>
+<span class="sd">				- The output of the last node in the path.</span>
+<span class="sd">				- The output of the last node when the path is removed</span>
+<span class="sd">				- The model itself</span>
+<span class="sd">		start_node (ApproxNode): </span>
+<span class="sd">			The initial node to begin the backward search from (e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).</span>
+<span class="sd">		min_contribution (float, default=0.5):</span>
+<span class="sd">			The minimum absolute contribution score required for a path to be considered valid.</span>
+<span class="sd">		include_negative (bool, default=False): </span>
+<span class="sd">			If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.</span>
+<span class="sd">		return_all (bool, default=False): </span>
+<span class="sd">			If True, return all evaluated complete paths regardless of their contribution score. The search will still be guided by min_contribution.</span>
 <span class="sd">	Returns:</span>
 <span class="sd">		A list of tuples containing the contribution score and the corresponding path, </span>
 <span class="sd">		sorted by contribution in descending order.</span>
@@ -457,6 +477,19 @@
 <div class="viewcode-block" id="get_path_msg">
 <a class="viewcode-back" href="../../../api/graph_search.html#backward_search_approximated.utils.graph_search.get_path_msg">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">get_path_msg</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">message</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">	</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	Recursively computes the message by applying the forward method of each node in the path.</span>
+
+<span class="sd">	Args:</span>
+<span class="sd">		path (list of ApproxNode): </span>
+<span class="sd">			The sequence of nodes representing the path.</span>
+<span class="sd">		message (torch.Tensor, default=None):</span>
+<span class="sd">			Initial message to be passed to the first node in the path.</span>
+
+<span class="sd">	Returns:</span>
+<span class="sd">		torch.Tensor:</span>
+<span class="sd">			The final message after applying all nodes in the path.</span>
+<span class="sd">	&quot;&quot;&quot;</span>
 	<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
 		<span class="k">return</span> <span class="n">message</span>
 	<span class="n">message</span> <span class="o">=</span> <span class="n">path</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">message</span><span class="o">=</span><span class="n">message</span><span class="p">)</span>
@@ -466,6 +499,16 @@
 <div class="viewcode-block" id="get_path">
 <a class="viewcode-back" href="../../../api/graph_search.html#backward_search_approximated.utils.graph_search.get_path">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">get_path</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+<span class="w">	</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	Constructs the path from the given node back to the root by following parent links.</span>
+
+<span class="sd">	Args:</span>
+<span class="sd">		node (ApproxNode): The node from which to start constructing the path.</span>
+<span class="sd">	</span>
+<span class="sd">	Returns:</span>
+<span class="sd">		list of ApproxNode:</span>
+<span class="sd">			The sequence of nodes representing the path from the root to the given node.</span>
+<span class="sd">	&quot;&quot;&quot;</span>
 	<span class="n">path</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span><span class="p">]</span>
 	<span class="k">while</span> <span class="n">path</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">parent</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 		<span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">path</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">parent</span><span class="p">)</span>
@@ -489,15 +532,23 @@
 <span class="sd">	the most significant paths reaching it from an EMBED_ApproxNode.</span>
 
 <span class="sd">	Args:</span>
-<span class="sd">		model: The transformer model used for evaluation.</span>
-<span class="sd">		cache: The activation cache containing intermediate activations.</span>
-<span class="sd">		metric: A function to evaluate the contribution or importance of a path.</span>
-<span class="sd">				(Assumes higher scores indicate greater importance based on evaluate_path behavior).</span>
-<span class="sd">		start_node: The initial node to begin the backward search from (e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).</span>
-<span class="sd">		ground_truth_tokens: The reference tokens used for evaluating path contributions.</span>
-<span class="sd">		min_contribution: The minimum absolute contribution score required for a path to be considered valid.</span>
-<span class="sd">		include_negative: If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.</span>
-<span class="sd">		return_all: If True, return all evaluated paths regardless of their contribution score. The search will still be guided by min_contribution.</span>
+<span class="sd">		model (HookedTransformer): </span>
+<span class="sd">			The transformer model used for evaluation.</span>
+<span class="sd">		msg_cache (ActivationCache): </span>
+<span class="sd">			The activation cache containing intermediate activations.</span>
+<span class="sd">		metric (Callable):</span>
+<span class="sd">			A function to evaluate the contribution or importance of the path.</span>
+<span class="sd">				It must accept a single parameter corresponding to the corrupted residual stream just before the final layer norm.</span>
+<span class="sd">		root (ApproxNode): </span>
+<span class="sd">			The initial node to begin the backward search from (e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).</span>
+<span class="sd">		ground_truth_tokens (list of int): </span>
+<span class="sd">			The reference tokens used for evaluating path contributions.</span>
+<span class="sd">		min_contribution (float, default=0.5): </span>
+<span class="sd">			The minimum absolute contribution score required for a path to be considered valid.</span>
+<span class="sd">		include_negative (bool, default=False): </span>
+<span class="sd">			If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.</span>
+<span class="sd">		return_all (bool, default=False): </span>
+<span class="sd">			If True, return all evaluated paths regardless of their contribution score. The search will still be guided by min_contribution threshold.</span>
 <span class="sd">	Returns:</span>
 <span class="sd">		A list of tuples containing the contribution score and the corresponding path, sorted by contribution in descending order.</span>
 <span class="sd">	&quot;&quot;&quot;</span>

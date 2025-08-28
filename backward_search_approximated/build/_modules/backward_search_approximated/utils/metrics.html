@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>backward_search_approximated.utils.metrics &#8212; IPE-Isolating Path Effects for Improving Latent Circuit Identification 0.0.1 documentation</title>
+    <title>backward_search_approximated.utils.metrics &#8212; IPE 0.0.1 documentation</title>
   
   
   
@@ -29,7 +29,7 @@
   <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 <link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
 
-    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d75fae25" />
     <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-design.min.css?v=95c83b7e" />
   
@@ -43,7 +43,7 @@
     <script src="../../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
-    <script src="../../../_static/copybutton.js?v=a56c686a"></script>
+    <script src="../../../_static/copybutton.js?v=30646c52"></script>
     <script src="../../../_static/design-tabs.js?v=f930bc37"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = '_modules/backward_search_approximated/utils/metrics';</script>
     <link rel="index" title="Index" href="../../../genindex.html" />
@@ -112,7 +112,7 @@
   
   
   
-    <p class="title logo__title">IPE-Isolating Path Effects for Improving Latent Circuit Identification 0.0.1 documentation</p>
+    <p class="title logo__title">IPE Documentation</p>
   
 </a></div>
     
@@ -177,7 +177,7 @@
           
           
           
-          <a href="https://github.com/your-username/your-repo" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
+          <a href="https://github.com/andreac01/IPE-LatentCircuitIdentification.git" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
             <span class="sr-only">GitHub</span></a>
         </li>
 </ul></div>
@@ -268,7 +268,7 @@
           
           
           
-          <a href="https://github.com/your-username/your-repo" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
+          <a href="https://github.com/andreac01/IPE-LatentCircuitIdentification.git" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
             <span class="sr-only">GitHub</span></a>
         </li>
 </ul></div>
@@ -347,20 +347,26 @@
 								<span class="n">corrupted_resid</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
 								<span class="n">model</span><span class="p">:</span> <span class="n">HookedTransformer</span><span class="p">,</span>
 								<span class="n">target_tokens</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">	</span><span class="sd">&quot;&quot;&quot; Compute the difference of predicting the target token in probability</span>
-<span class="sd">		between the clean and corrupted model based on the final residuals.</span>
-<span class="sd">		args:</span>
-<span class="sd">			clean_resid: torch.Tensor, shape (batch, seq_len, d_model)</span>
-<span class="sd">				The final residual stream of the clean model.</span>
-<span class="sd">			corrupted_resid: torch.Tensor, shape (batch, seq_len, d_model)</span>
-<span class="sd">				The final residual stream of the corrupted model.</span>
-<span class="sd">			model: HookedTransformer</span>
-<span class="sd">				The hooked transformer model.</span>
-<span class="sd">			target_tokens: list of int</span>
-<span class="sd">				The indexes of the target tokens.</span>
-<span class="sd">		returns:</span>
-<span class="sd">			float</span>
-<span class="sd">				The difference in probability of predicting the target token.</span>
+<span class="w">	</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	Compute the difference in the probability of predicting the target token</span>
+<span class="sd">	between the clean and corrupted model based on the final residuals. </span>
+<span class="sd">	This probability is returned as a percentage of the clean model&#39;s probability.</span>
+
+<span class="sd">	Args:</span>
+<span class="sd">		clean_resid (torch.Tensor): </span>
+<span class="sd">			The final residual stream of the clean model.</span>
+<span class="sd">			Shape: (batch, seq_len, d_model).</span>
+<span class="sd">		corrupted_resid (torch.Tensor): </span>
+<span class="sd">			The final residual stream of the corrupted model.</span>
+<span class="sd">			Shape: (batch, seq_len, d_model).</span>
+<span class="sd">		model (HookedTransformer): </span>
+<span class="sd">			The hooked transformer model.</span>
+<span class="sd">		target_tokens (List[int]): </span>
+<span class="sd">			The indexes of the target tokens.</span>
+
+<span class="sd">	Returns:</span>
+<span class="sd">		float: </span>
+<span class="sd">			The difference in probability of predicting the target token.</span>
 <span class="sd">	&quot;&quot;&quot;</span>
 	<span class="c1"># Get logits for the last token</span>
 	<span class="n">clean_resid</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">ln_final</span><span class="p">(</span><span class="n">clean_resid</span><span class="p">)</span>
@@ -381,22 +387,28 @@
 						<span class="n">corrupted_resid</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
 						<span class="n">model</span><span class="p">:</span> <span class="n">HookedTransformer</span><span class="p">,</span>
 						<span class="n">target_tokens</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">	</span><span class="sd">&quot;&quot;&quot; Compute the difference of logits for the target token as a percentage</span>
-<span class="sd">		between the clean and corrupted model based on the final residuals.</span>
-<span class="sd">		This implementation is optimized for transformerlens HookedTransformer.</span>
-<span class="sd">		args:</span>
-<span class="sd">			clean_resid: torch.Tensor, shape (batch, seq_len, d_model)</span>
-<span class="sd">				The final residual stream of the clean model.</span>
-<span class="sd">			corrupted_resid: torch.Tensor, shape (batch, seq_len, d_model)</span>
-<span class="sd">				The final residual stream of the corrupted model.</span>
-<span class="sd">			model: HookedTransformer</span>
-<span class="sd">				The hooked transformer model.</span>
-<span class="sd">			target_tokens: list of int</span>
-<span class="sd">				The indexes of the target tokens.</span>
-<span class="sd">		returns:</span>
-<span class="sd">			float</span>
-<span class="sd">				The percentage difference in logits for the target token.</span>
+<span class="w">	</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	Compute the difference in logits for the target token as a percentage</span>
+<span class="sd">	between the clean and corrupted model based on the final residuals.</span>
+<span class="sd">	This implementation is optimized for transformerlens HookedTransformer.</span>
+
+<span class="sd">	Args:</span>
+<span class="sd">		clean_resid (torch.Tensor): </span>
+<span class="sd">			The final residual stream of the clean model.</span>
+<span class="sd">			Shape: (batch, seq_len, d_model).</span>
+<span class="sd">		corrupted_resid (torch.Tensor): </span>
+<span class="sd">			The final residual stream of the corrupted model.</span>
+<span class="sd">			Shape: (batch, seq_len, d_model).</span>
+<span class="sd">		model (HookedTransformer): </span>
+<span class="sd">			The hooked transformer model.</span>
+<span class="sd">		target_tokens (List[int]): </span>
+<span class="sd">			The indexes of the target tokens.</span>
+
+<span class="sd">	Returns:</span>
+<span class="sd">		torch.Tensor: </span>
+<span class="sd">			The percentage difference in logits for the target token.</span>
 <span class="sd">	&quot;&quot;&quot;</span>
+	
 	<span class="c1"># Get the unembedding weights and bias</span>
 	<span class="n">W_U</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">W_U</span>
 	<span class="n">b_U</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">b_U</span>
@@ -428,21 +440,24 @@
      				<span class="n">verbose</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 					<span class="n">use_ablation_mode</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     				<span class="n">set_baseline</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">	</span><span class="sd">&quot;&quot;&quot; Compute the difference of logits for the target token as a percentage</span>
-<span class="sd">		between the clean and corrupted model based on the final residuals.</span>
-<span class="sd">		This implementation is optimized for transformerlens HookedTransformer.</span>
-<span class="sd">		args:</span>
-<span class="sd">			clean_resid: torch.Tensor, shape (batch, seq_len, d_model)</span>
-<span class="sd">				The final residual stream of the clean model.</span>
-<span class="sd">			corrupted_resid: torch.Tensor, shape (batch, seq_len, d_model)</span>
-<span class="sd">				The final residual stream of the corrupted model.</span>
-<span class="sd">			model: HookedTransformer</span>
-<span class="sd">				The hooked transformer model.</span>
-<span class="sd">			target_tokens: list of int</span>
-<span class="sd">				The indexes of the target tokens.</span>
-<span class="sd">		returns:</span>
-<span class="sd">			float</span>
-<span class="sd">				The percentage difference in logits for the target token.</span>
+<span class="w">	</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	Compute the indirect effect as a percentage difference in logits for the target tokens</span>
+<span class="sd">	between the clean and corrupted model based on the final residuals.</span>
+
+<span class="sd">	Args:</span>
+<span class="sd">		clean_resid (torch.Tensor): The final residual stream of the clean model.</span>
+<span class="sd">			Shape: (batch, seq_len, d_model).</span>
+<span class="sd">		corrupted_resid (torch.Tensor): The final residual stream of the corrupted model.</span>
+<span class="sd">			Shape: (batch, seq_len, d_model).</span>
+<span class="sd">		model (HookedTransformer): The hooked transformer model.</span>
+<span class="sd">		clean_targets (List[int]): The indexes of the target tokens for the clean model.</span>
+<span class="sd">		corrupt_targets (List[int]): The indexes of the target tokens for the corrupted model.</span>
+<span class="sd">		verbose (bool, optional): If True, prints intermediate values for debugging. Default is False.</span>
+<span class="sd">		use_ablation_mode (bool, optional): If True, uses ablation-based comparison. Default is True.</span>
+<span class="sd">		set_baseline (bool, optional): If True, sets the baseline score for centering the metric. Default is False.</span>
+
+<span class="sd">	Returns:</span>
+<span class="sd">		torch.Tensor: The indirect effect as a percentage difference in logits for the target tokens.</span>
 <span class="sd">	&quot;&quot;&quot;</span>
 
 	<span class="c1"># Get the final residual stream for the last token</span>
@@ -481,27 +496,31 @@
                                    <span class="n">target_tokens</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
                                    <span class="n">counterfactual_tokens</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
                                    <span class="n">use_ablation_mode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">	</span><span class="sd">&quot;&quot;&quot; Compute logit difference: y&#39; - y between correct answer y (clean) and y&#39; (counterfactual)</span>
-<span class="sd">		This function can handle both explicit counterfactual comparison and ablation-based comparison.</span>
-<span class="sd">		</span>
-<span class="sd">		args:</span>
-<span class="sd">			clean_resid: torch.Tensor, shape (batch, seq_len, d_model)</span>
-<span class="sd">				The final residual stream of the clean model.</span>
-<span class="sd">			counterfactual_resid: torch.Tensor, shape (batch, seq_len, d_model)</span>
-<span class="sd">				The final residual stream of the counterfactual model (or ablated model).</span>
-<span class="sd">			model: HookedTransformer</span>
-<span class="sd">				The hooked transformer model.</span>
-<span class="sd">			target_tokens: list of int</span>
-<span class="sd">				The indexes of the target tokens for the clean model.</span>
-<span class="sd">			counterfactual_tokens: Optional[list of int]</span>
-<span class="sd">				The indexes of the target tokens for the counterfactual model.</span>
-<span class="sd">				Required when use_ablation_mode=False.</span>
-<span class="sd">			use_ablation_mode: bool</span>
-<span class="sd">				If True, uses ablation-based comparison (counterfactual_resid is ablated version).</span>
-<span class="sd">				If False, uses explicit counterfactual comparison.</span>
-<span class="sd">		returns:</span>
-<span class="sd">			float</span>
-<span class="sd">				The logit difference: y&#39; - y</span>
+<span class="w">	</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	Compute logit difference: y&#39; - y between the correct answer y (clean) and y&#39; (counterfactual).</span>
+<span class="sd">	This function supports both explicit counterfactual comparison and ablation-based comparison.</span>
+
+<span class="sd">	Args:</span>
+<span class="sd">		clean_resid (torch.Tensor): </span>
+<span class="sd">			The final residual stream of the clean model.</span>
+<span class="sd">			Shape: (batch, seq_len, d_model).</span>
+<span class="sd">		counterfactual_resid (torch.Tensor): </span>
+<span class="sd">			The final residual stream of the counterfactual model (or ablated model).</span>
+<span class="sd">			Shape: (batch, seq_len, d_model).</span>
+<span class="sd">		model (HookedTransformer): </span>
+<span class="sd">			The hooked transformer model.</span>
+<span class="sd">		target_tokens (List[int]): </span>
+<span class="sd">			The indexes of the target tokens for the clean model.</span>
+<span class="sd">		counterfactual_tokens (Optional[List[int]]): </span>
+<span class="sd">			The indexes of the target tokens for the counterfactual model.</span>
+<span class="sd">			Required when use_ablation_mode is False.</span>
+<span class="sd">		use_ablation_mode (bool): </span>
+<span class="sd">			If True, uses ablation-based comparison (counterfactual_resid is the ablated version).</span>
+<span class="sd">			If False, uses explicit counterfactual comparison.</span>
+
+<span class="sd">	Returns:</span>
+<span class="sd">		float: </span>
+<span class="sd">			The logit difference: y&#39; - y.</span>
 <span class="sd">	&quot;&quot;&quot;</span>
 	<span class="c1"># Get the unembedding weights and bias</span>
 	<span class="n">W_U</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">W_U</span>
@@ -532,40 +551,6 @@
 	<span class="n">logit_diffs</span> <span class="o">=</span> <span class="n">counterfactual_logits</span> <span class="o">-</span> <span class="n">clean_logits</span>
 	<span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">logit_diffs</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">()</span></div>
 
-
-<span class="c1"># TODO: check if this is correct</span>
-<div class="viewcode-block" id="kl_divergence">
-<a class="viewcode-back" href="../../../api/metrics.html#backward_search_approximated.utils.metrics.kl_divergence">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">kl_divergence</span><span class="p">(</span><span class="n">clean_resid</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
-					<span class="n">corrupted_resid</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
-					<span class="n">model</span><span class="p">:</span> <span class="n">HookedTransformer</span><span class="p">,</span>
-					<span class="n">target_token</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">	</span><span class="sd">&quot;&quot;&quot; Compute the Kullback-Leibler divergence between the probability distributions</span>
-<span class="sd">		of the clean and corrupted model based on the final residuals.</span>
-<span class="sd">		args:</span>
-<span class="sd">			clean_resid: torch.Tensor, shape (batch, seq_len, d_model)</span>
-<span class="sd">				The final residual stream of the clean model.</span>
-<span class="sd">			corrupted_resid: torch.Tensor, shape (batch, seq_len, d_model)</span>
-<span class="sd">				The final residual stream of the corrupted model.</span>
-<span class="sd">			model: HookedTransformer</span>
-<span class="sd">				The hooked transformer model.</span>
-<span class="sd">		returns:</span>
-<span class="sd">			float</span>
-<span class="sd">				The Kullback-Leibler divergence.</span>
-<span class="sd">	&quot;&quot;&quot;</span>
-	<span class="c1"># Get logits for the last token	</span>
-	<span class="n">clean_resid</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">ln_final</span><span class="p">(</span><span class="n">clean_resid</span><span class="p">)</span>
-	<span class="n">corrupted_resid</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">ln_final</span><span class="p">(</span><span class="n">corrupted_resid</span><span class="p">)</span>
-	<span class="n">clean_logits</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">unembed</span><span class="p">(</span><span class="n">clean_resid</span><span class="p">)[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>
-	<span class="n">corrupted_logits</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">unembed</span><span class="p">(</span><span class="n">corrupted_resid</span><span class="p">)[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>
-
-	<span class="c1"># Convert logits to probability distributions using softmax</span>
-	<span class="n">prob_clean</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">softmax</span><span class="p">(</span><span class="n">clean_logits</span><span class="p">,</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
-	<span class="n">prob_corrupted</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">softmax</span><span class="p">(</span><span class="n">corrupted_logits</span><span class="p">,</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
-
-	<span class="c1"># Compute KL divergence</span>
-	<span class="n">kl_div</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">kl_div</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">prob_corrupted</span><span class="p">),</span> <span class="n">prob_clean</span><span class="p">,</span> <span class="n">reduction</span><span class="o">=</span><span class="s1">&#39;batchmean&#39;</span><span class="p">)</span>
-	<span class="k">return</span> <span class="n">kl_div</span><span class="o">.</span><span class="n">item</span><span class="p">()</span></div>
 
 </pre></div>
 
@@ -608,7 +593,7 @@
 
   <p class="copyright">
     
-      © Copyright 2025, Andrea Cerutti.
+      © Copyright 2025, Andrea Cerutti. Released under the GNU General Public License v3.0.
       <br/>
     
   </p>

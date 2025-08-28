@@ -89,7 +89,7 @@ html_theme_options = {
 	"icon_links": [
 		{
 			"name": "GitHub",
-			"url": "https://github.com/your-username/your-repo", # TODO: Update this URL
+			"url": "https://github.com/andreac01/IPE-LatentCircuitIdentification.git", 
 			"icon": "fab fa-github-square",
 			"type": "fontawesome",
 		}
@@ -105,8 +105,8 @@ html_theme_options = {
 
 # Required for "edit-this-page" link
 html_context = {
-	"github_user": "your-username", # TODO: Update this
-	"github_repo": "your-repo",     # TODO: Update this
+	"github_user": "acerutti",
+	"github_repo": "https://github.com/andreac01/IPE-LatentCircuitIdentification.git",
 	"github_version": "main",
 	"doc_path": "source",
 }

@@ -179,7 +179,7 @@
           
           
           
-          <a href="https://github.com/your-username/your-repo" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
+          <a href="https://github.com/andreac01/IPE-LatentCircuitIdentification.git" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
             <span class="sr-only">GitHub</span></a>
         </li>
 </ul></div>
@@ -272,7 +272,7 @@
           
           
           
-          <a href="https://github.com/your-username/your-repo" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
+          <a href="https://github.com/andreac01/IPE-LatentCircuitIdentification.git" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
             <span class="sr-only">GitHub</span></a>
         </li>
 </ul></div>
@@ -357,14 +357,11 @@
 <dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.ATTN_ApproxNode">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.nodes.</span></span><span class="sig-name descname"><span class="pre">ATTN_ApproxNode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">head</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keyvalue_position</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">children</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cf_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gradient</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_query</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_key</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_value</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_patterns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'zero'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#ATTN_ApproxNode"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.ATTN_ApproxNode" title="Link to this definition">#</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a></p>
-<p>Represents an Attention node (potentially a specific head) in the transformer.
-:ivar model:</p>
-<blockquote>
-<div><p>The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.</p>
-</div></blockquote>
+<p>Represents an Attention node (potentially a specific head) in the transformer model.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Variables<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>) – The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.</p></li>
 <li><p><strong>layer</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>) – Layer index in the transformer. Embedding layer is assumed to be layer 0.</p></li>
 <li><p><strong>head</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Attention head index if head-specific, else None. None is equivalent to all heads. When an head is specified the contribution of the is considered, particularly the bias term which is not head-specific is not included. Therefore the output of an ATTN node is equal to the output of all the heads plus the bias term. If head is None the whole attention output is considered.</p></li>
 <li><p><strong>position</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Token position if position-specific, else None. None is equivalent to all positions.</p></li>
@@ -385,8 +382,28 @@ If keyvalue_position is specified, the node represents the contribution of the a
 <li><p><strong>plot_patterns</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#False" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code></a>) – Whether to plot the attention patterns when calculating the forward pass. This is useful for debugging purposes but also to visualize the changes in the attention patterns when patching specific positions.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.ATTN_ApproxNode.__hash__">
+<span class="sig-name descname"><span class="pre">__hash__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#ATTN_ApproxNode.__hash__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.ATTN_ApproxNode.__hash__" title="Link to this definition">#</a></dt>
+<dd><p>Hash function for the ATTN_ApproxNode instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A hash value based on the layer, head, position, keyvalue_position, and patching options.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)">int</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.ATTN_ApproxNode.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">head</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keyvalue_position</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">children</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cf_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gradient</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_query</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_key</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_value</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_patterns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'zero'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#ATTN_ApproxNode.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.ATTN_ApproxNode.__init__" title="Link to this definition">#</a></dt>
+<dd><p>Initializes an ATTN_ApproxNode instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
 <li><p><strong>model</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>) – The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.</p></li>
 <li><p><strong>layer</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>) – Layer index in the transformer. Embedding layer is assumed to be layer 0.</p></li>
 <li><p><strong>head</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Attention head index if head-specific, else None. None is equivalent to all heads. When an head is specified the contribution of the is considered, particularly the bias term which is not head-specific is not included. Therefore the output of an ATTN node is equal to the output of all the heads plus the bias term. If head is None the whole attention output is considered.</p></li>
@@ -405,11 +422,29 @@ If keyvalue_position is specified, the node represents the contribution of the a
 <li><p><strong>plot_patterns</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#False" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code></a>) – Whether to plot the attention patterns when calculating the forward pass. This is useful for debugging purposes but also to visualize the changes in the attention patterns when patching specific positions.</p></li>
 </ul>
 </dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The initialized ATTN_ApproxNode instance.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>self (<a class="reference internal" href="#backward_search_approximated.utils.nodes.ATTN_ApproxNode" title="backward_search_approximated.utils.nodes.ATTN_ApproxNode">ATTN_ApproxNode</a>)</p>
+</dd>
 </dl>
+</dd></dl>
+
 <dl class="py method">
-<dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.ATTN_ApproxNode.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">head</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keyvalue_position</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">children</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cf_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gradient</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_query</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_key</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_value</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_patterns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'zero'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#ATTN_ApproxNode.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.ATTN_ApproxNode.__init__" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
+<dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.ATTN_ApproxNode.__repr__">
+<span class="sig-name descname"><span class="pre">__repr__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#ATTN_ApproxNode.__repr__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.ATTN_ApproxNode.__repr__" title="Link to this definition">#</a></dt>
+<dd><p>String representation of the ATTN_ApproxNode instance.
+Includes layer, head, position, keyvalue_position, and patching options.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A string representation of the ATTN_ApproxNode instance.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.ATTN_ApproxNode.calculate_gradient">
@@ -466,16 +501,12 @@ In simpler terms, it represents the message caused by passing the input message 
 <dd class="field-odd"><p>Tensor</p>
 </dd>
 </dl>
-<section id="notes">
-<h2>Notes<a class="headerlink" href="#notes" title="Link to this heading">#</a></h2>
-<ul class="simple">
-<li><p>If a position is specified the output will be zero for all other positions.</p></li>
-<li><p>The method assumes that the msg_cache and cf_cache contain the necessary activations.</p></li>
-<li><p>When message is None, the method will cache the output in msg_cache or cf_cache if not already present.</p></li>
-<li><p>The method automatically adds entries to the msg_cache and cf_cache, correspoding to the output of single attention heads, if they are not already present.</p></li>
-<li><p>This method uses precomputed attention scores if possible, this may introduce small numerical differences compared to a full recomputation.</p></li>
-</ul>
-</section>
+<p>Notes:
+- If a position is specified the output will be zero for all other positions.
+- The method assumes that the msg_cache and cf_cache contain the necessary activations.
+- When message is None, the method will cache the output in msg_cache or cf_cache if not already present.
+- The method automatically adds entries to the msg_cache and cf_cache, correspoding to the output of single attention heads, if they are not already present.
+- This method uses precomputed attention scores if possible, this may introduce small numerical differences compared to a full recomputation.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -505,6 +536,12 @@ Previous nodes are:</p>
 <dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)">list</a> of <a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode">ApproxNode</a></p>
 </dd>
 </dl>
+<div class="admonition-notes admonition">
+<p class="admonition-title">Notes</p>
+<ul class="simple">
+<li><p>If self.position is None, only non-position-specific previous nodes are considered.</p></li>
+</ul>
+</div>
 </dd></dl>
 
 </dd></dl>
@@ -521,21 +558,6 @@ Previous nodes are:</p>
 <dl class="field-list simple">
 <dt class="field-odd">Variables<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>model</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>) – The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.</p></li>
-<li><p><strong>layer</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>) – Layer index in the transformer. Embedding layer is assumed to be layer 0.</p></li>
-<li><p><strong>position</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Token position if position-specific, else None. None is equivalent to all positions.</p></li>
-<li><p><strong>parent</strong> (<a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Parent node in the next node in the path. The parent is a successor in the computational graph.</p></li>
-<li><p><strong>children</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#set" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">set</span></code></a>, <em>default</em> <code class="xref py py-class docutils literal notranslate"><span class="pre">set()</span></code>) – Set of child nodes. A child is a predecessor in the computational graph.</p></li>
-<li><p><strong>msg_cache</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>) – Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).</p></li>
-<li><p><strong>cf_cache</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">{}</span></code>) – Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).</p></li>
-<li><p><strong>gradient</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.</p></li>
-<li><p><strong>input_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>) – Input activation name. This is the name associated to the cache entry corresponding to the input of this node.</p></li>
-<li><p><strong>output_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>) – Output activation name. This is the name associated to the cache entry corresponding to the output of this node.</p></li>
-<li><p><strong>patch_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">'zero'</span></code>) – Type of intervention (‘zero’ or ‘counterfactual’). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
 <li><p><strong>model</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>) – The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.</p></li>
 <li><p><strong>layer</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>) – Layer index in the transformer. Embedding layer is assumed to be layer 0.</p></li>
 <li><p><strong>position</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Token position if position-specific, else None. None is equivalent to all positions.</p></li>
@@ -586,7 +608,31 @@ Previous nodes are:</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.ApproxNode.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg_cache</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cf_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">children</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gradient</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'zero'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#ApproxNode.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.ApproxNode.__init__" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
+<dd><p>Initializes an ApproxNode instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>) – The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.</p></li>
+<li><p><strong>layer</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>) – Layer index in the transformer. Embedding layer is assumed to be layer 0.</p></li>
+<li><p><strong>position</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Token position if position-specific, else None. None is equivalent to all positions.</p></li>
+<li><p><strong>parent</strong> (<a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Parent node in the next node in the path. The parent is a successor in the computational graph.</p></li>
+<li><p><strong>children</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#set" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">set</span></code></a>, <em>default</em> <code class="xref py py-class docutils literal notranslate"><span class="pre">set()</span></code>) – Set of child nodes. A child is a predecessor in the computational graph.</p></li>
+<li><p><strong>msg_cache</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>) – Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).</p></li>
+<li><p><strong>cf_cache</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">{}</span></code>) – Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).</p></li>
+<li><p><strong>gradient</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.</p></li>
+<li><p><strong>input_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>) – Input activation name. This is the name associated to the cache entry corresponding to the input of this node.</p></li>
+<li><p><strong>output_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>) – Output activation name. This is the name associated to the cache entry corresponding to the output of this node.</p></li>
+<li><p><strong>patch_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">'zero'</span></code>) – Type of intervention (‘zero’ or ‘counterfactual’). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>An instance of ApproxNode.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode">ApproxNode</a></p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.ApproxNode.__lt__">
@@ -702,14 +748,10 @@ In simpler terms, it represents the message caused by passing the input message 
 <dd class="field-odd"><p>Tensor</p>
 </dd>
 </dl>
-<section id="id1">
-<h2>Notes<a class="headerlink" href="#id1" title="Link to this heading">#</a></h2>
-<ul class="simple">
-<li><p>If a position is specified the output will be zero for all other positions.</p></li>
-<li><p>The method assumes that the msg_cache and cf_cache contain the necessary activations.</p></li>
-<li><p>When message is None, the method will cache the output in msg_cache or cf_cache if not already present.</p></li>
-</ul>
-</section>
+<p>Notes:
+- If a position is specified the output will be zero for all other positions.
+- The method assumes that the msg_cache and cf_cache contain the necessary activations.
+- When message is None, the method will cache the output in msg_cache or cf_cache if not already present.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -740,11 +782,87 @@ output of this node.</p>
 <dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.EMBED_ApproxNode">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.nodes.</span></span><span class="sig-name descname"><span class="pre">EMBED_ApproxNode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">children</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cf_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gradient</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'zero'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#EMBED_ApproxNode"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.EMBED_ApproxNode" title="Link to this definition">#</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a></p>
-<p>Represents the embedding node in the transformer.</p>
+<p>Represents the embedding node in the transformer. This is almost a dummy node, as it only serves as the starting point for paths that begin at the input embeddings. This classes uses cached activations from the model to provide an interface consistent with other node types.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Variables<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>) – The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.</p></li>
+<li><p><strong>layer</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>) – Layer index in the transformer. Embedding layer is assumed to be layer 0.</p></li>
+<li><p><strong>position</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Token position if position-specific, else None. None is equivalent to all positions.</p></li>
+<li><p><strong>parent</strong> (<a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Parent node in the next node in the path. The parent is a successor in the computational graph.</p></li>
+<li><p><strong>children</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#set" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">set</span></code></a>, <em>default</em> <code class="xref py py-class docutils literal notranslate"><span class="pre">set()</span></code>) – Set of child nodes. A child is a predecessor in the computational graph.</p></li>
+<li><p><strong>msg_cache</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>) – Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).</p></li>
+<li><p><strong>cf_cache</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">{}</span></code>) – Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).</p></li>
+<li><p><strong>gradient</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.</p></li>
+<li><p><strong>input_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>) – Input activation name. This is the name associated to the cache entry corresponding to the input of this node.</p></li>
+<li><p><strong>output_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>) – Output activation name. This is the name associated to the cache entry corresponding to the output of this node.</p></li>
+<li><p><strong>patch_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">'zero'</span></code>) – Type of intervention (‘zero’ or ‘counterfactual’). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.EMBED_ApproxNode.__hash__">
+<span class="sig-name descname"><span class="pre">__hash__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#EMBED_ApproxNode.__hash__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.EMBED_ApproxNode.__hash__" title="Link to this definition">#</a></dt>
+<dd><p>Hash function for the EMBED_ApproxNode instance.
+:returns:         A hash value based on the layer and position.
+:rtype: int</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.EMBED_ApproxNode.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">children</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cf_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gradient</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'zero'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#EMBED_ApproxNode.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.EMBED_ApproxNode.__init__" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
+<dd><p>Initializes the EMBED_ApproxNode instance.
+:type model: <span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code></span>
+:param model: The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
+:type model: <code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>
+:type layer: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span>
+:param layer: Layer index in the transformer. Embedding layer is assumed to be layer 0.
+:type layer: <a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>
+:type position: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span>
+:param position: Token position if position-specific, else None. None is equivalent to all positions.
+:type position: <a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>
+:type parent: <span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a></span>
+:param parent: Parent node in the next node in the path. The parent is a successor in the computational graph.
+:type parent: <a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>
+:type children: 
+:param children: Set of child nodes. A child is a predecessor in the computational graph.
+:type children: <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#set" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">set</span></code></a>, <em>default</em> <code class="xref py py-class docutils literal notranslate"><span class="pre">set()</span></code>
+:type msg_cache: 
+:param msg_cache: Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
+:type msg_cache: <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>
+:type cf_cache: 
+:param cf_cache: Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
+:type cf_cache: <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">{}</span></code>
+:type gradient: 
+:param gradient: Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
+:type gradient: <code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>
+:type patch_type: 
+:param patch_type: Type of intervention (‘zero’ or ‘counterfactual’). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
+:type patch_type: <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">'zero'</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>An instance of the EMBED_ApproxNode class.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>self (<a class="reference internal" href="#backward_search_approximated.utils.nodes.EMBED_ApproxNode" title="backward_search_approximated.utils.nodes.EMBED_ApproxNode">EMBED_ApproxNode</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.EMBED_ApproxNode.__repr__">
+<span class="sig-name descname"><span class="pre">__repr__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#EMBED_ApproxNode.__repr__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.EMBED_ApproxNode.__repr__" title="Link to this definition">#</a></dt>
+<dd><p>String representation of the EMBED_ApproxNode instance.
+Includes layer and position.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A string representation of the EMBED_ApproxNode instance.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.EMBED_ApproxNode.calculate_gradient">
@@ -756,7 +874,7 @@ or assuming a gradient of ones if self has no parent. When ‘grad_outputs’ is
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>grad_outputs</strong> – Tensor, optional (default=None)
-Gradient to propagate backwards. If None, uses the gradient from the parent node or ones.</p></li>
+Usually the gradient to propagate backwards in this particular case it is never used.</p></li>
 <li><p><strong>save</strong> – bool, optional (default=True)
 Whether to save the computed gradient in self.gradient. The gradient can be reused
 later by setting use_precomputed to True.</p></li>
@@ -777,6 +895,12 @@ of this node, passing trough the path from final node to the current one.</p>
 <dd class="field-odd"><p>gradient</p>
 </dd>
 </dl>
+<div class="admonition-notes admonition">
+<p class="admonition-title">Notes</p>
+<ul class="simple">
+<li><p>Given that the EMBED node is a dummy node, the gradient is simply the one provided or the one from the parent node. The only modification is to zero out the gradient for positions not equal to self.position if specified.</p></li>
+</ul>
+</div>
 </dd></dl>
 
 <dl class="py method">
@@ -801,34 +925,37 @@ In simpler terms, it represents the message caused by passing the input message 
 <dd class="field-odd"><p>Tensor</p>
 </dd>
 </dl>
-<section id="id2">
-<h2>Notes<a class="headerlink" href="#id2" title="Link to this heading">#</a></h2>
+<div class="admonition-notes admonition">
+<p class="admonition-title">Notes</p>
 <ul class="simple">
 <li><p>If a position is specified the output will be zero for all other positions.</p></li>
 <li><p>The method assumes that the msg_cache and cf_cache contain the necessary activations.</p></li>
 <li><p>When message is None, the method will cache the output in msg_cache or cf_cache if not already present.</p></li>
 </ul>
-</section>
+</div>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.EMBED_ApproxNode.get_expansion_candidates">
 <span class="sig-name descname"><span class="pre">get_expansion_candidates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_cfg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sequence_length</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_head</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">separate_kv</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#EMBED_ApproxNode.get_expansion_candidates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.EMBED_ApproxNode.get_expansion_candidates" title="Link to this definition">#</a></dt>
 <dd><p>Returns the list of predecessors nodes in the computational graph whose outputs influence the
-output of this node.</p>
+output of this node.
+Given that this is an EMBED node, there are no predecessors, so the method returns an empty list.
+:type model_cfg: <span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformerConfig</span></code></span>
+:param model_cfg: The configuration of the transformer model. It is used to determine the number of heads and other model parameters.
+:type model_cfg: <code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformerConfig</span></code>
+:type include_head: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>
+:param include_head: Whether to consider specific head nodes for ATTN.
+:type include_head: <a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#False" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code></a>
+:type separate_kv: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>
+:param separate_kv: Whether to consider key and value positions separately for ATTN nodes
+:type separate_kv: <a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#False" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code></a></p>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>model_cfg</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformerConfig</span></code>) – The configuration of the transformer model. It is used to determine the number of heads and other model parameters.</p></li>
-<li><p><strong>include_head</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#False" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code></a>) – Whether to consider specific head nodes for ATTN.</p></li>
-<li><p><strong>separate_kv</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#False" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code></a>) – Whether to consider key and value positions separately for ATTN nodes</p></li>
-</ul>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The list of all predecessor, which is always empty for EMBED nodes.</p>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>The list of all predecessor nodes infuencing the input of this node.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)">list</a> of <a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode">ApproxNode</a></p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)">list</a> of <a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode">ApproxNode</a></p>
 </dd>
 </dl>
 </dd></dl>
@@ -839,11 +966,69 @@ output of this node.</p>
 <dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.FINAL_ApproxNode">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">backward_search_approximated.utils.nodes.</span></span><span class="sig-name descname"><span class="pre">FINAL_ApproxNode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">children</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cf_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gradient</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'zero'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#FINAL_ApproxNode"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.FINAL_ApproxNode" title="Link to this definition">#</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a></p>
-<p>Represents the final node in the transformer (This is a dummy node).</p>
+<p>Represents the final node in the transformer. This is almost a dummy node, as it only serves as the final point for paths that begin at the input embeddings. This classes uses cached activations from the model to provide an interface consistent with other node types.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Variables<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>) – The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.</p></li>
+<li><p><strong>layer</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>) – Layer index in the transformer. Embedding layer is assumed to be layer 0.</p></li>
+<li><p><strong>position</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Token position if position-specific, else None. None is equivalent to all positions.</p></li>
+<li><p><strong>parent</strong> (<a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Parent node in the next node in the path. The parent is a successor in the computational graph.</p></li>
+<li><p><strong>children</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#set" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">set</span></code></a>, <em>default</em> <code class="xref py py-class docutils literal notranslate"><span class="pre">set()</span></code>) – Set of child nodes. A child is a predecessor in the computational graph.</p></li>
+<li><p><strong>msg_cache</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>) – Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).</p></li>
+<li><p><strong>cf_cache</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">{}</span></code>) – Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).</p></li>
+<li><p><strong>gradient</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.</p></li>
+<li><p><strong>input_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>) – Input activation name. This is the name associated to the cache entry corresponding to the input of this node.</p></li>
+<li><p><strong>output_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>) – Output activation name. This is the name associated to the cache entry corresponding to the output of this node.</p></li>
+<li><p><strong>patch_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">'zero'</span></code>) – Type of intervention (‘zero’ or ‘counterfactual’). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.FINAL_ApproxNode.__hash__">
+<span class="sig-name descname"><span class="pre">__hash__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#FINAL_ApproxNode.__hash__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.FINAL_ApproxNode.__hash__" title="Link to this definition">#</a></dt>
+<dd><p>Hash function for the FINAL_ApproxNode instance.
+:returns:         A hash value based on the layer and position.
+:rtype: int</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.FINAL_ApproxNode.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">children</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cf_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gradient</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'zero'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#FINAL_ApproxNode.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.FINAL_ApproxNode.__init__" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
+<dd><p>Initializes the FINAL_ApproxNode instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>) – The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.</p></li>
+<li><p><strong>layer</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>) – Layer index in the transformer. Embedding layer is assumed to be layer 0.</p></li>
+<li><p><strong>metric</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">callable</span></code>) – A callable that takes as input a tensor of shape (batch_size, seq_len, d_model) and returns a scalar tensor.
+It is used to compute the gradient of the output with respect to the input of this node.</p></li>
+<li><p><strong>position</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Token position if position-specific, else None. None is equivalent to all positions.</p></li>
+<li><p><strong>parent</strong> (<a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Parent node in the next node in the path. The parent is a successor in the computational graph.</p></li>
+<li><p><strong>children</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#set" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">set</span></code></a>, <em>default</em> <code class="xref py py-class docutils literal notranslate"><span class="pre">set()</span></code>) – Set of child nodes. A child is a predecessor in the computational graph.</p></li>
+<li><p><strong>msg_cache</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>) – Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).</p></li>
+<li><p><strong>cf_cache</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">{}</span></code>) – Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).</p></li>
+<li><p><strong>gradient</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.</p></li>
+<li><p><strong>patch_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">'zero'</span></code>) – Type of intervention (‘zero’ or ‘counterfactual’). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>An instance of the FINAL_ApproxNode class.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>self (<a class="reference internal" href="#backward_search_approximated.utils.nodes.FINAL_ApproxNode" title="backward_search_approximated.utils.nodes.FINAL_ApproxNode">FINAL_ApproxNode</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.FINAL_ApproxNode.__repr__">
+<span class="sig-name descname"><span class="pre">__repr__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#FINAL_ApproxNode.__repr__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.FINAL_ApproxNode.__repr__" title="Link to this definition">#</a></dt>
+<dd><p>Returns a string representation of the FINAL_ApproxNode instance.
+Includes layer and position if specified.
+:returns:         A string representation of the FINAL_ApproxNode instance.
+:rtype: str</p>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.FINAL_ApproxNode.calculate_gradient">
@@ -855,13 +1040,17 @@ or assuming a gradient of ones if self has no parent. When ‘grad_outputs’ is
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>grad_outputs</strong> – Tensor, optional (default=None)
-Gradient to propagate backwards. If None, uses the gradient from the parent node or ones.</p></li>
+Usually the gradient to propagate backwards in this particular case it is never used.</p></li>
 <li><p><strong>save</strong> – bool, optional (default=True)
 Whether to save the computed gradient in self.gradient. The gradient can be reused
 later by setting use_precomputed to True.</p></li>
 <li><p><strong>use_precomputed</strong> – bool, optional (default=False)
 Whether to use the precomputed gradient if available. The precoputed gradient is stored whenever
 save is True.</p></li>
+<li><p><strong>metric</strong> – callable, optional (default=None)
+A callable that takes as input a tensor of shape (batch_size, seq_len, d_model) and returns a scalar tensor.
+It is used to compute the gradient of the output with respect to the input of this node.
+If None, uses the metric provided at initialization. If neither is provided, raises an error.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -900,40 +1089,42 @@ In simpler terms, it represents the message caused by passing the input message 
 <dd class="field-odd"><p>Tensor</p>
 </dd>
 </dl>
-<section id="id3">
-<h2>Notes<a class="headerlink" href="#id3" title="Link to this heading">#</a></h2>
+<div class="admonition-notes admonition">
+<p class="admonition-title">Notes</p>
 <ul class="simple">
 <li><p>If a position is specified the output will be zero for all other positions.</p></li>
 <li><p>The method assumes that the msg_cache and cf_cache contain the necessary activations.</p></li>
 <li><p>When message is None, the method will cache the output in msg_cache or cf_cache if not already present.</p></li>
 </ul>
-</section>
+</div>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.FINAL_ApproxNode.get_expansion_candidates">
 <span class="sig-name descname"><span class="pre">get_expansion_candidates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_cfg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_head</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">separate_kv</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#FINAL_ApproxNode.get_expansion_candidates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.FINAL_ApproxNode.get_expansion_candidates" title="Link to this definition">#</a></dt>
-<dd><p>Returns a list of potential previous nodes that contribute to this FINAL node.
-Previous nodes are:</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>MLP, EMBED and ATTN nodes in self.position from all layers.</p></li>
-</ul>
-</div></blockquote>
+<dd><p>Returns the list of predecessors nodes in the computational graph whose outputs influence the output of this node.
+For the FINAL node, these are all MLP, EMBED and ATTN nodes from all layers.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>model_cfg</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformerConfig</span></code></span>) – The configuration of the transformer model.</p></li>
-<li><p><strong>include_head</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – Whether to consider specific head nodes for ATTN.</p></li>
+<li><p><strong>model_cfg</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformerConfig</span></code>) – The configuration of the transformer model. It is used to determine the number of heads and other model parameters.</p></li>
+<li><p><strong>include_head</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#False" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code></a>) – Whether to consider specific head nodes for ATTN.</p></li>
+<li><p><strong>separate_kv</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#False" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code></a>) – Whether to consider key and value positions separately for ATTN nodes</p></li>
 </ul>
 </dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a>]</span></p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The list of all nodes.</p>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>A list of potential previous nodes.</p>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)">list</a> of <a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode">ApproxNode</a></p>
 </dd>
 </dl>
+<div class="admonition-notes admonition">
+<p class="admonition-title">Notes</p>
+<ul class="simple">
+<li><p>If self.position is None, only non-position-specific previous nodes are considered.</p></li>
+</ul>
+</div>
 </dd></dl>
 
 </dd></dl>
@@ -961,19 +1152,6 @@ Note that an MLP output in a specific position is independent from the outputs i
 <li><p><strong>patch_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">'zero'</span></code>) – Type of intervention (‘zero’ or ‘counterfactual’). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>model</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>) – The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.</p></li>
-<li><p><strong>layer</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>) – Layer index in the transformer. Embedding layer is assumed to be layer 0.</p></li>
-<li><p><strong>position</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Token position if position-specific, else None. None is equivalent to all positions.</p></li>
-<li><p><strong>parent</strong> (<a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Parent node in the next node in the path. The parent is a successor in the computational graph.</p></li>
-<li><p><strong>children</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#set" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">set</span></code></a>, <em>default</em> <code class="xref py py-class docutils literal notranslate"><span class="pre">set()</span></code>) – Set of child nodes. A child is a predecessor in the computational graph.</p></li>
-<li><p><strong>msg_cache</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>) – Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).</p></li>
-<li><p><strong>cf_cache</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">{}</span></code>) – Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).</p></li>
-<li><p><strong>gradient</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>) – Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.</p></li>
-<li><p><strong>patch_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">'zero'</span></code>) – Type of intervention (‘zero’ or ‘counterfactual’). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.</p></li>
-</ul>
-</dd>
 </dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.MLP_ApproxNode.__hash__">
@@ -986,7 +1164,43 @@ Note that an MLP output in a specific position is independent from the outputs i
 <dl class="py method">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.MLP_ApproxNode.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">children</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cf_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gradient</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'zero'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/backward_search_approximated/utils/nodes.html#MLP_ApproxNode.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backward_search_approximated.utils.nodes.MLP_ApproxNode.__init__" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
+<dd><p>Initializes an MLP_ApproxNode instance.
+:type model: <span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code></span>
+:param model: The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
+:type model: <code class="xref py py-class docutils literal notranslate"><span class="pre">HookedTransformer</span></code>
+:type layer: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span>
+:param layer: Layer index in the transformer. Embedding layer is assumed to be layer 0.
+:type layer: <a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>
+:type position: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span>
+:param position: Token position if position-specific, else None. None is equivalent to all positions.
+:type position: <a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>
+:type parent: <span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a></span>
+:param parent: Parent node in the next node in the path. The parent is a successor in the computational graph.
+:type parent: <a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode"><code class="xref py py-class docutils literal notranslate"><span class="pre">ApproxNode</span></code></a>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>
+:type children: 
+:param children: Set of child nodes. A child is a predecessor in the computational graph.
+:type children: <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#set" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">set</span></code></a>, <em>default</em> <code class="xref py py-class docutils literal notranslate"><span class="pre">set()</span></code>
+:type msg_cache: 
+:param msg_cache: Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
+:type msg_cache: <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>
+:type cf_cache: 
+:param cf_cache: Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
+:type cf_cache: <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">{}</span></code>
+:type gradient: 
+:param gradient: Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
+:type gradient: <code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <em>default</em> <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>
+:type patch_type: 
+:param patch_type: Type of intervention (‘zero’ or ‘counterfactual’). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
+:type patch_type: <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <em>default</em> <code class="docutils literal notranslate"><span class="pre">'zero'</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The initialized MLP_ApproxNode instance.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>self (<a class="reference internal" href="#backward_search_approximated.utils.nodes.MLP_ApproxNode" title="backward_search_approximated.utils.nodes.MLP_ApproxNode">MLP_ApproxNode</a>)</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="backward_search_approximated.utils.nodes.MLP_ApproxNode.__repr__">
@@ -1050,14 +1264,10 @@ output or the difference between normal and counterfactual output depending on p
 <dd class="field-odd"><p>Tensor</p>
 </dd>
 </dl>
-<section id="id4">
-<h2>Notes<a class="headerlink" href="#id4" title="Link to this heading">#</a></h2>
-<ul class="simple">
-<li><p>If a position is specified the output will be zero for all other positions.</p></li>
-<li><p>The method assumes that the msg_cache and cf_cache contain the necessary activations.</p></li>
-<li><p>When message is None, the method will cache the output in msg_cache or cf_cache if not already present.</p></li>
-</ul>
-</section>
+<p>Notes:
+- If a position is specified the output will be zero for all other positions.
+- The method assumes that the msg_cache and cf_cache contain the necessary activations.
+- When message is None, the method will cache the output in msg_cache or cf_cache if not already present.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -1069,7 +1279,7 @@ Previous nodes of an MLP are:</p>
 <blockquote>
 <div><ul class="simple">
 <li><p>MLP, EMBED and ATTN nodes in self.position from previous layers.</p></li>
-<li><p>ATTN nodes in all previous positions from current layers.</p></li>
+<li><p>ATTN nodes in self.position from current layers.</p></li>
 </ul>
 </div></blockquote>
 <p>ATTN nodes are always patched both in query and key-value positions separately.
@@ -1090,6 +1300,12 @@ Previous nodes of an MLP are:</p>
 <dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)">list</a> of <a class="reference internal" href="#backward_search_approximated.utils.nodes.ApproxNode" title="backward_search_approximated.utils.nodes.ApproxNode">ApproxNode</a></p>
 </dd>
 </dl>
+<div class="admonition-notes admonition">
+<p class="admonition-title">Notes</p>
+<ul class="simple">
+<li><p>If self.position is None, only non-position-specific previous nodes are considered.</p></li>
+</ul>
+</div>
 </dd></dl>
 
 </dd></dl>
@@ -1135,7 +1351,9 @@ Previous nodes of an MLP are:</p>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.ATTN_ApproxNode"><code class="docutils literal notranslate"><span class="pre">ATTN_ApproxNode</span></code></a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.ATTN_ApproxNode.__hash__"><code class="docutils literal notranslate"><span class="pre">ATTN_ApproxNode.__hash__()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.ATTN_ApproxNode.__init__"><code class="docutils literal notranslate"><span class="pre">ATTN_ApproxNode.__init__()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.ATTN_ApproxNode.__repr__"><code class="docutils literal notranslate"><span class="pre">ATTN_ApproxNode.__repr__()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.ATTN_ApproxNode.calculate_gradient"><code class="docutils literal notranslate"><span class="pre">ATTN_ApproxNode.calculate_gradient()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.ATTN_ApproxNode.forward"><code class="docutils literal notranslate"><span class="pre">ATTN_ApproxNode.forward()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.ATTN_ApproxNode.get_expansion_candidates"><code class="docutils literal notranslate"><span class="pre">ATTN_ApproxNode.get_expansion_candidates()</span></code></a></li>
@@ -1155,14 +1373,18 @@ Previous nodes of an MLP are:</p>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.EMBED_ApproxNode"><code class="docutils literal notranslate"><span class="pre">EMBED_ApproxNode</span></code></a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.EMBED_ApproxNode.__hash__"><code class="docutils literal notranslate"><span class="pre">EMBED_ApproxNode.__hash__()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.EMBED_ApproxNode.__init__"><code class="docutils literal notranslate"><span class="pre">EMBED_ApproxNode.__init__()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.EMBED_ApproxNode.__repr__"><code class="docutils literal notranslate"><span class="pre">EMBED_ApproxNode.__repr__()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.EMBED_ApproxNode.calculate_gradient"><code class="docutils literal notranslate"><span class="pre">EMBED_ApproxNode.calculate_gradient()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.EMBED_ApproxNode.forward"><code class="docutils literal notranslate"><span class="pre">EMBED_ApproxNode.forward()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.EMBED_ApproxNode.get_expansion_candidates"><code class="docutils literal notranslate"><span class="pre">EMBED_ApproxNode.get_expansion_candidates()</span></code></a></li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.FINAL_ApproxNode"><code class="docutils literal notranslate"><span class="pre">FINAL_ApproxNode</span></code></a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.FINAL_ApproxNode.__hash__"><code class="docutils literal notranslate"><span class="pre">FINAL_ApproxNode.__hash__()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.FINAL_ApproxNode.__init__"><code class="docutils literal notranslate"><span class="pre">FINAL_ApproxNode.__init__()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.FINAL_ApproxNode.__repr__"><code class="docutils literal notranslate"><span class="pre">FINAL_ApproxNode.__repr__()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.FINAL_ApproxNode.calculate_gradient"><code class="docutils literal notranslate"><span class="pre">FINAL_ApproxNode.calculate_gradient()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.FINAL_ApproxNode.forward"><code class="docutils literal notranslate"><span class="pre">FINAL_ApproxNode.forward()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#backward_search_approximated.utils.nodes.FINAL_ApproxNode.get_expansion_candidates"><code class="docutils literal notranslate"><span class="pre">FINAL_ApproxNode.get_expansion_candidates()</span></code></a></li>
@@ -1184,7 +1406,7 @@ Previous nodes of an MLP are:</p>
 
   
   <div class="tocsection editthispage">
-    <a href="https://github.com/your-username/your-repo/edit/main/source/api/nodes.rst">
+    <a href="https://github.com/acerutti/https://github.com/andreac01/IPE-LatentCircuitIdentification.git/edit/main/source/api/nodes.rst">
       <i class="fa-solid fa-pencil"></i>
       
       
