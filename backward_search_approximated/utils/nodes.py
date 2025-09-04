@@ -117,6 +117,7 @@ class ApproxNode(abc.ABC):
 		parent.children.add(self)
 
 	@abc.abstractmethod
+	@profile
 	def forward(self, message: Tensor = None) -> Tensor:
 		"""
 		Calculate the effect of the message on the output of the node. 
@@ -169,6 +170,7 @@ class ApproxNode(abc.ABC):
 		pass
 
 	@abc.abstractmethod
+	@profile
 	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> Tensor:
 		"""
 		Calculates the gradient of the node's input with respect to the final output.
@@ -328,6 +330,7 @@ class MLP_ApproxNode(ApproxNode):
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_mid", output_name=f"blocks.{layer}.hook_mlp_out", patch_type=patch_type)
 	
 
+	@profile
 	def forward(self, message: Tensor) -> Tensor:
 		"""
 		Calculate the effect of the message on the output of the node. 
@@ -475,6 +478,7 @@ class MLP_ApproxNode(ApproxNode):
 		"""
 		return hash((type(self).__name__, self.layer, self.position))
 	
+	@profile
 	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> Tensor:
 		"""
 		Calculates the gradient of the node's input with respect to the final output.
@@ -633,6 +637,7 @@ class ATTN_ApproxNode(ApproxNode):
 		if msg_cache.get(self.output_name, None) is not None:
 			assert msg_cache[self.input_name].shape == msg_cache[self.output_name].shape, "Input and output shapes must match"
 
+	@profile
 	def forward(self, message: Tensor) -> Tensor:
 		"""
 		Calculate the effect of the message on the output of the node. 
@@ -662,43 +667,43 @@ class ATTN_ApproxNode(ApproxNode):
 		- This method uses precomputed attention scores if possible, this may introduce small numerical differences compared to a full recomputation.
 		"""
 		length = self.position+1 if self.position is not None else self.msg_cache[self.input_name].shape[1]
-		value_residual = self.msg_cache[self.input_name].detach().clone()
 		if message is None:
+			value_residual = self.msg_cache[self.input_name]
 			if self.patch_type == 'zero':
 				if self.output_name in self.msg_cache:
 					if self.position is None:
-						return self.msg_cache[self.output_name].detach().clone()
+						return self.msg_cache[self.output_name]
 					else:
 						out = torch.zeros_like(self.msg_cache[self.input_name])
-						out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :].detach().clone()
+						out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :].detach()
 						return out
 				else:
 					if self.position is None:
-						query_residual = self.msg_cache[self.input_name].detach().clone()
+						query_residual = self.msg_cache[self.input_name]
 					else:
-						query_residual = self.msg_cache[self.input_name][:, self.position, :].detach().clone().unsqueeze(1)
+						query_residual = self.msg_cache[self.input_name][:, self.position, :].unsqueeze(1)
 					if self.keyvalue_position is None:
-						key_residual = self.msg_cache[self.input_name][:, :length].detach().clone()
+						key_residual = self.msg_cache[self.input_name][:, :length]
 					else:
-						key_residual = self.msg_cache[self.input_name][:, self.keyvalue_position, :].detach().clone().unsqueeze(1)
+						key_residual = self.msg_cache[self.input_name][:, self.keyvalue_position, :].unsqueeze(1)
 			if self.patch_type == 'counterfactual':
-				value_residual = self.cf_cache[self.input_name].detach().clone()
+				value_residual = self.cf_cache[self.input_name]
 				if self.output_name in self.cf_cache and self.output_name in self.msg_cache:
 					if self.position is None:
-						return self.msg_cache[self.output_name].detach().clone() - self.cf_cache[self.output_name].detach().clone()
+						return self.msg_cache[self.output_name] - self.cf_cache[self.output_name]
 					else:
 						out = torch.zeros_like(self.msg_cache[self.input_name])
-						out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :].detach().clone() - self.cf_cache[self.output_name][:, self.position, :].detach().clone()
+						out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :] - self.cf_cache[self.output_name][:, self.position, :]
 						return out
 				else:
 					if self.position is None:
-						query_residual = self.cf_cache[self.input_name].detach().clone()
+						query_residual = self.cf_cache[self.input_name]
 					else:
-						query_residual = self.cf_cache[self.input_name][:, self.position, :].detach().clone().unsqueeze(1)
+						query_residual = self.cf_cache[self.input_name][:, self.position, :].unsqueeze(1)
 					if self.keyvalue_position is None:
-						key_residual = self.cf_cache[self.input_name][:, :length].detach().clone()
+						key_residual = self.cf_cache[self.input_name][:, :length]
 					else:
-						key_residual = self.cf_cache[self.input_name][:, self.keyvalue_position, :].detach().clone().unsqueeze(1)
+						key_residual = self.cf_cache[self.input_name][:, self.keyvalue_position, :].unsqueeze(1)
 		else:
 			if self.patch_query:
 				if self.position is None:
@@ -726,9 +731,12 @@ class ATTN_ApproxNode(ApproxNode):
 					key_residual = key_residual.unsqueeze(1)
 			if self.patch_value:
 				if self.keyvalue_position is None:
-					value_residual = value_residual - message
+					value_residual = self.msg_cache[self.input_name].detach().clone() - message
 				else:
-					value_residual[:, self.keyvalue_position, :] = value_residual[:, self.keyvalue_position, :] - message[:, self.keyvalue_position, :]
+					value_residual = self.msg_cache[self.input_name].detach().clone()
+					value_residual[:, self.keyvalue_position, :] = value_residual[:, self.keyvalue_position, :].detach().clone() - message[:, self.keyvalue_position, :]
+			else:
+				value_residual = self.msg_cache[self.input_name]
 
 		key_residual = self.model.blocks[self.layer].ln1(key_residual)
 		value_residual = self.model.blocks[self.layer].ln1(value_residual)
@@ -749,12 +757,16 @@ class ATTN_ApproxNode(ApproxNode):
 			else:
 				value = torch.einsum('bsd,ndh->bsnh', value_residual, W_V) + b_V[None, None, :, :]
 		else:
+			if self.model.cfg.positional_embedding_type == 'rotary':
+				step = self.model.cfg.n_heads // self.model.cfg.n_key_value_heads
+			else:
+				step = 1
 			W_Q = self.model.blocks[self.layer].attn.W_Q
-			W_K = self.model.blocks[self.layer].attn.W_K
-			W_V = self.model.blocks[self.layer].attn.W_V
+			W_K = self.model.blocks[self.layer].attn.W_K[::step]
+			W_V = self.model.blocks[self.layer].attn.W_V[::step]
 			b_Q = self.model.blocks[self.layer].attn.b_Q
-			b_K = self.model.blocks[self.layer].attn.b_K
-			b_V = self.model.blocks[self.layer].attn.b_V
+			b_K = self.model.blocks[self.layer].attn.b_K[::step]
+			b_V = self.model.blocks[self.layer].attn.b_V[::step]
 			query = torch.einsum('bsd,ndh->bsnh', query_residual, W_Q) + b_Q[None, None, :, :]
 			key = torch.einsum('bsd,ndh->bsnh', key_residual, W_K) + b_K[None, None, :, :]
 			if self.keyvalue_position is not None:
@@ -810,6 +822,7 @@ class ATTN_ApproxNode(ApproxNode):
 			return resized_out
 		return self.msg_cache[self.output_name].detach().clone() - out
 	
+	@profile
 	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> Tensor:
 		"""
 		Calculates the gradient of the node's input with respect to the final output.
@@ -838,7 +851,7 @@ class ATTN_ApproxNode(ApproxNode):
 				return self.gradient.detach().clone()
 			gradient = self.gradient.detach().clone()
 			out = torch.zeros_like(gradient, device=gradient.device)
-			if self.patch_query or self.patch_key:
+			if self.patch_value or self.patch_key:
 				out[:, self.keyvalue_position, :] = gradient[:, self.keyvalue_position, :]
 			if self.patch_query:
 				out[:, self.position, :] = gradient[:, self.position, :]
@@ -883,12 +896,16 @@ class ATTN_ApproxNode(ApproxNode):
 				else:
 					value = torch.einsum('bsd,ndh->bsnh', value_residual, W_V) + b_V[None, None, :, :]
 			else:
+				if self.model.cfg.positional_embedding_type == 'rotary':
+					step = self.model.cfg.n_heads // self.model.cfg.n_key_value_heads
+				else:
+					step = 1
 				W_Q = self.model.blocks[self.layer].attn.W_Q
-				W_K = self.model.blocks[self.layer].attn.W_K
-				W_V = self.model.blocks[self.layer].attn.W_V
+				W_K = self.model.blocks[self.layer].attn.W_K[::step]
+				W_V = self.model.blocks[self.layer].attn.W_V[::step]
 				b_Q = self.model.blocks[self.layer].attn.b_Q
-				b_K = self.model.blocks[self.layer].attn.b_K
-				b_V = self.model.blocks[self.layer].attn.b_V
+				b_K = self.model.blocks[self.layer].attn.b_K[::step]
+				b_V = self.model.blocks[self.layer].attn.b_V[::step]
 				query = torch.einsum('bsd,ndh->bsnh', query_residual, W_Q) + b_Q[None, None, :, :]
 				key = torch.einsum('bsd,ndh->bsnh', key_residual, W_K) + b_K[None, None, :, :]
 				if self.keyvalue_position is not None:
@@ -1109,6 +1126,7 @@ class EMBED_ApproxNode(ApproxNode):
 		"""		
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name="hook_embed", output_name="hook_embed", patch_type=patch_type)
 
+	@profile
 	def forward(self, message: Tensor = None) -> Tensor:
 		"""
 		Calculate the effect of the message on the output of the node. 
@@ -1149,6 +1167,7 @@ class EMBED_ApproxNode(ApproxNode):
 			embedding[:, self.position + 1:, :] = torch.zeros_like(embedding[:, self.position + 1:, :], device=embedding.device)
 		return embedding
 
+	@profile
 	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False):
 		"""
 		Calculates the gradient of the node's input with respect to the final output.
@@ -1296,6 +1315,7 @@ class FINAL_ApproxNode(ApproxNode):
 		"""
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_post", output_name=f"blocks.{layer}.hook_resid_post", patch_type=patch_type)
 		self.metric = metric
+	@profile
 	def forward(self, message: Tensor = None) -> Tensor:
 		"""
 		Calculate the effect of the message on the output of the node. 
@@ -1337,6 +1357,7 @@ class FINAL_ApproxNode(ApproxNode):
 			return res_zeroed
 		return res
 
+	@profile
 	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False, metric=None) -> Tensor:
 		"""
 		Calculates the gradient of the node's input with respect to the final output.
@@ -1472,4 +1493,4 @@ class FINAL_ApproxNode(ApproxNode):
 			int:
 				A hash value based on the layer and position.
 		"""
-		return hash((type(self).__name__, self.layer, self.position)) 
+		return hash((type(self).__name__, self.layer, self.position))

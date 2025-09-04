@@ -45,9 +45,12 @@ def custom_attention_forward(
 		NotImplementedError: If using unsupported positional embedding types
 	"""
 	if attention_module.cfg.positional_embedding_type == "rotary":
-		raise NotImplementedError(
-			"Rotary positional embeddings are not supported in this function. Use the full attention module instead."
-		)
+		past_kv_pos_offset = 0 if query_position is None else query_position
+		q = attention_module.hook_rot_q(attention_module.apply_rotary(q, past_kv_pos_offset=past_kv_pos_offset))
+		past_kv_pos_offset = 0 if keyvalue_position is None else keyvalue_position
+		k = attention_module.hook_rot_k(
+			attention_module.apply_rotary(k, past_kv_pos_offset=past_kv_pos_offset)
+		) 
 	if attention_module.cfg.dtype not in [torch.float32, torch.float64]:
 		# If using 16 bits, increase the precision to avoid numerical instabilities
 		q = q.to(torch.float32)
@@ -58,7 +61,7 @@ def custom_attention_forward(
 		attn_scores_new = attention_module.calculate_attention_scores(q, k)
 		if plot_patterns:
 			plt.figure(figsize=(10, 5))
-			plt.imshow(attn_scores_new[0][0].detach().numpy(), cmap='viridis', aspect='auto', vmin=0, vmax=1)
+			plt.imshow(attn_scores_new[0][0].detach().cpu().numpy(), cmap='viridis', aspect='auto', vmin=0, vmax=1)
 			for i in range(attn_scores_new[0][0].shape[0]):
 				for j in range(attn_scores_new[0][0].shape[1]):
 					plt.text(j, i, f'{attn_scores_new[0,0][i,j].item():.2f}', ha='center', va='center', color='white')
@@ -76,7 +79,7 @@ def custom_attention_forward(
 			attn_scores = precomputed_attention_scores[:, head:head+1, :, :]
 			if plot_patterns:
 				plt.figure(figsize=(10, 5))
-				plt.imshow(attn_scores[0][0].detach().numpy(), cmap='viridis', aspect='auto', vmin=0, vmax=1)
+				plt.imshow(attn_scores[0][0].detach().cpu().numpy(), cmap='viridis', aspect='auto', vmin=0, vmax=1)
 				for i in range(attn_scores[0][0].shape[0]):
 					for j in range(attn_scores[0][0].shape[1]):
 						plt.text(j, i, f'{attn_scores[0,0][i,j].item():.2f}', ha='center', va='center', color='white')
@@ -127,7 +130,7 @@ def custom_attention_forward(
 		attn_scores = attention_module.apply_causal_mask(attn_scores)
 	if plot_patterns:
 		plt.figure(figsize=(10, 5))
-		plt.imshow(attn_scores[0][0].detach().numpy(), cmap='viridis', aspect='auto', vmin=0, vmax=1)
+		plt.imshow(attn_scores[0][0].detach().cpu().numpy(), cmap='viridis', aspect='auto', vmin=0, vmax=1)
 		for i in range(attn_scores[0][0].shape[0]):
 			for j in range(attn_scores[0][0].shape[1]):
 				plt.text(j, i, f'{attn_scores[0,0][i,j].item():.2f}', ha='center', va='center', color='white')
@@ -147,7 +150,7 @@ def custom_attention_forward(
 	if plot_patterns:
 		for h in range(pattern.shape[1]):
 			plt.figure(figsize=(10, 5))
-			plt.imshow(pattern[0][h].detach().numpy(), cmap='viridis', aspect='auto', vmin=0, vmax=1)
+			plt.imshow(pattern[0][h].detach().cpu().numpy(), cmap='viridis', aspect='auto', vmin=0, vmax=1)
 			for i in range(pattern[0][h].shape[0]):
 				for j in range(pattern[0][h].shape[1]):
 					plt.text(j, i, f'{pattern[0][h][i,j].item():.2f}', ha='center', va='center', color='white')
