@@ -5,6 +5,7 @@ from backward_search_approximated.utils.nodes import ApproxNode, FINAL_ApproxNod
 from tqdm import tqdm
 from functools import partial
 from typing import Callable
+from itertools import islice
 
 
 
@@ -168,6 +169,17 @@ def get_path(node):
 		path.append(path[-1].parent)
 	return path
 
+
+def batch_iterable(iterable, batch_size):
+	it = iter(iterable)
+	while True:
+		chunk = list(islice(it, batch_size))
+		if not chunk:
+			break
+		yield chunk
+
+
+@profile
 def PathAttributionPatching(
 	model: HookedTransformer,
 	msg_cache: dict,
@@ -207,41 +219,44 @@ def PathAttributionPatching(
 	completed_paths = []
 	while frontier:
 		cur_depth_frontier = []
-		print(frontier)
 		# Expand all paths in the frontier looking for meaningful continuations
-		for node in tqdm(frontier):
+		for node in tqdm(frontier): # TODO: Try to batch across nodes that have the same children (only one forward pass of the child needed, then just set the correct parent) combining this with batching the einsum should be great
 
 			grad = node.calculate_gradient(use_precomputed=True)
 
 			childrens = []
 
-			candidate_components = node.get_expansion_candidates(model.cfg, include_head=True)
+			candidate_components = node.get_expansion_candidates(model.cfg, include_head=True) 
+   			# TODO, NOTE: we might reuse the candidates from the previous nodes, but we need to order nodes correctly and remove the ones that are not children of the current node
 
 			# Get the meaningful candidates for expansion
-			for candidate in candidate_components:
-				candidate_path = get_path(candidate)
-				candidate_contribution = candidate.forward(message=None)
-				approx_contribution = torch.einsum('bsd,bsd->b', candidate_contribution, grad)
-				# EMBED is the base case
-				if candidate.__class__.__name__ == 'EMBED_ApproxNode':
-					if return_all:
-						contribution = evaluate_path(model, msg_cache, candidate_path, metric, ground_truth_tokens)
-						completed_paths.append((contribution, candidate_path))
-					elif include_negative:
-						if abs(approx_contribution) >= min_contribution:
+			for candidate_batch in batch_iterable(candidate_components, 100):
+				candidate_contributions = torch.stack([candidate.forward(message=None) for candidate in candidate_batch], dim=0) # TODO: make this somewhat batched by position if possible
+
+				approx_contributions = torch.einsum('xbsd,bsd->x', candidate_contributions, grad) # TODO: make this batched (up to 40% of the total time)
+				for i, candidate in enumerate(candidate_batch):
+					approx_contribution = approx_contributions[i]
+					# EMBED is the base case
+					if candidate.__class__.__name__ == 'EMBED_ApproxNode':
+						candidate_path = get_path(candidate)
+						if return_all:
 							contribution = evaluate_path(model, msg_cache, candidate_path, metric, ground_truth_tokens)
 							completed_paths.append((contribution, candidate_path))
-					elif approx_contribution >= min_contribution:
-						contribution = evaluate_path(model, msg_cache, candidate_path, metric, ground_truth_tokens)
-						completed_paths.append((contribution, candidate_path))
-				
-				# MLP requires to check the contribution of the whole component and of the individual layers
-				elif candidate.__class__.__name__ == 'MLP_ApproxNode' or candidate.__class__.__name__ == 'ATTN_ApproxNode':
-					if include_negative:
-						if abs(approx_contribution) >= min_contribution:
+						elif include_negative:
+							if abs(approx_contribution.item()) >= min_contribution:
+								contribution = evaluate_path(model, msg_cache, candidate_path, metric, ground_truth_tokens)
+								completed_paths.append((contribution, candidate_path))
+						elif approx_contribution >= min_contribution:
+							contribution = evaluate_path(model, msg_cache, candidate_path, metric, ground_truth_tokens)
+							completed_paths.append((contribution, candidate_path))
+					
+					# MLP requires to check the contribution of the whole component and of the individual layers
+					elif candidate.__class__.__name__ == 'MLP_ApproxNode' or candidate.__class__.__name__ == 'ATTN_ApproxNode':
+						if include_negative:
+							if abs(approx_contribution.item()) >= min_contribution: # TODO: make this faster batched? np.abs?
+								childrens.append(candidate)
+						elif approx_contribution >= min_contribution:
 							childrens.append(candidate)
-					elif approx_contribution >= min_contribution:
-						childrens.append(candidate)
 			cur_depth_frontier.extend(childrens)
 			node.children = childrens
 
