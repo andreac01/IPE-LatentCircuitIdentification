@@ -6,6 +6,9 @@ from tqdm import tqdm
 from functools import partial
 from typing import Callable
 from itertools import islice
+import gc
+from collections import defaultdict
+import weakref
 
 
 
@@ -35,7 +38,7 @@ def evaluate_path(model, cache, path, metric, correct_tokens):
 	for i in range(len(path)):
 		message = path[i].forward(message=message)
 
-	return metric(path[-1].forward(), path[-1].forward() - message, model, correct_tokens)
+	return metric(corrupted_resid=path[-1].forward() - message)
 
 
 
@@ -57,11 +60,7 @@ def IsolatingPathEffect_BW(
 			The transformer model used for evaluation. It should be an instance
 			of HookedTransformer, to ensure compatibility with cache and nodes forward methods.
 		metric (Callable): 
-			A function to evaluate the contribution or importance of the path.
-				It must accept three parameters:
-				- The output of the last node in the path.
-				- The output of the last node when the path is removed
-				- The model itself
+			A function to evaluate the contribution or importance of the path. It must accept a single parameter: `corrupted_resid`.
 		start_node (ApproxNode): 
 			The initial node to begin the backward search from (e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).
 		min_contribution (float, default=0.5):
@@ -179,7 +178,7 @@ def batch_iterable(iterable, batch_size):
 		yield chunk
 
 
-@profile
+
 def PathAttributionPatching(
 	model: HookedTransformer,
 	msg_cache: dict,
@@ -220,14 +219,13 @@ def PathAttributionPatching(
 	while frontier:
 		cur_depth_frontier = []
 		# Expand all paths in the frontier looking for meaningful continuations
-		for node in tqdm(frontier): # TODO: Try to batch across nodes that have the same children (only one forward pass of the child needed, then just set the correct parent) combining this with batching the einsum should be great
+		for node in tqdm(frontier):
 
 			grad = node.calculate_gradient(use_precomputed=True)
 
 			childrens = []
 
 			candidate_components = node.get_expansion_candidates(model.cfg, include_head=True) 
-   			# TODO, NOTE: we might reuse the candidates from the previous nodes, but we need to order nodes correctly and remove the ones that are not children of the current node
 
 			# Get the meaningful candidates for expansion
 			for candidate_batch in batch_iterable(candidate_components, 100):
@@ -259,6 +257,12 @@ def PathAttributionPatching(
 							childrens.append(candidate)
 			cur_depth_frontier.extend(childrens)
 			node.children = childrens
+			if len(childrens) == 0:
+				node.gradient = None # Free the gradient of the node if it has no children to save memory
+		
+		for node in frontier: # Free the gradient of the parent nodes to save memory
+			if node.parent is not None:
+				node.parent.gradient = None
 
 		frontier = cur_depth_frontier
 

@@ -117,7 +117,7 @@ class ApproxNode(abc.ABC):
 		parent.children.add(self)
 
 	@abc.abstractmethod
-	@profile
+	
 	def forward(self, message: Tensor = None) -> Tensor:
 		"""
 		Calculate the effect of the message on the output of the node. 
@@ -170,7 +170,7 @@ class ApproxNode(abc.ABC):
 		pass
 
 	@abc.abstractmethod
-	@profile
+	
 	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> Tensor:
 		"""
 		Calculates the gradient of the node's input with respect to the final output.
@@ -330,7 +330,7 @@ class MLP_ApproxNode(ApproxNode):
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_mid", output_name=f"blocks.{layer}.hook_mlp_out", patch_type=patch_type)
 	
 
-	@profile
+	
 	def forward(self, message: Tensor) -> Tensor:
 		"""
 		Calculate the effect of the message on the output of the node. 
@@ -478,7 +478,7 @@ class MLP_ApproxNode(ApproxNode):
 		"""
 		return hash((type(self).__name__, self.layer, self.position))
 	
-	@profile
+	
 	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> Tensor:
 		"""
 		Calculates the gradient of the node's input with respect to the final output.
@@ -637,7 +637,7 @@ class ATTN_ApproxNode(ApproxNode):
 		if msg_cache.get(self.output_name, None) is not None:
 			assert msg_cache[self.input_name].shape == msg_cache[self.output_name].shape, "Input and output shapes must match"
 
-	@profile
+	
 	def forward(self, message: Tensor) -> Tensor:
 		"""
 		Calculate the effect of the message on the output of the node. 
@@ -696,14 +696,13 @@ class ATTN_ApproxNode(ApproxNode):
 						out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :] - self.cf_cache[self.output_name][:, self.position, :]
 						return out
 				else:
+					out = ATTN_ApproxNode(self.model, layer=self.layer, head=self.head, msg_cache=self.msg_cache, cf_cache={}, keyvalue_position=self.keyvalue_position, patch_type='zero').forward(message=None) - ATTN_ApproxNode(self.model, layer=self.layer, head=self.head, msg_cache=self.cf_cache, cf_cache={}, keyvalue_position=self.keyvalue_position, patch_type='zero').forward(message=None)
 					if self.position is None:
-						query_residual = self.cf_cache[self.input_name]
-					else:
-						query_residual = self.cf_cache[self.input_name][:, self.position, :].unsqueeze(1)
-					if self.keyvalue_position is None:
-						key_residual = self.cf_cache[self.input_name][:, :length]
-					else:
-						key_residual = self.cf_cache[self.input_name][:, self.keyvalue_position, :].unsqueeze(1)
+						return out
+					out_pos = torch.zeros_like(self.msg_cache[self.input_name])
+					out_pos[:, self.position, :] = out[:, self.position, :]
+					return out_pos
+						
 		else:
 			if self.patch_query:
 				if self.position is None:
@@ -788,16 +787,11 @@ class ATTN_ApproxNode(ApproxNode):
 		)
 		
 
-		if self.msg_cache.get(self.output_name, None) is None:
+		if self.patch_type == 'zero' and self.msg_cache.get(self.output_name, None) is None:
 			if self.position is None and message is None:
 				self.msg_cache[self.output_name] = out.detach().clone()
 			else:
 				ATTN_ApproxNode(self.model, layer=self.layer, head=self.head, msg_cache=self.msg_cache, cf_cache=self.cf_cache, keyvalue_position=self.keyvalue_position, patch_type='zero').forward(message=None)
-		if self.patch_type == 'counterfactual' and self.cf_cache.get(self.output_name, None) is None:
-			if self.position is None and message is None:
-				self.cf_cache[self.output_name] = out.detach().clone()
-			else:
-				ATTN_ApproxNode(self.model, layer=self.layer, head=self.head, msg_cache=self.cf_cache, cf_cache=self.cf_cache, keyvalue_position=self.keyvalue_position, patch_type='counterfactual').forward(message=None)
 		if message is None:
 			if self.patch_type == 'zero':
 				if self.position is not None:
@@ -806,15 +800,8 @@ class ATTN_ApproxNode(ApproxNode):
 					return resized_out
 				self.msg_cache[self.output_name] = out.detach().clone()
 				return out
-			elif self.patch_type == 'counterfactual':
-				if self.position is not None:
-					resized_out = torch.zeros_like(self.msg_cache[self.input_name], device=out.device)
-					resized_out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :].detach().clone() - out
-					return resized_out
-				self.cf_cache[self.output_name] = out.detach().clone()
-				return self.msg_cache[self.output_name].detach().clone() - self.cf_cache[self.output_name].detach().clone()
 			else:
-				raise ValueError(f"Unknown patch type: {self.patch_type}")
+				raise ValueError(f"Invalid patch type: {self.patch_type}")
 		
 		if self.position is not None:
 			resized_out = torch.zeros_like(self.msg_cache[self.input_name], device=out.device)
@@ -822,7 +809,7 @@ class ATTN_ApproxNode(ApproxNode):
 			return resized_out
 		return self.msg_cache[self.output_name].detach().clone() - out
 	
-	@profile
+	
 	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> Tensor:
 		"""
 		Calculates the gradient of the node's input with respect to the final output.
@@ -1126,7 +1113,7 @@ class EMBED_ApproxNode(ApproxNode):
 		"""		
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name="hook_embed", output_name="hook_embed", patch_type=patch_type)
 
-	@profile
+	
 	def forward(self, message: Tensor = None) -> Tensor:
 		"""
 		Calculate the effect of the message on the output of the node. 
@@ -1167,7 +1154,7 @@ class EMBED_ApproxNode(ApproxNode):
 			embedding[:, self.position + 1:, :] = torch.zeros_like(embedding[:, self.position + 1:, :], device=embedding.device)
 		return embedding
 
-	@profile
+	
 	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False):
 		"""
 		Calculates the gradient of the node's input with respect to the final output.
@@ -1315,7 +1302,7 @@ class FINAL_ApproxNode(ApproxNode):
 		"""
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_post", output_name=f"blocks.{layer}.hook_resid_post", patch_type=patch_type)
 		self.metric = metric
-	@profile
+	
 	def forward(self, message: Tensor = None) -> Tensor:
 		"""
 		Calculate the effect of the message on the output of the node. 
@@ -1343,10 +1330,8 @@ class FINAL_ApproxNode(ApproxNode):
 			- When message is None, the method will cache the output in msg_cache or cf_cache if not already present.
 		"""
 		if message is None:
-			if self.patch_type == 'zero':
+			if self.patch_type == 'zero' or self.patch_type == 'counterfactual':
 				res = self.msg_cache[self.input_name].detach().clone()
-			elif self.patch_type == 'counterfactual':
-				res = self.msg_cache[self.input_name].detach().clone() - self.cf_cache[self.input_name].detach().clone()
 			else:
 				raise ValueError(f"Unknown patch type: {self.patch_type}")
 		else:
@@ -1357,7 +1342,7 @@ class FINAL_ApproxNode(ApproxNode):
 			return res_zeroed
 		return res
 
-	@profile
+	
 	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False, metric=None) -> Tensor:
 		"""
 		Calculates the gradient of the node's input with respect to the final output.
