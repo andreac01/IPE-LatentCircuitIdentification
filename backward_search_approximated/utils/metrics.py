@@ -4,8 +4,6 @@ from typing import List, Optional
 from torch import Tensor
 import torch.nn.functional as F
 
-baseline_score = 0.0
-
 def compare_token_probability(clean_resid: Tensor,
 								corrupted_resid: Tensor,
 								model: HookedTransformer,
@@ -94,27 +92,31 @@ def indirect_effect(clean_resid: Tensor,
 					model: HookedTransformer,
 					clean_targets: List[int],
 					corrupt_targets: List[int],
-     				verbose = False,
-					use_ablation_mode = True,
-    				set_baseline = False) -> Tensor:
+					verbose = False,
+					set_baseline = False) -> Tensor:
 	"""
-	Compute the indirect effect as a percentage difference in logits for the target tokens
-	between the clean and corrupted model based on the final residuals.
+	Compute the Indirect Effect (IE) score.
+	IE(z) = 0.5 * [ (P*z(r) - P(r)) / P(r) + (P(r') - P*z(r')) / P*z(r') ]
+	This measures how much a component's activation (z) from a corrupted run
+	influences the output probabilities on a clean run.
 
 	Args:
-		clean_resid (torch.Tensor): The final residual stream of the clean model.
+		clean_resid (torch.Tensor): 
+			The final residual stream of the clean model run (prompt p2).
 			Shape: (batch, seq_len, d_model).
-		corrupted_resid (torch.Tensor): The final residual stream of the corrupted model.
+		corrupted_resid (torch.Tensor): 
+			The final residual stream of the corrupted model run (prompt p2 with intervention z from p1).
 			Shape: (batch, seq_len, d_model).
 		model (HookedTransformer): The hooked transformer model.
-		clean_targets (List[int]): The indexes of the target tokens for the clean model.
-		corrupt_targets (List[int]): The indexes of the target tokens for the corrupted model.
+		clean_targets (List[int]): 
+			The indexes of the target tokens for the clean prompt (r').
+		corrupt_targets (List[int]): 
+			The indexes of the target tokens from the corrupted prompt (r).
 		verbose (bool, optional): If True, prints intermediate values for debugging. Default is False.
-		use_ablation_mode (bool, optional): If True, uses ablation-based comparison. Default is True.
 		set_baseline (bool, optional): If True, sets the baseline score for centering the metric. Default is False.
 
 	Returns:
-		torch.Tensor: The indirect effect as a percentage difference in logits for the target tokens.
+		torch.Tensor: The Indirect Effect score.
 	"""
 
 	# Get the final residual stream for the last token
@@ -125,24 +127,42 @@ def indirect_effect(clean_resid: Tensor,
 	clean_final_resid = model.ln_final(clean_final_resid)
 	corrupted_final_resid = model.ln_final(corrupted_final_resid)
 	
-	# Get the logits associated with the clean target in clean run and corrupted counterfactual run
-	P_r = torch.tensor([torch.softmax(model.unembed(clean_final_resid[i]), dim=-1)[clean_targets[i]] for i in range(len(clean_targets))])
-	P_r_star = torch.tensor([torch.softmax(model.unembed(corrupted_final_resid[i]), dim=-1)[clean_targets[i]] for i in range(len(clean_targets))])
-	
-	# Get the logits associated with the corrupted target in clean run and corrupted counterfactual run
-	P_r_prime = torch.tensor([torch.softmax(model.unembed(clean_final_resid[i]), dim=-1)[corrupt_targets[i]] for i in range(len(corrupt_targets))])
-	P_r_star_prime = torch.tensor([torch.softmax(model.unembed(corrupted_final_resid[i]), dim=-1)[corrupt_targets[i]] for i in range(len(corrupt_targets))])
+	# Get the logits for both runs
+	clean_logits = model.unembed(clean_final_resid)
+	corrupted_logits = model.unembed(corrupted_final_resid)
 
-	indirect_effects = 0.5 * ( (P_r_star - P_r)/(P_r + 1e-8) + (P_r_prime - P_r_star_prime)/(P_r_star_prime + 1e-8) )
+	# Apply softmax to get probabilities
+	clean_probs = F.softmax(clean_logits, dim=-1)
+	corrupted_probs = F.softmax(corrupted_logits, dim=-1)
+
+	batch_indices = torch.arange(len(clean_targets))
+
+	# P(r'): Probability of the clean target (r') on a clean run.
+	P_r_prime = clean_probs[batch_indices, clean_targets]
+	# P(r): Probability of the corrupt target (r) on a clean run.
+	P_r = clean_probs[batch_indices, corrupt_targets]
+
+	# P*z(r'): Probability of the clean target (r') on a corrupted run.
+	P_z_star_r_prime = corrupted_probs[batch_indices, clean_targets]
+	# P*z(r): Probability of the corrupt target (r) on a corrupted run.
+	P_z_star_r = corrupted_probs[batch_indices, corrupt_targets]
+
+	# Term 1: (P*z(r) - P(r)) / P(r)
+	# Relative increase in probability for the new answer (r)
+	term1 = (P_z_star_r - P_r) / (P_r + 1e-8)
+
+	# Term 2: (P(r') - P*z(r')) / P*z(r')
+	# Change in probability for the original answer (r')
+	term2 = (P_r_prime - P_z_star_r_prime) / (P_z_star_r_prime + 1e-8)
+
+	indirect_effects = 0.5 * (term1 + term2)
+
 	if verbose:
-		print(f"P_r: {P_r.mean().item()}, P_r_star: {P_r_star.mean().item()}")
-		print(f"P_r_prime: {P_r_prime.mean().item()}, P_r_star_prime: {P_r_star_prime.mean().item()}")
+		print(f"P(r): {P_r.mean().item()}, P*z(r): {P_z_star_r.mean().item()}")
+		print(f"P(r'): {P_r_prime.mean().item()}, P*z(r'): {P_z_star_r_prime.mean().item()}")
 		print(f"Indirect effect: {indirect_effects.mean().item()}")
 
-	if set_baseline: # Workaround for the fact that the score may be negative and is easier to have the metric centered
-		global baseline_score
-		baseline_score = indirect_effects.mean()
-	return torch.mean(indirect_effects) - baseline_score
+	return torch.mean(indirect_effects)
 
 def logit_difference_counterfactual(clean_resid: Tensor,
                                    counterfactual_resid: Tensor, 
@@ -204,4 +224,3 @@ def logit_difference_counterfactual(clean_resid: Tensor,
 	# Calculate the logit difference: y' - y   ## y - y*
 	logit_diffs = counterfactual_logits - clean_logits
 	return torch.mean(logit_diffs).item()
-
