@@ -1,55 +1,111 @@
-from transformer_lens import HookedTransformer, ActivationCache
+from transformer_lens import HookedTransformer
 import torch
-from torch import Tensor
-from backward_search_approximated.utils.nodes import ApproxNode, FINAL_ApproxNode, MLP_ApproxNode, ATTN_ApproxNode, EMBED_ApproxNode
+from backward_search_approximated.utils.nodes import ApproxNode, ATTN_ApproxNode
+from backward_search_approximated.utils.paths import evaluate_path, get_path
+from backward_search_approximated.utils.miscellanea import batch_iterable
 from tqdm import tqdm
-from functools import partial
 from typing import Callable
-from itertools import islice
 import gc
-from collections import defaultdict
-import weakref
 
 
+def find_relevant_positions(candidate, incomplete_path, metric, min_contribution, include_negative):
+	relevant_extensions = []
+	target_positions = []
+	if incomplete_path[0].__class__.__name__ == 'ATTN_ApproxNode':
+		if incomplete_path[0].patch_key or incomplete_path[0].patch_value:
+			target_positions = [incomplete_path[0].keyvalue_position]
+		if incomplete_path[0].patch_query:
+			target_positions.append(incomplete_path[0].position)
+	else:
+		target_positions = [incomplete_path[0].position]
+	for target_position in target_positions:
+		candidate.position = target_position
+		if candidate.patch_key or candidate.patch_value:
+			for kv_position in range(candidate.position):
+				candidate_pos = ATTN_ApproxNode(
+					model=candidate.model,
+					layer=candidate.layer,
+					head=candidate.head,
+					position=candidate.position,
+					keyvalue_position=kv_position,
+					parent=candidate.parent,
+					children=set(),
+					msg_cache=candidate.msg_cache,
+					cf_cache=candidate.cf_cache,
+					gradient=None,
+					patch_query=candidate.patch_query,
+					patch_key=candidate.patch_key,
+					patch_value=candidate.patch_value,
+					plot_patterns=False,
+					patch_type=candidate.patch_type
+				)
+				contribution = evaluate_path([candidate_pos] + incomplete_path, metric)
+				if (contribution >= min_contribution) or (include_negative and abs(contribution) >= min_contribution):
+					relevant_extensions.append((contribution, [candidate]+incomplete_path))
+		elif candidate.patch_query:
+			candidate_pos = ATTN_ApproxNode(
+				model=candidate.model,
+				layer=candidate.layer,
+				head=candidate.head,
+				position=target_position,
+				keyvalue_position=None,
+				parent=candidate.parent,
+				children=set(),
+				msg_cache=candidate.msg_cache,
+				cf_cache=candidate.cf_cache,
+				gradient=None,
+				patch_query=candidate.patch_query,
+				patch_key=candidate.patch_key,
+				patch_value=candidate.patch_value,
+				plot_patterns=False,
+				patch_type=candidate.patch_type
+			)
+			contribution = evaluate_path([candidate_pos] + incomplete_path, metric)
 
-def evaluate_path(model, cache, path, metric, correct_tokens):
-	"""
-	Evaluates the contribution of a given path by executing the forward methods of each node in the path and then applying the provided metric function to the final output.
-	
-	Args:
-		model (HookedTransformer): The transformer model used for evaluation.
-		cache (ActivationCache): The activation cache containing intermediate activations.
-		path (list of ApproxNode): The sequence of nodes representing the path to be evaluated.
-		metric (Callable): A function to evaluate the contribution or importance of the path.
-			It must accept three parameters:
-			- The output of the last node in the path.
-			- The output of the last node when the path is removed
-			- The model itself
-		correct_tokens (list of int): The reference tokens used for evaluating path contributions.
-	
-	Returns:
-		float: 
-			The contribution score of the path as determined by the metric function.
-	"""
-	message = None
-	if len(path) == 0:
-		return message
+			if (contribution >= min_contribution) or (include_negative and abs(contribution) >= min_contribution):
+				relevant_extensions.append((contribution, [candidate]+incomplete_path))
+	return relevant_extensions
 
-	for i in range(len(path)):
-		message = path[i].forward(message=message)
 
-	return metric(corrupted_resid=path[-1].forward() - message)
+def find_relevant_heads(candidate, incomplete_path, metric, min_contribution, include_negative, batch_positions):
+	relevant_extensions = []
+	for head in range(candidate.model.cfg.n_heads):
+		candidate_head = ATTN_ApproxNode(
+			model=candidate.model,
+			layer=candidate.layer,
+			head=head,
+			position=candidate.position,
+			keyvalue_position=candidate.keyvalue_position,
+			parent=candidate.parent,
+			children=set(),
+			msg_cache=candidate.msg_cache,
+			cf_cache=candidate.cf_cache,
+			gradient=None,
+			patch_query=candidate.patch_query,
+			patch_key=candidate.patch_key,
+			patch_value=candidate.patch_value,
+			plot_patterns=False,
+			patch_type=candidate.patch_type
+		)
+		contribution = evaluate_path([candidate_head]+incomplete_path, metric)
+		if (contribution >= min_contribution) or (include_negative and abs(contribution) >= min_contribution):
+			if batch_positions:
+				relevant_extensions.extend(find_relevant_positions(candidate_head, incomplete_path, metric, min_contribution, include_negative))
+			else:
+				relevant_extensions.append((contribution, [candidate_head] + incomplete_path))
+	return relevant_extensions
 
 
 
 def IsolatingPathEffect_BW(
 	model: HookedTransformer,
 	metric: Callable,
-	start_node: ApproxNode,
+	root: ApproxNode,
 	min_contribution: float = 0.5,
 	include_negative: bool = False,
 	return_all: bool = False,
-	counterfactual_cache: ActivationCache = None,
+	batch_positions: bool = False,
+	batch_heads: bool = False
 ) -> list[tuple[float, list[ApproxNode]]]:
 	"""
 	Performs a Breadth-First Search (BFS) starting from a node backwards to identify
@@ -61,7 +117,7 @@ def IsolatingPathEffect_BW(
 			of HookedTransformer, to ensure compatibility with cache and nodes forward methods.
 		metric (Callable): 
 			A function to evaluate the contribution or importance of the path. It must accept a single parameter: `corrupted_resid`.
-		start_node (ApproxNode): 
+		root (ApproxNode): 
 			The initial node to begin the backward search from (e.g., FINAL_ApproxNode(layer=model.cfg.n_layers - 1, position=target_pos)).
 		min_contribution (float, default=0.5):
 			The minimum absolute contribution score required for a path to be considered valid.
@@ -69,12 +125,20 @@ def IsolatingPathEffect_BW(
 			If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.
 		return_all (bool, default=False): 
 			If True, return all evaluated complete paths regardless of their contribution score. The search will still be guided by min_contribution.
+		batch_positions (bool, default=False): 
+			If True, when expanding nodes, first evaluates attentions without considering position-wise contributions, only later, if the attention has been deemed meaningful, it will be evaluated at all possible key-value positions.
+		batch_heads (bool, default=False): 
+			If True, when expanding nodes, first evaluates attentions without considering all heads at once, only later, if the attention as a whole has been deemed meaningful, it will evaluate all single heads.
 	Returns:
 		A list of tuples containing the contribution score and the corresponding path, 
 		sorted by contribution in descending order.
 	"""
-	last_node_contribution = evaluate_path(model, [start_node], metric)
-	frontier = [(last_node_contribution, [start_node])]
+	if root.position is None:
+		print("Warning: Starting node has no position defined. Batch positions will not be used.")
+		batch_positions = False
+
+	last_node_contribution = evaluate_path([root], metric)
+	frontier = [(last_node_contribution, [root])]
 	completed_paths = []
 	while frontier:
 		if len(frontier) > 2:
@@ -93,98 +157,56 @@ def IsolatingPathEffect_BW(
 			cur_path_continuations = []
 
 			# Use a proxy compenent where heads and positions are not yet defined (declare a component of the same class)
-			candidate_components = cur_path_start.get_expansion_candidates(model.cfg, include_head=True)
+			if batch_positions:
+				backup_position = cur_path_start.position
+				target_position = cur_path_start.position
+				if cur_path_start.__class__.__name__ == 'ATTN_ApproxNode' and (cur_path_start.patch_key or cur_path_start.patch_value):
+					target_position = cur_path_start.keyvalue_position
+				cur_path_start.position = None
+			
+			candidate_components = cur_path_start.get_expansion_candidates(model.cfg, include_head=not batch_heads)
 
+			if batch_positions:
+				cur_path_start.position = backup_position
 			# Get the meaningful candidates for expansion
 			for candidate in candidate_components:
 				# EMBED is the base case, the path is complete and after evaluation can be added to the completed paths
 				if candidate.__class__.__name__ == 'EMBED_ApproxNode':
-					# If the candidate is 
-					if counterfactual_cache is not None:
-						initial_message = counterfactual_cache[candidate.input_name]
-					else:
-						initial_message = None
-					contribution = evaluate_path(model, [candidate] + incomplete_path, metric, initial_message)
+					candidate.position = target_position if batch_positions else candidate.position
+					
+					contribution = evaluate_path([candidate] + incomplete_path, metric)
 					if return_all:
 						completed_paths.append((contribution, [candidate] + incomplete_path))
-					elif include_negative:
-						if abs(contribution) >= min_contribution:
-							completed_paths.append((contribution, [candidate] + incomplete_path))
-					elif contribution >= min_contribution:
+					elif (contribution >= min_contribution) or (include_negative and abs(contribution) >= min_contribution):
 						completed_paths.append((contribution, [candidate] + incomplete_path))
 				
 				# ATTNs and MLPs are possible expansions of the current path to be added to the frontier
-				elif candidate.__class__.__name__ == 'MLP_ApproxNode' or candidate.__class__.__name__ == 'ATTN_ApproxNode':
-					if counterfactual_cache is not None:
-						initial_message = counterfactual_cache[candidate.input_name]
-					else:
-						initial_message = None
-					contribution = evaluate_path(model, [candidate] + incomplete_path, metric, initial_message)
+				elif candidate.__class__.__name__ == 'MLP_ApproxNode':
+					candidate.position = target_position if batch_positions else candidate.position
+					contribution = evaluate_path([candidate] + incomplete_path, metric)
 					if include_negative:
 						if abs(contribution) >= min_contribution:
 							cur_path_continuations.append((contribution, [candidate] + incomplete_path))
 					elif contribution >= min_contribution:
 						cur_path_continuations.append((contribution, [candidate] + incomplete_path))
-
+				elif candidate.__class__.__name__ == 'ATTN_ApproxNode':
+					contribution = evaluate_path([candidate] + incomplete_path, metric)
+					if (contribution >= min_contribution) or (include_negative and abs(contribution) >= min_contribution):
+						if batch_heads:
+							cur_path_continuations.extend(find_relevant_heads(candidate, incomplete_path, metric, min_contribution, include_negative, batch_positions))
+						elif batch_positions:
+							cur_path_continuations.extend(find_relevant_positions(candidate, incomplete_path, metric, min_contribution, include_negative))
+						else:
+							cur_path_continuations.append((contribution, [candidate] + incomplete_path))
 			cur_depth_frontier.extend(cur_path_continuations)
 		# Sort the frontier just for visualization purposes
 		frontier = sorted(cur_depth_frontier, key=lambda x: x[0], reverse=True)
-
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
-
-
-def get_path_msg(path, message=None):
-	"""
-	Recursively computes the message by applying the forward method of each node in the path.
-
-	Args:
-		path (list of ApproxNode): 
-			The sequence of nodes representing the path.
-		message (torch.Tensor, default=None):
-			Initial message to be passed to the first node in the path.
-
-	Returns:
-		torch.Tensor:
-			The final message after applying all nodes in the path.
-	"""
-	if len(path) == 0:
-		return message
-	message = path[0].forward(message=message)
-	return get_path_msg(path[1:], message=message)
-
-def get_path(node):
-	"""
-	Constructs the path from the given node back to the root by following parent links.
-
-	Args:
-		node (ApproxNode): The node from which to start constructing the path.
-	
-	Returns:
-		list of ApproxNode:
-			The sequence of nodes representing the path from the root to the given node.
-	"""
-	path = [node]
-	while path[-1].parent is not None:
-		path.append(path[-1].parent)
-	return path
-
-
-def batch_iterable(iterable, batch_size):
-	it = iter(iterable)
-	while True:
-		chunk = list(islice(it, batch_size))
-		if not chunk:
-			break
-		yield chunk
-
-
 
 def PathAttributionPatching(
 	model: HookedTransformer,
-	msg_cache: dict,
 	metric: Callable,
 	root: ApproxNode,
-	ground_truth_tokens: list[int],
 	min_contribution: float = 0.5,
 	include_negative: bool = False,
 	return_all: bool = False,
@@ -229,29 +251,29 @@ def PathAttributionPatching(
 
 			# Get the meaningful candidates for expansion
 			for candidate_batch in batch_iterable(candidate_components, 100):
-				candidate_contributions = torch.stack([candidate.forward(message=None) for candidate in candidate_batch], dim=0) # TODO: make this somewhat batched by position if possible
+				candidate_contributions = torch.stack([candidate.forward(message=None) for candidate in candidate_batch], dim=0)
 
-				approx_contributions = torch.einsum('xbsd,bsd->x', candidate_contributions, grad) # TODO: make this batched (up to 40% of the total time)
+				approx_contributions = torch.einsum('xbsd,bsd->x', candidate_contributions, grad)
 				for i, candidate in enumerate(candidate_batch):
 					approx_contribution = approx_contributions[i]
 					# EMBED is the base case
 					if candidate.__class__.__name__ == 'EMBED_ApproxNode':
 						candidate_path = get_path(candidate)
 						if return_all:
-							contribution = evaluate_path(model, msg_cache, candidate_path, metric, ground_truth_tokens)
+							contribution = evaluate_path(candidate_path, metric)
 							completed_paths.append((contribution, candidate_path))
 						elif include_negative:
 							if abs(approx_contribution.item()) >= min_contribution:
-								contribution = evaluate_path(model, msg_cache, candidate_path, metric, ground_truth_tokens)
+								contribution = evaluate_path(candidate_path, metric)
 								completed_paths.append((contribution, candidate_path))
 						elif approx_contribution >= min_contribution:
-							contribution = evaluate_path(model, msg_cache, candidate_path, metric, ground_truth_tokens)
+							contribution = evaluate_path(candidate_path, metric)
 							completed_paths.append((contribution, candidate_path))
 					
 					# MLP requires to check the contribution of the whole component and of the individual layers
 					elif candidate.__class__.__name__ == 'MLP_ApproxNode' or candidate.__class__.__name__ == 'ATTN_ApproxNode':
 						if include_negative:
-							if abs(approx_contribution.item()) >= min_contribution: # TODO: make this faster batched? np.abs?
+							if abs(approx_contribution.item()) >= min_contribution:
 								childrens.append(candidate)
 						elif approx_contribution >= min_contribution:
 							childrens.append(candidate)
@@ -263,8 +285,9 @@ def PathAttributionPatching(
 		for node in frontier: # Free the gradient of the parent nodes to save memory
 			if node.parent is not None:
 				node.parent.gradient = None
+		gc.collect() # Reclaim memory
+		torch.cuda.empty_cache()
 
 		frontier = cur_depth_frontier
 
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
-

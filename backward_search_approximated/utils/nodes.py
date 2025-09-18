@@ -750,8 +750,8 @@ class ATTN_ApproxNode(ApproxNode):
 			query = torch.einsum('bsd,ndh->bsnh', query_residual, W_Q) + b_Q[None, None, :, :]
 			key = torch.einsum('bsd,ndh->bsnh', key_residual, W_K) + b_K[None, None, :, :]
 			if self.keyvalue_position is not None:
-				v = torch.einsum('bd,ndh->bnh', value_residual[:, self.keyvalue_position, :], W_V) + b_V[None, None, :, :]
-				value = torch.zeros(v.shape[0], value_residual.shape[1], v.shape[2], v.shape[3], device=v.device)
+				v = torch.einsum('bd,ndh->bnh', value_residual[:, self.keyvalue_position, :], W_V) + b_V[None, :, :]
+				value = torch.zeros(v.shape[0], value_residual.shape[1], W_V.shape[0], v.shape[2], device=v.device)
 				value[:, self.keyvalue_position, :] = v
 			else:
 				value = torch.einsum('bsd,ndh->bsnh', value_residual, W_V) + b_V[None, None, :, :]
@@ -769,8 +769,8 @@ class ATTN_ApproxNode(ApproxNode):
 			query = torch.einsum('bsd,ndh->bsnh', query_residual, W_Q) + b_Q[None, None, :, :]
 			key = torch.einsum('bsd,ndh->bsnh', key_residual, W_K) + b_K[None, None, :, :]
 			if self.keyvalue_position is not None:
-				v = torch.einsum('bd,ndh->bnh', value_residual[:, self.keyvalue_position, :], W_V) + b_V[None, None, :, :]
-				value = torch.zeros(v.shape[0], value_residual.shape[1], v.shape[2], v.shape[3], device=v.device)
+				v = torch.einsum('bd,ndh->bnh', value_residual[:, self.keyvalue_position, :], W_V) + b_V[None, :, :]
+				value = torch.zeros(v.shape[0], value_residual.shape[1], W_V.shape[0], v.shape[2], device=v.device)
 				value[:, self.keyvalue_position, :] = v
 			else:
 				value = torch.einsum('bsd,ndh->bsnh', value_residual, W_V) + b_V[None, None, :, :]
@@ -877,8 +877,8 @@ class ATTN_ApproxNode(ApproxNode):
 				query = torch.einsum('bsd,ndh->bsnh', query_residual, W_Q) + b_Q[None, None, :, :]
 				key = torch.einsum('bsd,ndh->bsnh', key_residual, W_K) + b_K[None, None, :, :]
 				if self.keyvalue_position is not None:
-					v = torch.einsum('bd,ndh->bnh', value_residual[:, self.keyvalue_position, :], W_V) + b_V[None, None, :, :]
-					value = torch.zeros(v.shape[0], value_residual.shape[1], v.shape[2], v.shape[3], device=v.device)
+					v = torch.einsum('bd,ndh->bnh', value_residual[:, self.keyvalue_position, :], W_V) + b_V[None, :, :]
+					value = torch.zeros(v.shape[0], value_residual.shape[1], W_V.shape[0], v.shape[2], device=v.device)
 					value[:, self.keyvalue_position, :] = v
 				else:
 					value = torch.einsum('bsd,ndh->bsnh', value_residual, W_V) + b_V[None, None, :, :]
@@ -896,8 +896,8 @@ class ATTN_ApproxNode(ApproxNode):
 				query = torch.einsum('bsd,ndh->bsnh', query_residual, W_Q) + b_Q[None, None, :, :]
 				key = torch.einsum('bsd,ndh->bsnh', key_residual, W_K) + b_K[None, None, :, :]
 				if self.keyvalue_position is not None:
-					v = torch.einsum('bd,ndh->bnh', value_residual[:, self.keyvalue_position, :], W_V) + b_V[None, None, :, :]
-					value = torch.zeros(v.shape[0], value_residual.shape[1], v.shape[2], v.shape[3], device=v.device)
+					v = torch.einsum('bd,ndh->bnh', value_residual[:, self.keyvalue_position, :], W_V) + b_V[None, :, :]
+					value = torch.zeros(v.shape[0], value_residual.shape[1], W_V.shape[0], v.shape[2], device=v.device)
 					value[:, self.keyvalue_position, :] = v
 				else:
 					value = torch.einsum('bsd,ndh->bsnh', value_residual, W_V) + b_V[None, None, :, :]
