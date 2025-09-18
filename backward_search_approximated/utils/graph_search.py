@@ -41,7 +41,7 @@ def find_relevant_positions(candidate, incomplete_path, metric, min_contribution
 				)
 				contribution = evaluate_path([candidate_pos] + incomplete_path, metric)
 				if (contribution >= min_contribution) or (include_negative and abs(contribution) >= min_contribution):
-					relevant_extensions.append((contribution, [candidate]+incomplete_path))
+					relevant_extensions.append((contribution, [candidate_pos]+incomplete_path))
 		elif candidate.patch_query:
 			candidate_pos = ATTN_ApproxNode(
 				model=candidate.model,
@@ -63,7 +63,7 @@ def find_relevant_positions(candidate, incomplete_path, metric, min_contribution
 			contribution = evaluate_path([candidate_pos] + incomplete_path, metric)
 
 			if (contribution >= min_contribution) or (include_negative and abs(contribution) >= min_contribution):
-				relevant_extensions.append((contribution, [candidate]+incomplete_path))
+				relevant_extensions.append((contribution, [candidate_pos]+incomplete_path))
 	return relevant_extensions
 
 
