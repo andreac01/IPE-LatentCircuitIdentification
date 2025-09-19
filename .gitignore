@@ -1,1 +1,4 @@
 *.pyc
+src/ipe.egg-info/
+dist/
+documentation/build/
