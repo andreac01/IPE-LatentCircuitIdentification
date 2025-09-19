@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ipe"
+version = "0.1.0"
+description = "Implementation of IPE: Isolating Path Effect for Latent Circuit Identification. This module implements an interface to handle complex patching of transformer nodes, a path-wise backpropagation algorithm and various graph search strategies to identify task specific circuits in transformer models."
+authors = [
+	{ name="Andrea Cerutti", email="andrea01.cerutti@gmail.com" }
+]
+dependencies = [
+	"einops",
+	"torch",
+	"transformer-lens",
+	"matplotlib",
+	"tqdm"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
