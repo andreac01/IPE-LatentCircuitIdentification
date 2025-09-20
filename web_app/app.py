@@ -4,6 +4,7 @@ import pickle
 import os
 import logging
 from functools import partial
+from dotenv import load_dotenv
 import json
 import torch
 
@@ -14,6 +15,11 @@ from ipe.miscellanea import get_topk
 from ipe.graph_search import PathAttributionPatching, IsolatingPathEffect_BW
 from ipe.metrics import compare_token_logit
 from ipe.webutils.model import load_model, load_model_config, load_tokenizer
+
+# load the evnironment
+load_dotenv()
+DATA_DIR = os.getenv('DATA_DIR', './data')
+MODEL_DIR = os.getenv('MODEL_DIR', './app/models')
 
 app = Flask(__name__)
 app.logger.setLevel(logging.DEBUG) 
@@ -42,7 +48,7 @@ def run_model():
 	tokenizer = load_tokenizer(model_name, model_config)
 	
 	try:
-		model = load_model(model_name, required_bytes=model_config['required_bytes'], device=device)
+		model = load_model(model_name, required_bytes=model_config['required_bytes'], device=device, cache_dir=MODEL_DIR)
 	except Exception as e:
 		return jsonify({'error': str(e)}), 500
 
@@ -57,9 +63,9 @@ def run_model():
 		prompt = sample_prompts[task_name]["prompt"]
 		target = sample_prompts[task_name]["target"]
 		
-		base_dir = f'data/{model_name}/{task_shortname}'
-		path_file = f'{base_dir}/paths{search_mode}.pkl'
-		decoding_file = f'{base_dir}/top10{search_mode}.pkl' # NEW: Path for cached decodings
+		base_dir = os.path.join(DATA_DIR, model_name, task_shortname)
+		path_file = os.path.join(base_dir, f'paths{search_mode}.pkl')
+		decoding_file = os.path.join(base_dir, f'top10{search_mode}.pkl')
 
 		if not os.path.exists(path_file):
 			return jsonify({'error': 'Precomputed paths not found'}), 404
@@ -77,10 +83,10 @@ def run_model():
 
 			# The computation logic is the same as before
 			for i, path_tuple in enumerate(paths):
-				messages = get_path_msgs(path=path_tuple[1], msg_cache=dict(cache), model=model)
+				messages = get_path_msgs(path=path_tuple[1], messages=[], msg_cache=dict(cache), model=model)
 				image_path = img_node_paths[i][1]
-				decoding_info = [get_topk(model, messages[j][0][image_path[j].position], topk=10) for j in range(len(image_path))]
-				
+				decoding_info = [get_topk(model, messages[j][0][image_path[j].position].detach().clone(), topk=10) for j in range(len(image_path))]
+			
 				path_data = [
 					{
 						'cmpt': n.cmpt, 'layer': n.layer, 'head': n.head_idx, 

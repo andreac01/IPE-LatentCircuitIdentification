@@ -73,16 +73,9 @@ def get_path_msgs(path, messages=[], msg_cache=None, model=None):
 	
 	# Compute the next message and append it
 	if msg_cache is not None:
-		print("setting msg_cache")
-		print("shape:", msg_cache['hook_embed'].shape)
-		print("out before:", path[0].forward(message=message))
-		print("out after:", path[0].forward(message=message))
 		path[0].msg_cache = msg_cache
 	if model is not None:
 		path[0].model = model
-	if message is not None:
-		print("message shape:", message.shape)
-		print("node:", path[0])
 	next_message = path[0].forward(message=message)
 	messages.append(next_message)
 

@@ -34,10 +34,9 @@ def download_model(model_name: str, cache_dir: str = "/app/models") -> None:
 		cache_dir=cache_dir
 	)
 
-def load_model(model_name: str, required_bytes: int = 0, device='cpu') -> HookedTransformer:
+def load_model(model_name: str, required_bytes: int = 0, device='cpu', cache_dir = "/app/models") -> HookedTransformer:
 	"""Load (and cache) a HookedTransformer, but first check memory."""
 	
-	cache_dir = "./app/models"
 	device = torch.device(device)
 	
 	if not has_enough_memory(device, required_bytes):

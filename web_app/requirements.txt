@@ -1,0 +1,12 @@
+flask
+numpy
+networkx
+transformer-lens
+gunicorn
+torch
+tqdm
+huggingface-hub
+einops
+psutils
+flask-cors
+python-dotenv
