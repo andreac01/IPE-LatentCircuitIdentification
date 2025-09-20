@@ -53,3 +53,34 @@ def get_path_msg(path, message=None):
 		return message
 	message = path[0].forward(message=message)
 	return get_path_msg(path[1:], message=message)
+
+def get_path_msgs(path, messages=[], msg_cache=None, model=None):
+	"""
+	Recursively computes and collects messages by applying the forward method of each node in the path.
+	Args:
+		path (list of Node): 
+			The sequence of nodes representing the path.
+		messages (list of torch.Tensor, default=[]):
+			List to collect messages at each step.
+	Returns:
+		list of torch.Tensor:
+			The list of all messages flowing through the path including intermediate ones."""
+	if not path:
+		return messages
+	
+	# Determine the patch tensor
+	message = messages[-1] if messages else None
+	
+	# Compute the next message and append it
+	if msg_cache is not None:
+		path[0].msg_cache = msg_cache
+	if model is not None:
+		path[0].model = model
+	if message is not None:
+		print("message shape:", message.shape)
+		print("node:", path[0])
+	next_message = path[0].forward(message=message)
+	messages.append(next_message)
+
+	# Recurse with the rest of the path
+	return get_path_msgs(path[1:], messages=messages, msg_cache=msg_cache, model=model)

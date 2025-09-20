@@ -1,0 +1,12 @@
+{
+	"gpt2-small": {
+		"required_bytes": 3000000000,
+		"transformer-lens_name": "gpt2-small",
+		"huggingface_name": "gpt2"
+	},
+	"qwen2.5-0.5B": {
+		"mem_to_load": 8000000000,
+		"transformer-lens_name": "Qwen/Qwen2.5-0.5B",
+		"huggingface_name": "Qwen/Qwen2.5-0.5B"
+	}
+}
