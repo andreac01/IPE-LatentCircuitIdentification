@@ -2,8 +2,8 @@ document.addEventListener('DOMContentLoaded', function() {
 	// --- DOM Element Selection ---
 	const runButton = document.getElementById('run-button');
 	const modeSwitch = document.getElementById('input-mode-switch');
-    const modelTaskView = document.getElementById('model-task-view');
-    const promptTargetView = document.getElementById('prompt-target-view');
+	const modelTaskView = document.getElementById('model-task-view');
+	const promptTargetView = document.getElementById('prompt-target-view');
 	const promptInput = document.getElementById('prompt-input');
 	const targetTokenInput = document.getElementById('target-token-input');
 	const numPathsSlider = document.getElementById('num-paths-slider');
@@ -218,10 +218,11 @@ document.addEventListener('DOMContentLoaded', function() {
 			});
 			if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 			const data = await response.json();
-			fullPlotData = data; // Store full data
+			fullPlotData = data; // Store full data { graphData: {...}, pathDetails: {...} }
 
-			// Update the slider's max value based on the total number of paths received
-			numPathsSlider.max = data.num_paths > 0 ? data.num_paths : 0;
+			// Access num_paths from the nested graphData object
+			const numPathsAvailable = fullPlotData.graphData ? fullPlotData.graphData.num_paths : 0;
+			numPathsSlider.max = numPathsAvailable > 0 ? numPathsAvailable : 0;
 			if (parseInt(numPathsSlider.value) > parseInt(numPathsSlider.max)) {
 				numPathsSlider.value = numPathsSlider.max;
 			}
@@ -242,37 +243,36 @@ document.addEventListener('DOMContentLoaded', function() {
 	 * Filters the full data based on UI controls and triggers a redraw.
 	 */
 	function filterAndDraw() {
-		if (!fullPlotData) {
+		// Check for fullPlotData and the nested graphData object
+		if (!fullPlotData || !fullPlotData.graphData) {
 			console.log("No data available to draw.");
 			return;
 		}
 
 		const numPathsToShow = parseInt(numPathsSlider.value);
 		
-		// Filter edges to include only the selected number of paths
-		const filteredEdges = fullPlotData.edges.filter(edge => edge.path_idx < numPathsToShow);
+		// Filter edges from the nested graphData object
+		const filteredEdges = fullPlotData.graphData.edges.filter(edge => edge.path_idx < numPathsToShow);
 
-		// Determine which nodes are involved in the filtered paths
 		const involvedNodeIds = new Set();
 		filteredEdges.forEach(edge => {
 			involvedNodeIds.add(edge.source);
 			involvedNodeIds.add(edge.target);
 		});
 
-		// Update the 'involved' status of each node based on the filtered edges
-		fullPlotData.nodes.forEach(node => {
+		// Update nodes from the nested graphData object
+		fullPlotData.graphData.nodes.forEach(node => {
 			node.involved = involvedNodeIds.has(node.id);
 		});
 
-		// Create a new data object for plotting
+		// Create a new data object for plotting using the nested graphData
 		currentPrimaryPlotData = {
-			...fullPlotData,
-			nodes: fullPlotData.nodes, // Use the nodes with updated 'involved' status
+			...fullPlotData.graphData,
+			nodes: fullPlotData.graphData.nodes,
 			edges: filteredEdges,
 			num_paths: numPathsToShow,
 		};
 
-		// Reset secondary plot state as the primary plot is changing
 		secondaryPlotWrapper.style.display = 'none';
 		showSecondaryPlotSwitch.checked = false;
 		currentSecondaryPlotPathIdx = null;
@@ -280,13 +280,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 		drawPrimaryPlot(currentPrimaryPlotData);
 
-		// Automatically show secondary plot for the first path if available
 		if (currentPrimaryPlotData.num_paths > 0) {
 			showSecondaryPlotSwitch.checked = true;
 			secondaryPlotWrapper.style.display = 'block';
-			loadSecondaryPlot(0); // Load details for the first path
+			loadSecondaryPlot(0);
 			highlightPrimaryPlotPath(0);
-			// Resize the primary plot to fill the space
 			window.dispatchEvent(new Event('resize'));
 		}
 	}
@@ -446,14 +444,28 @@ document.addEventListener('DOMContentLoaded', function() {
 		
 			// --- A. Uninvolved Node Trace (drawn first, in the background) ---
 			if (uninvolvedNodes.length > 0) {
+				let groupedNodes = uninvolvedNodes;
+				if (!divideHeads && cmpt === 'attn') {
+					// Group nodes by layer and position if not dividing heads
+					const groupedMap = new Map();
+					uninvolvedNodes.forEach(node => {
+						const key = `L${node.layer}_P${node.position}`;
+						if (!groupedMap.has(key)) {
+							groupedMap.set(key, { ...node, head: undefined, count: 0 });
+						}
+						groupedMap.get(key).count += 1;
+					});
+					groupedNodes = Array.from(groupedMap.values());
+				}
+
 				let textContent;
 				switch (cmpt) {
-					case 'emb': textContent = uninvolvedNodes.map(n => (n.label || 'test').replace(/ /g, ' ')); break;
- 					default: textContent = uninvolvedNodes.map(() => ''); break;
+					case 'emb': textContent = groupedNodes.map(n => (n.label || 'test').replace(/ /g, ' ')); break;
+					default: textContent = groupedNodes.map(() => ''); break;
 				}
 				uninvolvedNodeTraces.push({
-					x: uninvolvedNodes.map(n => n.x),
-					y: uninvolvedNodes.map(n => n.y),
+					x: groupedNodes.map(n => n.x),
+					y: groupedNodes.map(n => n.y),
 					text: textContent,
 					mode: 'markers+text',
 					type: 'scatter',
@@ -468,9 +480,9 @@ document.addEventListener('DOMContentLoaded', function() {
 						opacity: 0.2,
 					},
 					hoverinfo: 'text',
-					hovertext: uninvolvedNodes.map(n => {
-						const { layer, position, head } = n;
-						if (cmpt === 'attn') return `ATTN L${layer} ${divideHeads ? `H${head}` : ''} P${position}`.trim();
+					hovertext: groupedNodes.map(n => {
+						const { layer, position, count } = n;
+						if (cmpt === 'attn') return `ATTN L${layer} P${position} (${count} heads)`.trim();
 						if (cmpt === 'mlp') return `MLP L${layer} P${position}`;
 						if (cmpt === 'emb') return `Embedding P${position}`;
 						if (cmpt === 'lmh') return `Output P${position}`;
@@ -767,9 +779,9 @@ document.addEventListener('DOMContentLoaded', function() {
 		sortedEdgesCache.forEach(edge => {
 			const isSelected = edge.path_idx === pathIdx;
 			
-			mainOpacities.push(isSelected ? 0.85 : 0.2);
-			borderOpacities.push(isSelected ? 0.5 : 0.1);
-			borderColors.push(isSelected ? 'red' : themeLayout.edgeBorderColor);
+			mainOpacities.push(isSelected ? 0.85 : 0.3);
+			borderOpacities.push(isSelected ? 0.7 : 0.25);
+			borderColors.push(isSelected ? '#8B0000' : themeLayout.edgeBorderColor);
 			borderWidths.push(isSelected ? 5 : 1);
 		});
 
@@ -790,7 +802,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	/**
 	 * Loads data for the secondary plot when a path is clicked or selected.
 	 */
-	async function loadSecondaryPlot(pathIdx) {
+	function loadSecondaryPlot(pathIdx) { // The function is no longer async
 		currentSecondaryPlotPathIdx = pathIdx;
 		if (pathSlider) {
 			pathSlider.value = pathIdx;
@@ -798,26 +810,20 @@ document.addEventListener('DOMContentLoaded', function() {
 			if (valueDisplay) valueDisplay.textContent = pathIdx;
 		}
 		secondaryPlotWrapper.style.display = 'block';
-		secondaryPlotDiv.innerHTML = `<div class="d-flex justify-content-center mt-3"><div class="spinner-border text-secondary" role="status"></div></div>`;
-		
-		try {
-			const response = await fetch(`/api/get_path_details/${pathIdx}`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					model_name: document.getElementById('model-select').value
-				})
-			});
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(`Error: ${errorData.error || 'Unknown error'} (Status: ${response.status})`);
-			}
-			const details = await response.json();
+
+		// --- ENTIRE LOGIC REPLACED ---
+		// No more fetching. Get details directly from the stored data.
+		if (fullPlotData && fullPlotData.pathDetails && fullPlotData.pathDetails[pathIdx]) {
+			const details = {
+				path_data: fullPlotData.pathDetails[pathIdx]
+			};
 			currentSecondaryPlotDetails = details; // Store details
 			drawSecondaryPlot(details, pathIdx);
-		} catch (error) {
-			console.error("Error fetching path details:", error);
-			secondaryPlotDiv.innerHTML = `<div class="alert alert-danger">Failed to load path details: ${error.message}</div>`;
+		} else {
+			// This case might happen if data is inconsistent, which is unlikely but good to handle.
+			const errorMessage = `Failed to load path details: Data not found for path index ${pathIdx}.`;
+			console.error(errorMessage);
+			secondaryPlotDiv.innerHTML = `<div class="alert alert-danger">${errorMessage}</div>`;
 			currentSecondaryPlotDetails = null; // Clear on error
 		}
 	}
