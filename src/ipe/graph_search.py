@@ -210,6 +210,7 @@ def PathAttributionPatching(
 	min_contribution: float = 0.5,
 	include_negative: bool = False,
 	return_all: bool = False,
+	confirm_relevance: bool = False
 ) -> list[tuple[torch.Tensor, list[Node]]]:
 	"""
 	Performs a Breadth-First Search (BFS) starting from a node backwards to identify
@@ -233,6 +234,8 @@ def PathAttributionPatching(
 			If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.
 		return_all (bool, default=False): 
 			If True, return all evaluated paths regardless of their contribution score. The search will still be guided by min_contribution threshold.
+		confirm_relevance (bool, default=False):
+			If True, after identifying a potentially relevant component based on the linear approximation, it will also evaluate the contribution of the full path including to confirm its relevance.
 	Returns:
 		A list of tuples containing the contribution score and the corresponding path, sorted by contribution in descending order.
 	"""
@@ -265,18 +268,37 @@ def PathAttributionPatching(
 						elif include_negative:
 							if abs(approx_contribution.item()) >= min_contribution:
 								contribution = evaluate_path(candidate_path, metric)
-								completed_paths.append((contribution, candidate_path))
+								if confirm_relevance:
+									if abs(contribution) >= min_contribution:
+										completed_paths.append((contribution, candidate_path))
+								else:
+									completed_paths.append((contribution, candidate_path))
 						elif approx_contribution >= min_contribution:
 							contribution = evaluate_path(candidate_path, metric)
-							completed_paths.append((contribution, candidate_path))
+							if confirm_relevance:
+								if contribution >= min_contribution:
+									completed_paths.append((contribution, candidate_path))
+							else:
+								completed_paths.append((contribution, candidate_path))
+							
 					
 					# MLP requires to check the contribution of the whole component and of the individual layers
 					elif candidate.__class__.__name__ == 'MLP_Node' or candidate.__class__.__name__ == 'ATTN_Node':
 						if include_negative:
 							if abs(approx_contribution.item()) >= min_contribution:
-								childrens.append(candidate)
+								if confirm_relevance:
+									contribution = evaluate_path(get_path(candidate), metric)
+									if abs(contribution) >= min_contribution:
+										childrens.append(candidate)
+								else:
+									childrens.append(candidate)
 						elif approx_contribution >= min_contribution:
-							childrens.append(candidate)
+							if confirm_relevance:
+								contribution = evaluate_path(get_path(candidate), metric)
+								if contribution >= min_contribution:
+									childrens.append(candidate)
+							else:
+								childrens.append(candidate)
 			cur_depth_frontier.extend(childrens)
 			node.children = childrens
 			if len(childrens) == 0:
