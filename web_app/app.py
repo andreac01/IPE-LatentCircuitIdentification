@@ -8,11 +8,11 @@ from dotenv import load_dotenv
 import json
 import torch
 
-from ipe.webutils.image_nodes import get_image_paths, create_graph_data
+from ipe.webutils.image_nodes import get_image_path, create_graph_data
 from ipe.nodes import FINAL_Node
 from ipe.paths import get_path_msgs
 from ipe.miscellanea import get_topk
-from ipe.graph_search import PathAttributionPatching, IsolatingPathEffect_BW
+from ipe.graph_search import PathAttributionPatching
 from ipe.metrics import compare_token_logit
 from ipe.webutils.model import load_model, load_model_config, load_tokenizer
 
@@ -79,7 +79,7 @@ def run_model():
 			app.logger.debug("Precomputed decodings not found. Computing and saving them now.")
 			# We need the model's cache to compute messages
 			_, cache = model.run_with_cache(prompt)
-			img_node_paths = [get_image_paths(p, divide_heads=data.get('divide_heads', True)) for p in paths]
+			img_node_paths = [get_image_path(p, divide_heads=data.get('divide_heads', True)) for p in paths]
 
 			# The computation logic is the same as before
 			for i, path_tuple in enumerate(paths):
@@ -135,7 +135,7 @@ def run_model():
 		)
 		
 		# We still compute details directly, but we don't save them in this mode
-		img_node_paths_runtime = [get_image_paths(p, divide_heads=data.get('divide_heads', True)) for p in paths]
+		img_node_paths_runtime = [get_image_path(p, divide_heads=data.get('divide_heads', True)) for p in paths]
 		for i, path_tuple in enumerate(paths):
 			messages = get_path_msgs(path=path_tuple[1], messages=[], msg_cache=dict(cache), model=model)
 			image_path = img_node_paths_runtime[i][1]
@@ -154,7 +154,7 @@ def run_model():
 			path_details_store[str(i)] = path_data
 
 	# --- Final Response Preparation (this part is now common to both modes) ---
-	img_node_paths = [get_image_paths(p, divide_heads=data.get('divide_heads', True)) for p in paths]
+	img_node_paths = [get_image_path(p, divide_heads=data.get('divide_heads', True)) for p in paths]
 	config = load_model_config(model_name=model_name, config=model_config)
 	graph_data = create_graph_data(
 		img_node_paths, config.n_layer, config.n_head, 

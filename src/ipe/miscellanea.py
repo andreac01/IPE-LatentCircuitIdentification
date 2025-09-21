@@ -6,8 +6,10 @@ import torch
 def batch_iterable(iterable, batch_size):
 	"""Batch an iterable into chunks of a specified size.
 	Args:
-		iterable (iterable): The input iterable to be batched.
-		batch_size (int): The size of each batch.
+		iterable (iterable): 
+			The input iterable to be batched.
+		batch_size (int): 
+			The size of each batch.
 	Yields:
 		list: A batch of elements from the iterable.
 	"""
@@ -21,9 +23,12 @@ def batch_iterable(iterable, batch_size):
 def get_topk(model: HookedTransformer, residual: Tensor, topk=5) -> dict[list]:
 	"""Get the top-k token predictions from the model's output logits.
 	Args:
-		model (HookedTransformer): The transformer model.
-		residual (Tensor): The residual stream tensor of shape (d_model,).
-		topk (int): The number of top predictions to return.
+		model (HookedTransformer): 
+			The transformer model.
+		residual (Tensor): 
+			The residual stream tensor of shape (d_model,).
+		topk (int): 
+			The number of top predictions to return.
 	Returns:
 		dict: A dictionary containing top-k indices, logits, probabilities, and string tokens.
 	"""

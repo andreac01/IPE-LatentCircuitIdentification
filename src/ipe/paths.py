@@ -1,3 +1,7 @@
+from typing import List, Tuple
+from torch import Tensor
+from ipe.nodes import Node, FINAL_Node
+
 def evaluate_path(path, metric):
 	"""
 	Evaluates the contribution of a given path by executing the forward methods of each node in the path and then applying the provided metric function to the final output.
@@ -57,11 +61,16 @@ def get_path_msg(path, message=None):
 def get_path_msgs(path, messages=[], msg_cache=None, model=None):
 	"""
 	Recursively computes and collects messages by applying the forward method of each node in the path.
+	
 	Args:
 		path (list of Node): 
 			The sequence of nodes representing the path.
 		messages (list of torch.Tensor, default=[]):
 			List to collect messages at each step.
+		msg_cache (dict, optional):
+			Cache for messages to optimize computation.
+		model (HookedTransformer, optional):
+			The transformer model to be used in the nodes.
 	Returns:
 		list of torch.Tensor:
 			The list of all messages flowing through the path including intermediate ones."""
@@ -81,3 +90,30 @@ def get_path_msgs(path, messages=[], msg_cache=None, model=None):
 
 	# Recurse with the rest of the path
 	return get_path_msgs(path[1:], messages=messages, msg_cache=msg_cache, model=model)
+
+def clean_paths(paths: List[Tuple[float, List]]) -> List[Tuple[float, List]]:
+	"""Cleans up the paths by removing references to models, parents, children, and caches to save memory. It is useful to call this function before saving the outputs of graph search to a file, avoiding saving cache, gradients, and model.
+	
+	Args:
+		paths (List[Tuple[float, List]]): 
+			A list of tuples where each tuple contains a path weight and a list of Node instances representing the path.
+	Returns:
+		List[Tuple[float, List]]: 
+			The cleaned list of paths with unnecessary references removed.
+	"""
+	cleaned = []
+	for c, path in paths:
+		if c >= 1:
+			for node in path:
+				node.model = None  # remove model reference to save memory
+				node.parent = None  # remove parent reference to save memory
+				node.children = []  # remove children reference to save memory
+				node.msg_cache = None  # remove msg_cache reference to save memory
+				node.cf_cache = None  # remove cf_cache reference to save memorys
+				node.gradient = None  # remove gradient reference to save memory
+				if isinstance(node, FINAL_Node):
+					node.metric = None  # remove metric reference to save memory
+			if isinstance(c, Tensor):
+				c = c.item()  # convert tensor to float for serialization
+			cleaned.append((c, path))
+	return cleaned

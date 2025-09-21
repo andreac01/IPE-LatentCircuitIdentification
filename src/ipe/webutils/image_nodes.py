@@ -1,11 +1,43 @@
 import networkx as nx
+from typing import List, Tuple, Union, Set
 from math import ceil
-from typing import List, Tuple, Set, Union
-
+import torch
 
 
 class ImgNode:
+	"""
+	A support class that represent a node in the image graph for visualization purposes.
+
+	Attributes:
+		cmpt (str): 
+			The component type (e.g., 'emb', 'sa', 'mlp', 'lmh').
+		layer (int): 
+			The layer index of the component.
+		head_idx (Union[int, None]): 
+			The head index for attention components, None for non-attention components.
+		position (Union[int, None]): 
+			The token position in the sequence, None for components without a position.
+		in_type (str): 
+			The input type for attention components ('query' or 'key-value'), None for non-attention components.
+	"""
 	def __init__(self, cmpt: str, layer: int, head_idx: Union[int, None], position: Union[int, None], in_type: str = None):
+		"""Initializes an ImgNode instance.
+		
+		Args:
+			cmpt (str):
+				The component type (e.g., 'emb', 'sa', 'mlp', 'lmh').
+			layer (int):
+				The layer index of the component.
+			head_idx (Union[int, None]):
+				The head index for attention components, None for non-attention components.
+			position (Union[int, None]):
+				The token position in the sequence, None for components without a position.
+			in_type (str, optional):
+				The input type for attention components ('query' or 'key-value'), None for non-attention components.
+		Returns:
+			ImgNode:
+				An instance of ImgNode.
+		"""
 		self.cmpt = cmpt
 		self.layer = layer
 		self.head_idx = head_idx
@@ -13,26 +45,48 @@ class ImgNode:
 		self.in_type = in_type
 	
 	def __repr__(self):
+		""" A detailed string representation of the node for debugging purposes.
+		Returns:
+			str: A detailed string representation of the ImgNode instance.
+		"""
 		return f"ImgNode(cmpt={self.cmpt}, layer={self.layer}, head_idx={self.head_idx}, position={self.position}, in_type={self.in_type})"
 	
 	def __str__(self):
-		# A more concise string representation for use as a unique ID in the graph
+		""" A coincise string representation of the node."""
 		head_str = f"h{self.head_idx}" if self.head_idx is not None else ""
 		pos_str = f"p{self.position}" if self.position is not None else ""
 		type_str = f"_{self.in_type}" if self.in_type else ""
 		return f"{self.cmpt}_l{self.layer}{head_str}{pos_str}{type_str}"
 
 	def __lt__(self, other):
+		"""Defines a less-than comparison for ImgNode instances based on layer, component type, position, and head index. So that node A < node B if A is a predecessor of B in the architecture or inference.
+
+		Args:
+			other (ImgNode): The other ImgNode instance to compare against.
+		Returns:
+			bool: True if self is less than other, False otherwise.
+		"""
 		if not isinstance(other, ImgNode):
 			return NotImplemented
 		return (self.layer, self.cmpt, self.position, self.head_idx) < (other.layer, other.cmpt, other.position, other.head_idx)
 
 	def __eq__(self, other):
+		"""Defines equality comparison for ImgNode instances based on their string representation.
+		
+		Args:
+			other (ImgNode): The other ImgNode instance to compare against.
+		Returns:
+			bool: True if both instances are equal, False otherwise.
+		"""
 		if not isinstance(other, ImgNode):
 			return False
 		return str(self) == str(other)
 
 	def __hash__(self):
+		"""Defines a hash function for ImgNode instances based on the simplified string representation.
+		Returns:
+			int: The hash value of the ImgNode instance.
+		"""
 		return hash(str(self))
 
 def make_graph_from_paths(paths: List[Tuple[float, List[ImgNode]]],
@@ -40,6 +94,25 @@ def make_graph_from_paths(paths: List[Tuple[float, List[ImgNode]]],
 						  n_heads: int,
 						  n_positions: int,
 						  divide_heads: bool = True) -> nx.MultiDiGraph:
+	"""Creates a directed graph from a list of paths for visualization purposes, in networkx format.
+	
+	Args:
+		paths (List[Tuple[float, List[ImgNode]]]): 
+			A list of tuples where each tuple contains a path weight and a list of ImgNode instances representing the path.
+		n_layers (int): 
+			The total number of layers in the model.
+		n_heads (int): 
+			The total number of attention heads in each attention module.
+		n_positions (int): 
+			The total number of token positions in the input prompt.
+		divide_heads (bool, optional):
+			Whether to represent attention heads separately (True) or as a single attention block (False). Defaults to True.
+	Returns:
+		nx.MultiDiGraph: 
+			A directed graph where nodes are ImgNode instances and edges represent connections between them with weights.
+	"""
+
+		
 	G = nx.MultiDiGraph()
 	all_nodes: Set[ImgNode] = set()
 	all_edge_weights = []
@@ -52,8 +125,9 @@ def make_graph_from_paths(paths: List[Tuple[float, List[ImgNode]]],
 		for i in range(len(path_nodes) - 1):
 			src_node = path_nodes[i]
 			dst_node = path_nodes[i+1]
-			G.add_edge(src_node, dst_node, weight=path_weight.item(), path_idx=path_idx, in_type=dst_node.in_type)
-			all_edge_weights.append(path_weight.item())
+			path_weight = path_weight.item() if isinstance(path_weight, torch.Tensor) else path_weight
+			G.add_edge(src_node, dst_node, weight=path_weight, path_idx=path_idx, in_type=dst_node.in_type)
+			all_edge_weights.append(path_weight)
 
 	possible_nodes_context = {
 		ImgNode('emb', 0, None, pos) for pos in range(n_positions)
@@ -98,39 +172,69 @@ def place_node(node: ImgNode,
 			   pos_spacing: float = 1.0, 
 			   divide_heads: bool = True, 
 			   n_heads: int = 0, 
-			   heads_per_row: int = 4) -> tuple[float, float]:
+			   heads_per_row: int = 4) -> Tuple[float, float]:
+	"""Determines the (x, y) position of a node in the graph for visualization purposes.
+	
+	Args:
+		node (ImgNode): 
+			The ImgNode instance to be placed.
+		n_layers (int): 
+			The total number of layers in the model.
+		layer_spacing (float): 
+			The vertical spacing to leave in between layers.
+		pos_spacing (float, optional):
+			The horizontal spacing to leave in between token positions. Defaults to 1.0.
+		divide_heads (bool, optional):
+			Whether to represent attention heads separately (True) or as a single attention block (False). Defaults to True.
+		n_heads (int, optional):
+			The total number of attention heads in each attention module. Required if divide_heads is True. Defaults to 0.
+		heads_per_row (int, optional):
+			The number of attention heads to display per row when dividing heads. Defaults to 4. The attention block will be divided into ceil(n_heads / heads_per_row) rows.
+	Returns:
+		Tuple[float, float]:"""
 	
 	base_x = (node.position or 0) * pos_spacing
 	
 	if node.cmpt == 'emb':
-		return base_x, - layer_spacing * 0.75
+		return base_x, - layer_spacing * 0.5
 	if node.cmpt == 'lmh':
-		return base_x, (n_layers + 0.25) * layer_spacing
+		return base_x, (n_layers + 0.5) * layer_spacing
 
 	base_y = (node.layer) * layer_spacing
 
 	if divide_heads:
 		rows = ceil(n_heads / heads_per_row) if n_heads > 0 else 1
-		head_row_height = layer_spacing / (2*rows)
+		head_row_height = layer_spacing * 0.4 / rows
 		
 		if node.cmpt == 'mlp':
-			return base_x, base_y + head_row_height * rows
+			return base_x, base_y + layer_spacing * 0.7
 			
 		if node.cmpt == 'sa':
 			col = (node.head_idx or 0) % heads_per_row
 			row_idx = (node.head_idx or 0) // heads_per_row
 			x_offset = (col - (heads_per_row - 1) / 2) * (pos_spacing / (heads_per_row + 2))
-			return base_x + x_offset, base_y + row_idx * head_row_height - layer_spacing * 0.1
+			return base_x + x_offset, base_y + row_idx * head_row_height + 0.1 * layer_spacing
 			
 	else: # Full attention blocks
 		if node.cmpt == 'mlp':
-			return base_x, base_y + layer_spacing * 0.2
+			return base_x, base_y + layer_spacing * 0.7
 		if node.cmpt == 'attn':
-			return base_x, base_y - layer_spacing * 0.2
+			return base_x, base_y + layer_spacing * 0.3
 			
 	return base_x, base_y
 
-def get_image_paths(contrib_and_path: Tuple[float, List], divide_heads=True) -> Tuple[float, List[ImgNode]]:
+def get_image_path(contrib_and_path: Tuple[float, List], divide_heads=True) -> Tuple[float, List[ImgNode]]:
+	"""Converts a path represented as a list of nodes into a format suitable for visualization, using ImgNode instances.
+	
+	Args:
+		contrib_and_path (Tuple[float, List]): 
+			A tuple containing the path contribution (weight) and a list of nodes representing the path. It also accepts contribution as single-element torch.Tensor.
+		divide_heads (bool, optional):
+			Whether to represent attention heads separately (True) or as a single attention block (False). Defaults to True.
+	Returns:
+		Tuple[float, List[ImgNode]]: 
+			A tuple containing the path contribution and a list of ImgNode instances representing the path.
+	"""
 	contrib, path = contrib_and_path
 	img_nodes = []
 	for idx, node in enumerate(path):
@@ -152,10 +256,46 @@ def get_image_paths(contrib_and_path: Tuple[float, List], divide_heads=True) -> 
 				name = 'sa'
 		
 		img_nodes.append(ImgNode(name, node.layer, head_idx, position, in_type=in_type))
+	if isinstance(contrib, torch.Tensor):
+		contrib = contrib.item()
 	return (contrib, img_nodes)
 
 def create_graph_data(img_node_paths, n_layers, n_heads, n_positions, divide_heads, prompt_str_tokens, output_str_tokens):
-	"""Helper function to create graph data from paths."""
+	"""
+	Creates graph data visualization for a neural network's attention pathways.
+	This function processes a list of node paths from a neural network and constructs
+	a graph representation with proper node positioning and edge connections.
+	This function is required for visualization in the web app.
+
+	Args:
+		img_node_paths : list
+			List of paths through the network nodes to visualize
+		n_layers : int
+			Number of transformer layers in the model
+		n_heads : int
+			Number of attention heads per layer
+		n_positions : int
+			Number of token positions in the sequence
+		divide_heads : bool
+			Whether to visually separate heads in the layout
+		prompt_str_tokens : list
+			List of input tokens for labeling embedding nodes
+		output_str_tokens : list
+			List of output tokens for labeling LMH (language model head) nodes
+	
+	Returns;
+		dict
+			Dictionary containing:
+			- 'nodes': List of node data with positions and attributes
+			- 'edges': List of edge connections with weights and path indices
+			- 'max_abs_weight': Maximum absolute weight in the graph
+			- 'num_paths': Number of paths in the graph
+			- 'n_positions': Number of token positions
+			- 'n_layers': Number of layers in the model
+			- 'n_heads': Number of attention heads
+			- 'tokenized_prompt': List of input tokens
+			- 'tokenized_target': List containing the last output token
+	"""
 	G = make_graph_from_paths(img_node_paths, n_layers, n_heads, n_positions, divide_heads=divide_heads)
 	
 	involved_nodes = {u for u, _, _ in G.edges(data=True)} | {v for _, v, _ in G.edges(data=True)}

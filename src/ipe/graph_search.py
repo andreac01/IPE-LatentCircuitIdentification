@@ -106,7 +106,7 @@ def IsolatingPathEffect_BW(
 	return_all: bool = False,
 	batch_positions: bool = False,
 	batch_heads: bool = False
-) -> list[tuple[float, list[Node]]]:
+) -> list[tuple[torch.Tensor, list[Node]]]:
 	"""
 	Performs a Breadth-First Search (BFS) starting from a node backwards to identify
 	the most significant paths reaching it from an EMBED_Node.
@@ -210,7 +210,7 @@ def PathAttributionPatching(
 	min_contribution: float = 0.5,
 	include_negative: bool = False,
 	return_all: bool = False,
-) -> list[tuple[float, list[Node]]]:
+) -> list[tuple[torch.Tensor, list[Node]]]:
 	"""
 	Performs a Breadth-First Search (BFS) starting from a node backwards to identify
 	the most significant paths reaching it from an EMBED_Node.

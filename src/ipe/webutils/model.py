@@ -9,7 +9,16 @@ from transformers import AutoConfig, AutoTokenizer
 def has_enough_memory(device: torch.device, required_bytes: int) -> bool:
 	"""
 	Check if at least required_bytes are available on device.
-	Returns True if OK, False otherwise.
+	Returns True if enough memory is present, False otherwise.
+
+	Args:
+		device (torch.device):
+			The device to check memory on (e.g., 'cpu' or 'cuda').
+		required_bytes (int):
+			The number of bytes required.
+	Returns:
+		bool:
+			True if enough memory is available, False otherwise.
 	"""
 	if device.type == "cuda":
 		# torch.cuda.mem_get_info returns (free, total) in bytes
@@ -20,7 +29,16 @@ def has_enough_memory(device: torch.device, required_bytes: int) -> bool:
 		return vm.available >= required_bytes
 
 def download_model(model_name: str, cache_dir: str = "/app/models") -> None:
-	"""Download a model to local cache directory."""
+	"""Download a model to local cache directory. If the model is already present, it does nothing.
+	
+	Args:
+		model_name (str):
+			The name of the model to download (e.g., 'gpt2').
+		cache_dir (str, default="/app/models"):
+			The directory where the model should be cached.
+	Returns:
+		None
+	"""
 	# Create cache directory if it doesn't exist
 	os.makedirs(cache_dir, exist_ok=True)
 	
@@ -35,7 +53,20 @@ def download_model(model_name: str, cache_dir: str = "/app/models") -> None:
 	)
 
 def load_model(model_name: str, required_bytes: int = 0, device='cpu', cache_dir = "/app/models") -> HookedTransformer:
-	"""Load (and cache) a HookedTransformer, but first check memory."""
+	"""Load (and cache) a HookedTransformer, but first check memory.
+	Args:
+		model_name (str):
+			The name of the model to load (e.g., 'gpt2').
+		required_bytes (int, default=0):
+			The number of bytes required to load the model.
+		device (str or torch.device, default='cpu'):
+			The device to load the model onto (e.g., 'cpu' or 'cuda').
+		cache_dir (str, default="/app/models"):
+			The directory where the model should be cached.
+	Returns:
+		HookedTransformer:
+			The loaded transformer model.
+	"""
 	
 	device = torch.device(device)
 	
@@ -66,9 +97,28 @@ def load_model(model_name: str, required_bytes: int = 0, device='cpu', cache_dir
 	return model
 
 def load_tokenizer(model_name: str, config: dict):
-	"""Load the tokenizer for a given model."""
+	"""Load the tokenizer for a given model. The tokenizer is fetched from Hugging Face using the model's configuration, to avoiding loading the entire model as required by HookedTransformer.
+	
+	Args:
+		model_name (str):
+			The name of the model whose tokenizer to load (e.g., 'gpt2').
+		config (dict):
+			The configuration dictionary containing 'huggingface_name'.
+	Returns:
+		AutoTokenizer:
+			The loaded tokenizer.
+	"""
 	return AutoTokenizer.from_pretrained(config['huggingface_name'], trust_remote_code=True)
 
 def load_model_config(model_name: str, config: dict) -> AutoConfig:
-	"""Load the configuration of a model from Hugging Face."""
+	"""Load the configuration of a model from Hugging Face.
+	Args:
+		model_name (str):
+			The name of the model whose configuration to load (e.g., 'gpt2').
+		config (dict):
+			The configuration dictionary containing 'huggingface_name'.
+	Returns:
+		AutoConfig:
+			The loaded model configuration.
+	"""
 	return AutoConfig.from_pretrained(config['huggingface_name'], trust_remote_code=True)
