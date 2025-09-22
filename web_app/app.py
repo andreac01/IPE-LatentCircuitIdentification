@@ -13,7 +13,7 @@ from ipe.nodes import FINAL_Node
 from ipe.paths import get_path_msgs
 from ipe.miscellanea import get_topk
 from ipe.graph_search import PathAttributionPatching
-from ipe.metrics import compare_token_logit
+from ipe.metrics import target_logit_percentage
 from ipe.webutils.model import load_model, load_model_config, load_tokenizer
 
 # load the evnironment
@@ -41,6 +41,20 @@ def index():
 
 @app.route('/api/run_model', methods=['POST'])
 def run_model():
+	"""API endpoint to run the model and compute paths.
+	
+	Expects a JSON payload with:
+	- model_name: Name of the model to use (default: 'gpt2-small')
+	- prompt: The input prompt string
+	- target: The target token string
+	- precomputed: Boolean indicating whether to use precomputed paths (default: False)
+	- task_name: If precomputed is True, the name of the task to load paths for (default: 'Indirect Object Identification')
+	- mode: If precomputed is True, the search mode ('Probability' or 'Marginalization', default: 'Probability')
+	- divide_heads: Boolean indicating whether to divide head contributions (default: True)
+	
+	Returns a JSON response with:
+	- graphData: Data for visualizing the graph
+	- pathDetails: Details for each path including component info and top token probabilities"""
 	app.logger.debug("received")
 	data = request.json
 	model_name = data.get('model_name', 'gpt2-small')
@@ -119,7 +133,7 @@ def run_model():
 		if len(target_tokenized[0]) > 1:
 			return jsonify({'error': 'Target token must be a single token.'}), 400
 		
-		metric = partial(compare_token_logit, clean_resid=cache[f'blocks.{model.cfg.n_layers - 1}.hook_resid_post'], model=model, target_tokens=target_tokenized[0])
+		metric = partial(target_logit_percentage, clean_resid=cache[f'blocks.{model.cfg.n_layers - 1}.hook_resid_post'], model=model, target_tokens=target_tokenized[0])
 		paths= PathAttributionPatching(
 			model=model,
 			metric=metric,

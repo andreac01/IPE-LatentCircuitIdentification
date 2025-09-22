@@ -4,13 +4,13 @@ from typing import List, Optional
 from torch import Tensor
 import torch.nn.functional as F
 
-def compare_token_probability(clean_resid: Tensor,
+def target_probability_percentage(clean_resid: Tensor,
 								corrupted_resid: Tensor,
 								model: HookedTransformer,
 								target_tokens: List[int]) -> Tensor:
 	"""
-	Compute the difference in the probability of predicting the target token
-	between the clean and corrupted model based on the final residuals. 
+	Compute the difference in the probability of associated with the target token
+	when decoding the clean and corrupted residuals. 
 	This probability is returned as a percentage of the clean model's probability.
 
 	Args:
@@ -30,24 +30,24 @@ def compare_token_probability(clean_resid: Tensor,
 			The difference in probability of predicting the target token.
 	"""
 	# Get logits for the last token
-	clean_resid = model.ln_final(clean_resid)
-	corrupted_resid = model.ln_final(corrupted_resid)
-	clean_logits = model.unembed(clean_resid)[:, -1, :]
-	corrupted_logits = model.unembed(corrupted_resid)[:, -1, :]
+	clean_resid = model.ln_final(clean_resid[:, -1, :])
+	corrupted_resid = model.ln_final(corrupted_resid[:, -1, :])
+	clean_logits = model.unembed(clean_resid)
+	corrupted_logits = model.unembed(corrupted_resid)
 
 	# Get the probability of the target token
-	prob_clean = torch.Tensor([clean_logits[i].softmax(dim=-1)[target_tokens[i]] for i in range(len(target_tokens))])
-	prob_corrupted = torch.Tensor([corrupted_logits[i].softmax(dim=-1)[target_tokens[i]] for i in range(len(target_tokens))])
+	prob_clean = F.softmax(clean_logits, dim=-1)[..., target_tokens]
+	prob_corrupted = F.softmax(corrupted_logits, dim=-1)[..., target_tokens]
 
 	return torch.mean(100*(prob_clean - prob_corrupted)/prob_clean)
 
-def compare_token_logit(clean_resid: Tensor,
+def target_logit_percentage(clean_resid: Tensor,
 						corrupted_resid: Tensor,
 						model: HookedTransformer,
 						target_tokens: List[int]) -> Tensor:
 	"""
 	Compute the difference in logits for the target token as a percentage
-	between the clean and corrupted model based on the final residuals.
+	between the logit obtained from the decoding of the clean and corrupted residual.
 	This implementation is optimized for transformerlens HookedTransformer.
 
 	Args:
@@ -87,13 +87,48 @@ def compare_token_logit(clean_resid: Tensor,
 	percentage_diffs = 100 * (clean_logits - corrupted_logits) / (torch.abs(clean_logits))
 	return torch.mean(percentage_diffs)
 
+def kl_divergence(clean_resid: Tensor,
+				corrupted_resid: Tensor,
+				model: HookedTransformer) -> Tensor:
+	"""
+	Compute the KL divergence between the output distributions of the clean and corrupted residuals.
+	The implementation is particularly useful when the target token is not known in advance.
+	This implementation is optimized for transformerlens HookedTransformer.
+
+	Args:
+		clean_resid (torch.Tensor): 
+			The final residual stream of the clean model.
+			Shape: (batch, seq_len, d_model).
+		corrupted_resid (torch.Tensor): 
+			The final residual stream of the corrupted model.
+			Shape: (batch, seq_len, d_model).
+		model (HookedTransformer): 
+			The hooked transformer model.
+	Returns:
+		torch.Tensor: 
+			The KL divergence between the output distributions.
+	"""
+	clean_final_resid = clean_resid[:, -1, :]
+	corrupted_final_resid = corrupted_resid[:, -1, :]
+
+	clean_normed = model.ln_final(clean_final_resid)
+	corrupted_normed = model.ln_final(corrupted_final_resid)
+
+	clean_logits = model.unembed(clean_normed)
+	corrupted_logits = model.unembed(corrupted_normed)
+
+	clean_log_probs = F.softmax(clean_logits, dim=-1)
+	corrupted_probs = F.softmax(corrupted_logits, dim=-1)
+
+	kl_divs = F.kl_div(clean_log_probs.log(), corrupted_probs, reduction='batchmean')
+	return kl_divs
+
 def indirect_effect(clean_resid: Tensor,
 					corrupted_resid: Tensor,
 					model: HookedTransformer,
 					clean_targets: List[int],
 					corrupt_targets: List[int],
-					verbose = False,
-					set_baseline = False) -> Tensor:
+					verbose = False) -> Tensor:
 	"""
 	Compute the Indirect Effect (IE) score.
 	IE(z) = 0.5 * [ (P*z(r) - P(r)) / P(r) + (P(r') - P*z(r')) / P*z(r') ]
@@ -113,7 +148,6 @@ def indirect_effect(clean_resid: Tensor,
 		corrupt_targets (List[int]): 
 			The indexes of the target tokens from the corrupted prompt (r).
 		verbose (bool, optional): If True, prints intermediate values for debugging. Default is False.
-		set_baseline (bool, optional): If True, sets the baseline score for centering the metric. Default is False.
 
 	Returns:
 		torch.Tensor: The Indirect Effect score.
@@ -164,21 +198,18 @@ def indirect_effect(clean_resid: Tensor,
 
 	return torch.mean(indirect_effects)
 
-def logit_difference_counterfactual(clean_resid: Tensor,
-                                   counterfactual_resid: Tensor, 
-                                   model: HookedTransformer,
-                                   target_tokens: List[int],
-                                   counterfactual_tokens: Optional[List[int]] = None,
-                                   use_ablation_mode: bool = False) -> Tensor:
+def logit_difference(corrupted_resid: Tensor, 
+					model: HookedTransformer,
+					target_tokens: List[int],
+					counterfactual_tokens: List[int],
+					baseline_value: float) -> Tensor:
 	"""
-	Compute logit difference: y' - y between the correct answer y (clean) and y' (counterfactual).
+	Compute logit difference: y' - y between the logit associated with the target token of the
+	clean prompt y and y', the answer associated with the counterfactual prompt.
 	This function supports both explicit counterfactual comparison and ablation-based comparison.
 
 	Args:
-		clean_resid (torch.Tensor): 
-			The final residual stream of the clean model.
-			Shape: (batch, seq_len, d_model).
-		counterfactual_resid (torch.Tensor): 
+		corrupted_resid (torch.Tensor): 
 			The final residual stream of the counterfactual model (or ablated model).
 			Shape: (batch, seq_len, d_model).
 		model (HookedTransformer): 
@@ -201,26 +232,13 @@ def logit_difference_counterfactual(clean_resid: Tensor,
 	b_U = model.b_U
 
 	# Get the final residual stream for the last token
-	clean_final_resid = clean_resid[:, -1, :]
-	counterfactual_final_resid = counterfactual_resid[:, -1, :]
+	corrupted_final_resid = corrupted_resid[:, -1, :]
 	
 	# Apply the layer norm to the final residuals
-	clean_final_resid = model.ln_final(clean_final_resid)
-	counterfactual_final_resid = model.ln_final(counterfactual_final_resid)
+	corrupted_final_resid = model.ln_final(corrupted_final_resid)
 	
-	if use_ablation_mode:
-		# Ablation mode: counterfactual_resid is the ablated version
-		# Use same target tokens for both clean and ablated
-		clean_logits = torch.einsum('b d, d b-> b', clean_final_resid, W_U[:, target_tokens]) + b_U[target_tokens]
-		counterfactual_logits = torch.einsum('b d, d b-> b', counterfactual_final_resid, W_U[:, target_tokens]) + b_U[target_tokens]
-	else:
-		# Explicit counterfactual mode: need separate target tokens
-		if counterfactual_tokens is None:
-			raise ValueError("counterfactual_tokens must be provided when use_ablation_mode=False")
-		
-		clean_logits = torch.einsum('b d, d b-> b', clean_final_resid, W_U[:, target_tokens]) + b_U[target_tokens]
-		counterfactual_logits = torch.einsum('b d, d b-> b', counterfactual_final_resid, W_U[:, counterfactual_tokens]) + b_U[counterfactual_tokens]
+	target_logits = torch.einsum('b d, d b-> b', corrupted_final_resid, W_U[:, target_tokens]) + b_U[target_tokens]
+	counterfactual_logits = torch.einsum('b d, d b-> b', corrupted_final_resid, W_U[:, counterfactual_tokens]) + b_U[counterfactual_tokens]
 	
-	# Calculate the logit difference: y' - y   ## y - y*
-	logit_diffs = counterfactual_logits - clean_logits
-	return torch.mean(logit_diffs).item()
+	logit_diffs = counterfactual_logits - target_logits
+	return torch.mean(logit_diffs) - baseline_value
