@@ -226,6 +226,7 @@ class Node(abc.ABC):
 		layer = self.layer if self.layer is not None else -1
 		pos = self.position if self.position is not None else -1
 		keyvalue_position = getattr(self, 'keyvalue_position', -1)
+		keyvalue_position = keyvalue_position if keyvalue_position is not None else -1
 		head = getattr(self, 'head', None)
 		head = head if head is not None else -1
 
