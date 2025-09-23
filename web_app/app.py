@@ -133,7 +133,7 @@ def run_model():
 		if len(target_tokenized[0]) > 1:
 			return jsonify({'error': 'Target token must be a single token.'}), 400
 		
-		metric = partial(target_logit_percentage, clean_resid=cache[f'blocks.{model.cfg.n_layers - 1}.hook_resid_post'], model=model, target_tokens=target_tokenized[0])
+		metric = partial(target_logit_percentage, clean_final_resid=cache[f'blocks.{model.cfg.n_layers - 1}.hook_resid_post'], model=model, target_tokens=target_tokenized[0])
 		paths= PathAttributionPatching(
 			model=model,
 			metric=metric,

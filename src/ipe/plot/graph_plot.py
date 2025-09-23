@@ -105,8 +105,8 @@ def plot_transformer_paths(G: nx.MultiDiGraph,
 	
 	attn_size = min(112.5, 450*heads_per_row/n_heads) if divide_heads else 450
 
-	draw_nodes(involved_emb, node_shape='s', node_size=2400, node_color='white', edgecolors='black', linewidths=1.0, alpha=0.75)
-	draw_nodes(involved_lmh, node_shape='s', node_size=2400, node_color='white', edgecolors='black', linewidths=1.0, alpha=0.75)
+	draw_nodes(involved_emb, node_shape='s', node_size=2400, node_color='white', edgecolors='black', linewidths=1.0, alpha=0.75, img_layer=10)
+	draw_nodes(involved_lmh, node_shape='s', node_size=2400, node_color='white', edgecolors='black', linewidths=1.0, alpha=0.75, img_layer=10)
 	draw_nodes(involved_mlp, node_shape='s', node_size=450, node_color='white', edgecolors='black', linewidths=1.0, alpha=0.75, img_layer=10)
 
 	draw_nodes(uninvolved_mlp, node_shape='s', node_size=450, node_color='white', edgecolors='grey',  linewidths=0.5, alpha=0.55)
@@ -126,12 +126,16 @@ def plot_transformer_paths(G: nx.MultiDiGraph,
 
 	labels_emb_inv = {n: example_input[n.position].replace(' ', '_') for n in involved_emb}
 	labels_emb_uninv = {n: example_input[n.position].replace(' ', '_') for n in uninvolved_emb}
-	nx.draw_networkx_labels(G, pos_dict, labels=labels_emb_inv, font_size=12, font_weight='normal', ax=ax)
+	text_items = nx.draw_networkx_labels(G, pos_dict, labels=labels_emb_inv, font_size=12, font_weight='normal', ax=ax)
+	for _, text_obj in text_items.items():
+		text_obj.set_zorder(11)
 	nx.draw_networkx_labels(G, pos_dict, labels=labels_emb_uninv, font_size=12, font_weight='light', ax=ax)
 
 	labels_lmh_inv = {n: example_output[n.position].replace(' ', '_') for n in involved_lmh}
 	labels_lmh_uninv = {n: example_output[n.position].replace(' ', '_') for n in uninvolved_lmh}
-	nx.draw_networkx_labels(G, pos_dict, labels=labels_lmh_inv, font_size=12, font_weight='normal', ax=ax)
+	text_items = nx.draw_networkx_labels(G, pos_dict, labels=labels_lmh_inv, font_size=12, font_weight='normal', ax=ax)
+	for _, text_obj in text_items.items():
+		text_obj.set_zorder(11)
 	nx.draw_networkx_labels(G, pos_dict, labels=labels_lmh_uninv, font_size=12, font_weight='light', ax=ax)
 
 	sorted_edges = sorted(G.edges(data=True, keys=True), key=lambda x: x[3]['weight'], reverse=True)
