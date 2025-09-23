@@ -103,17 +103,16 @@ def clean_paths(paths: List[Tuple[float, List]]) -> List[Tuple[float, List]]:
 	"""
 	cleaned = []
 	for c, path in paths:
-		if c >= 1:
-			for node in path:
-				node.model = None  # remove model reference to save memory
-				node.parent = None  # remove parent reference to save memory
-				node.children = []  # remove children reference to save memory
-				node.msg_cache = None  # remove msg_cache reference to save memory
-				node.cf_cache = None  # remove cf_cache reference to save memorys
-				node.gradient = None  # remove gradient reference to save memory
-				if isinstance(node, FINAL_Node):
-					node.metric = None  # remove metric reference to save memory
-			if isinstance(c, Tensor):
-				c = c.item()  # convert tensor to float for serialization
-			cleaned.append((c, path))
+		for node in path:
+			node.model = None  # remove model reference to save memory
+			node.parent = None  # remove parent reference to save memory
+			node.children = []  # remove children reference to save memory
+			node.msg_cache = None  # remove msg_cache reference to save memory
+			node.cf_cache = None  # remove cf_cache reference to save memorys
+			node.gradient = None  # remove gradient reference to save memory
+			if isinstance(node, FINAL_Node):
+				node.metric = None  # remove metric reference to save memory
+		if isinstance(c, Tensor):
+			c = c.item()  # convert tensor to float for serialization
+		cleaned.append((c, path))
 	return cleaned

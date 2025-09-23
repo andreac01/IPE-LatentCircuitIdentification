@@ -10,12 +10,12 @@ def plot_transformer_paths(G: nx.MultiDiGraph,
 							n_positions: int,
 							example_input: list[str] = [],
 							example_output: list[str] = [],
-							cmap_name: str = 'viridis', 
+							cmap_name: str = 'coolwarm', 
 							heads_per_row: int = 4,
 							save_fig: bool = False,
 							save_path: str = 'transformer_paths.png',
 							max_w: float = None, # User-defined normalization cap for weight/contribution
-							color_scheme: str = 'path_index',
+							color_scheme: str = 'path_weight', # 'path_index', 'path_weight', 'input_position'
 							divide_heads: bool = True
 						) -> None:
 	"""
@@ -60,26 +60,25 @@ def plot_transformer_paths(G: nx.MultiDiGraph,
 		example_output = [''] * (n_positions - len(example_output)) + example_output
 
 	if divide_heads:
-		layer_spacing_multiplier = (ceil( (0.25*n_heads) / heads_per_row) if n_heads > 0 else 1)
+		layer_spacing_multiplier = (ceil( (0.5*n_heads) / heads_per_row) if n_heads > 0 else 1)
 	else:
 		layer_spacing_multiplier = 1.0
 		n_heads = 1
 		heads_per_row = 1
 
 	layer_spacing = layer_spacing_multiplier
-	pos_spacing = max(1, heads_per_row/4)
+	pos_spacing = max(heads_per_row/2, 2)
 
 	pos_dict = {
-		node: place_node(node, n_layers, layer_spacing, pos_spacing=1/heads_per_row,
+		node: place_node(node, n_layers, layer_spacing, pos_spacing=pos_spacing,
 						 divide_heads=divide_heads,
 						 n_heads=n_heads, heads_per_row=heads_per_row)
 		for node in G.nodes()
 	}
-	
-		
+			
 
 	height = layer_spacing * (n_layers + 2) 
-	width = n_positions * pos_spacing
+	width = max(n_positions * pos_spacing, height/2)
 	fig, ax = plt.subplots(figsize=(width, height))
 
 	involved = {u for u, v, data in G.edges(data=True)} | {v for u, v, data in G.edges(data=True)}
@@ -147,7 +146,7 @@ def plot_transformer_paths(G: nx.MultiDiGraph,
 
 	# Use user-provided max_w for normalization cap if available, otherwise use graph's max_abs_weight
 	norm_cap = max_w if max_w is not None else graph_max_abs_weight
-	if norm_cap <= 0:
+	if norm_cap == 0:
 		norm_cap = 1.0
 
 
@@ -172,7 +171,7 @@ def plot_transformer_paths(G: nx.MultiDiGraph,
 
 	all_drawn_edges = []
 	parallel_edge_drawn = {} 
-	width_scale = 12 
+	width_scale = 18 
 	alpha = 0.6
 
 	for i, (u, v, key, data) in enumerate(sorted_edges):
@@ -249,14 +248,19 @@ def plot_transformer_paths(G: nx.MultiDiGraph,
 	ax.set_yticklabels(['EMB'] + list(range(n_layers)) + ['LMH'] + [''], fontsize=16)
 	ax.tick_params(axis='y', left=True, labelleft=True)
 
-	ax.set_xticks([i - 0.5 for i in range(n_positions + 1)], minor=True)
+	ax.set_xticks([(i - 0.5)*pos_spacing for i in range(n_positions + 1)], minor=True)
 	ax.set_yticks([layer_spacing * (i) for i in range(0, n_layers + 1)], minor=True) 
 	ax.grid(False, which='major')
 	ax.grid(True, which='minor', linestyle='-', alpha=0.8)
 
 	xs, ys = zip(*pos_dict.values()) if pos_dict else ([0],[0])
 	
-	ax.set_xlim(min(xs) - 0.05*max(xs), 1.05*max(xs))
+	# Include edge positions in xlim calculation using the bounding box of drawn elements
+	bbox = ax.dataLim
+	min_x = min(min(xs), bbox.x0)
+	max_x = max(max(xs), bbox.x1)
+	
+	ax.set_xlim(min_x - 0.05 * max_x, 1.05 * max_x)
 	ax.set_ylim(max(ys) + 1 * layer_spacing, min(ys) - 1 * layer_spacing) 
 	ax.invert_yaxis()
 

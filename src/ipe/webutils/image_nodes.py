@@ -246,7 +246,7 @@ def get_image_path(contrib_and_path: Tuple[float, List], divide_heads=True) -> T
 		
 		head_idx = None
 		in_type = None
-		position = node.position
+		position = node.position if node.position is not None else 0
 		
 		if name == 'attn':
 			head_idx = node.head

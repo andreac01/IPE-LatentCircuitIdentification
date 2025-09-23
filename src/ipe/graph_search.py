@@ -300,7 +300,9 @@ def IsolatingPathEffect_BestFirstSearch(
 				heapq.heappush(frontier, (-abs(contribution.item()), [candidate] + best_incomplete_path))
 			else:
 				heapq.heappush(frontier, (-contribution.item(), [candidate] + best_incomplete_path))
-
+	pbar.n = min(len(completed_paths), top_n)
+	pbar.refresh()
+	pbar.close()
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
 
 def IsolatingPathEffect_LimitedLevelWidth(
@@ -575,7 +577,11 @@ def PathAttributionPatching_BestFirstSearch(
 	start_time = time.time()
 
 	# Best-first loop: pop highest-priority element, expand it, push children with priority
+	pbar = tqdm(total=top_n, desc="Completed paths")
 	while frontier and (time.time() - start_time) < max_time and (len(completed_paths) < top_n):
+		# ensure the bar reflects current number of completed paths
+		pbar.n = min(len(completed_paths), top_n)
+		pbar.refresh()
 		_, node = heapq.heappop(frontier)
 
 		if node.__class__.__name__ == 'EMBED_Node':
@@ -598,12 +604,10 @@ def PathAttributionPatching_BestFirstSearch(
 				approx_contribution = approx_contributions[i]
 				if include_negative or approx_contribution > 0:
 					approx_contribution = -abs(approx_contribution.item())
-					try:
-						heapq.heappush(frontier, (approx_contribution, candidate))
-					except Exception as e:
-						print(candidate, approx_contribution, e)
-						return frontier
-
+					heapq.heappush(frontier, (approx_contribution, candidate))
+	pbar.n = min(len(completed_paths), top_n)
+	pbar.refresh()
+	pbar.close()
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
 
 def PathAttributionPatching_LimitedLevelWidth(

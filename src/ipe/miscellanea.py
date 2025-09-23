@@ -2,6 +2,28 @@ from itertools import islice
 from transformer_lens import HookedTransformer
 from torch import Tensor
 import torch
+import inspect
+
+def get_function_params(func, which='all'):
+	"""
+	Returns a dictionary of all parameters for a given function.
+	Keys are parameter names, values are inspect.Parameter objects.
+
+	Args:
+		func: The function to inspect.
+		which: 'all' to get all parameters, 'required' to get only required parameters, 'default' to get only parameters with default values.
+	Returns:
+		dict: A dictionary of parameter names and their default values.
+	"""
+	sig = inspect.signature(func)
+	if which == 'required':
+		return {k: v for k, v in sig.parameters.items() if v.default == inspect.Parameter.empty}
+	elif which == 'default':
+		return {k: v.default for k, v in sig.parameters.items() if v.default != inspect.Parameter.empty}
+	elif which == 'all':
+		return {k: v for k, v in sig.parameters.items()}
+	else:
+		raise ValueError("Parameter 'which' must be one of 'all', 'required', or 'default'.")
 
 def batch_iterable(iterable, batch_size):
 	"""Batch an iterable into chunks of a specified size.
