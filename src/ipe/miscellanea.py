@@ -26,7 +26,7 @@ def get_function_params(func: callable, which: str='all') -> dict[str, inspect.P
 	else:
 		raise ValueError("Parameter 'which' must be one of 'all', 'required', or 'default'.")
 
-def batch_iterable(iterable: Iterable, batch_size: int) -> list[list]:
+def batch_iterable(iterable: Iterable, batch_size: int):
 	"""Batch an iterable into chunks of a specified size.
 	Args:
 		iterable (iterable): 

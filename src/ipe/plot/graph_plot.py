@@ -192,13 +192,8 @@ def plot_transformer_paths(G: nx.MultiDiGraph,
 		# Edge Color
 		if color_scheme == 'path_weight':
 			normalized_abs_contribution = (contribution - min_width) / (max_width - min_width)
-			if normalized_abs_contribution > 1.0:
-				normalized_abs_contribution = 1.0
 
-			if contribution < 0:
-				current_color = (0.6 + 0.4*normalized_abs_contribution, 0.2, 0.2) # (R, G, B) for negative
-			else:
-				current_color = cmap_obj(normalized_abs_contribution) # Use cmap for positive
+			current_color = cmap_obj(normalized_abs_contribution) # Use cmap for positive
 		
 		elif color_scheme == 'path_index':
 			current_color = edge_colors_by_path_idx[path_idx % len(edge_colors_by_path_idx)]

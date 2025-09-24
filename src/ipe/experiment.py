@@ -5,9 +5,9 @@ from ipe.graph_search import (
 	PathAttributionPatching,
 	PathAttributionPatching_BestFirstSearch,
 	PathAttributionPatching_LimitedLevelWidth,
-	IsolatingPathEffect,
-	IsolatingPathEffect_BestFirstSearch,
-	IsolatingPathEffect_LimitedLevelWidth
+	PathActivationPatching,
+	PathActivationPatching_BestFirstSearch,
+	PathActivationPatching_LimitedLevelWidth
 )
 from ipe.webutils.image_nodes import get_image_path, make_graph_from_paths
 from ipe.plot.graph_plot import plot_transformer_paths
@@ -50,11 +50,11 @@ class ExperimentManager:
 				- :func:`ipe.metrics.indirect_effect` (metric = 'indirect_effect')
 			2. Choose the seach algorithm in between:
 				- :func:`ipe.graph_search.PathAttributionPatching` (alorithm = 'PathAttributionPatching', method = 'Threshold')
-				- :func:`ipe.graph_search.IsolatingPathEffect` (alorithm = 'IsolatingPathEffect', method = 'Threshold')
+				- :func:`ipe.graph_search.PathActivationPatching` (alorithm = 'PathActivationPatching', method = 'Threshold')
 				- :func:`ipe.graph_search.PathAttributionPatching_BestFirstSearch` (alorithm = 'PathAttributionPatching', method = 'BestFirstSearch') (default)
-				- :func:`ipe.graph_search.IsolatingPathEffect_BestFirstSearch` (alorithm = 'IsolatingPathEffect', method = 'BestFirstSearch')
+				- :func:`ipe.graph_search.PathActivationPatching_BestFirstSearch` (alorithm = 'PathActivationPatching', method = 'BestFirstSearch')
 				- :func:`ipe.graph_search.PathAttributionPatching_LimitedLevelWidth` (alorithm = 'PathAttributionPatching', method = 'LimitedLevelWidth')
-				- :func:`ipe.graph_search.IsolatingPathEffect_LimitedLevelWidth` (alorithm = 'IsolatingPathEffect', method = 'LimitedLevelWidth')
+				- :func:`ipe.graph_search.PathActivationPatching_LimitedLevelWidth` (alorithm = 'PathActivationPatching', method = 'LimitedLevelWidth')
 		You can also provide custom parameters to the metric and the algorithm as a dictionary.
 		
 		Args:
@@ -69,7 +69,7 @@ class ExperimentManager:
 			cf_targets (list[str], optional):
 				List of counterfactual target tokens corresponding to each counterfactual prompt. Each target must be a single token. If provided, must have the same length as targets. Defaults to None
 			algorithm (str, optional):
-				The path-finding algorithm to use. Options are 'PathAttributionPatching' or 'IsolatingPathEffect'. Defaults to 'PathAttributionPatching'.
+				The path-finding algorithm to use. Options are 'PathAttributionPatching' or 'PathActivationPatching'. Defaults to 'PathAttributionPatching'.
 			search_strategy (str, optional):
 				The search strategy to use within the chosen algorithm. Options are 'Threshold', 'BestFirstSearch', or 'LimitedLevelWidth'. Defaults to 'BestFirstSearch'.
 			algorithm_params (dict, optional):
@@ -130,10 +130,10 @@ class ExperimentManager:
 		"""
 		if self.positional_search:
 			for p in self.prompts:
-				assert self.prompt_length == self.model.to_str_tokens(p, prepend_bos=True)
+				assert self.prompt_length == len(self.model.to_str_tokens(p, prepend_bos=True))
 			if self.cf_prompts:
 				for p in self.cf_prompts:
-					assert self.prompt_length == self.model.to_str_tokens(p, prepend_bos=True)
+					assert self.prompt_length == len(self.model.to_str_tokens(p, prepend_bos=True))
 		if self.metric != 'kl_divergence':
 			for t in self.targets:
 				assert len(self.model.to_str_tokens(t, prepend_bos=False)) == 1, f"Target '{t}' is not a single token."
@@ -376,7 +376,7 @@ class ExperimentManager:
 
 		Args:
 			algorithm (str):
-				The name of the path-finding algorithm to use. Options are 'PathAttributionPatching' or 'IsolatingPathEffect'.
+				The name of the path-finding algorithm to use. Options are 'PathAttributionPatching' or 'PathActivationPatching'.
 			search_strategy (str):
 				The search strategy to use within the chosen algorithm. Options are 'Threshold', 'BestFirstSearch', or 'LimitedLevelWidth'.
 			algorithm_params (dict, optional):
@@ -393,17 +393,17 @@ class ExperimentManager:
 				algorithm_function = PathAttributionPatching_LimitedLevelWidth
 			else:
 				raise ValueError(f"Unknown search strategy: {search_strategy}, available: ['Threshold', 'BestFirstSearch', 'LimitedLevelWidth']")
-		elif algorithm == 'IsolatingPathEffect':
+		elif algorithm == 'PathActivationPatching':
 			if search_strategy == 'Threshold':
-				algorithm_function = IsolatingPathEffect
+				algorithm_function = PathActivationPatching
 			elif search_strategy == 'BestFirstSearch':
-				algorithm_function = IsolatingPathEffect_BestFirstSearch
+				algorithm_function = PathActivationPatching_BestFirstSearch
 			elif search_strategy == 'LimitedLevelWidth':
-				algorithm_function = IsolatingPathEffect_LimitedLevelWidth
+				algorithm_function = PathActivationPatching_LimitedLevelWidth
 			else:
 				raise ValueError(f"Unknown search strategy: {search_strategy}, available: ['Threshold', 'BestFirstSearch', 'LimitedLevelWidth']")
 		else:
-			raise ValueError(f"Unknown algorithm: {algorithm}, available: ['PathAttributionPatching', 'IsolatingPathEffect']")
+			raise ValueError(f"Unknown algorithm: {algorithm}, available: ['PathAttributionPatching', 'PathActivationPatching']")
 		
 		all_parameters = get_function_params(algorithm_function, which='all')
 		if 'metric' in all_parameters:

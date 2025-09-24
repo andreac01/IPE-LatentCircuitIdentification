@@ -146,7 +146,7 @@ def find_relevant_heads(
 
 
 
-def IsolatingPathEffect(
+def PathActivationPatching(
 	model: HookedTransformer,
 	metric: Callable,
 	root: Node,
@@ -252,7 +252,7 @@ def IsolatingPathEffect(
 		frontier = sorted(cur_depth_frontier, key=lambda x: x[0], reverse=True)
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
 
-def IsolatingPathEffect_BestFirstSearch(
+def PathActivationPatching_BestFirstSearch(
 	model: HookedTransformer,
 	metric: Callable,
 	root: Node,
@@ -352,7 +352,7 @@ def IsolatingPathEffect_BestFirstSearch(
 	pbar.close()
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
 
-def IsolatingPathEffect_LimitedLevelWidth(
+def PathActivationPatching_LimitedLevelWidth(
     model: HookedTransformer,
     metric: Callable,
     root: Node,

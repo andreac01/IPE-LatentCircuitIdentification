@@ -1,8 +1,9 @@
 from ipe.nodes import Node, FINAL_Node
 import torch
 from transformer_lens import HookedTransformer
+from typing import Callable
 
-def evaluate_path(path: list[Node], metric: callable[[torch.Tensor], float]) -> float:
+def evaluate_path(path: list[Node], metric: Callable[[torch.Tensor], float]) -> float:
 	"""
 	Evaluates the contribution of a given path by executing the forward methods of each node in the path and then applying the provided metric function to the final output.
 	
