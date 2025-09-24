@@ -3,8 +3,9 @@ from transformer_lens import HookedTransformer
 from torch import Tensor
 import torch
 import inspect
+from typing import Iterable
 
-def get_function_params(func, which='all'):
+def get_function_params(func: callable, which: str='all') -> dict[str, inspect.Parameter]:
 	"""
 	Returns a dictionary of all parameters for a given function.
 	Keys are parameter names, values are inspect.Parameter objects.
@@ -25,7 +26,7 @@ def get_function_params(func, which='all'):
 	else:
 		raise ValueError("Parameter 'which' must be one of 'all', 'required', or 'default'.")
 
-def batch_iterable(iterable, batch_size):
+def batch_iterable(iterable: Iterable, batch_size: int) -> list[list]:
 	"""Batch an iterable into chunks of a specified size.
 	Args:
 		iterable (iterable): 
@@ -53,6 +54,10 @@ def get_topk(model: HookedTransformer, residual: Tensor, topk=5) -> dict[list]:
 			The number of top predictions to return.
 	Returns:
 		dict: A dictionary containing top-k indices, logits, probabilities, and string tokens.
+			- 'topk_indices': The top-k token indices.
+			- 'topk_logits': The top-k logits.
+			- 'topk_probs': The top-k probabilities.
+			- 'topk_strtokens': The top-k string representations of the tokens.
 	"""
 	assert residual.dim() == 1, "Residual must be a 1D tensor of shape (d_model,)"
 	resid_norm = model.ln_final(residual)

@@ -10,7 +10,29 @@ import heapq
 import time
 
 
-def find_relevant_positions(candidate, incomplete_path, metric, min_contribution, include_negative):
+def find_relevant_positions(
+		candidate: ATTN_Node,
+		incomplete_path: list[Node],
+		metric: Callable,
+		min_contribution: float,
+		include_negative: bool) -> list[tuple[torch.Tensor, list[Node]]]:
+	"""Helper function to find relevant key-value positions for a candidate attention node.
+	
+	Args:
+		candidate (ATTN_Node):
+			The candidate attention node to evaluate.
+		incomplete_path (list of Node):
+			The current incomplete path to be extended.
+		metric (Callable):
+			A function to evaluate the contribution or importance of the path.
+		min_contribution (float):
+			The minimum absolute contribution score required for a path to be considered valid.
+		include_negative (bool):
+			If True, include paths with negative contributions.
+	
+	Returns:
+		list of tuples: A list of tuples containing the contribution score and the corresponding extended path.
+	"""
 	relevant_extensions = []
 	target_positions = []
 	if incomplete_path[0].__class__.__name__ == 'ATTN_Node':
@@ -69,7 +91,32 @@ def find_relevant_positions(candidate, incomplete_path, metric, min_contribution
 	return relevant_extensions
 
 
-def find_relevant_heads(candidate, incomplete_path, metric, min_contribution, include_negative, batch_positions):
+def find_relevant_heads(
+		candidate: ATTN_Node,
+		incomplete_path: list[Node],
+		metric: Callable,
+		min_contribution: float,
+		include_negative: bool,
+		batch_positions: bool) -> list[tuple[torch.Tensor, list[Node]]]:
+	"""Helper function to find relevant heads for a candidate attention node.
+	
+	Args:
+		candidate (ATTN_Node):
+			The candidate attention node to evaluate.
+		incomplete_path (list of Node):
+			The current incomplete path to be extended.
+		metric (Callable):
+			A function to evaluate the contribution or importance of the path.
+		min_contribution (float):
+			The minimum absolute contribution score required for a path to be considered valid.
+		include_negative (bool):
+			If True, include paths with negative contributions.
+		batch_positions (bool):
+			If True, when expanding nodes, first evaluates attentions without considering position-wise contributions, only later, if the attention has been deemed meaningful, it will be evaluated at all possible key-value positions.
+	
+	Returns:
+		list of tuples: A list of tuples containing the contribution score and the corresponding extended path.
+	"""
 	relevant_extensions = []
 	for head in range(candidate.model.cfg.n_heads):
 		candidate_head = ATTN_Node(
@@ -104,7 +151,7 @@ def IsolatingPathEffect(
 	metric: Callable,
 	root: Node,
 	min_contribution: float = 0.5,
-	include_negative: bool = False,
+	include_negative: bool = True,
 	return_all: bool = False,
 	batch_positions: bool = False,
 	batch_heads: bool = False
@@ -211,7 +258,7 @@ def IsolatingPathEffect_BestFirstSearch(
 	root: Node,
 	top_n: int = 100,
 	max_time: int = 300,
-	include_negative: bool = False,
+	include_negative: bool = True,
 	batch_positions: bool = False,
 	batch_heads: bool = False
 ) -> list[tuple[torch.Tensor, list[Node]]]:
@@ -429,7 +476,7 @@ def PathAttributionPatching(
 	metric: Callable,
 	root: Node,
 	min_contribution: float = 0.5,
-	include_negative: bool = False,
+	include_negative: bool = True,
 	return_all: bool = False,
 	confirm_relevance: bool = False
 ) -> list[tuple[torch.Tensor, list[Node]]]:
@@ -541,7 +588,7 @@ def PathAttributionPatching_BestFirstSearch(
 	model: HookedTransformer,
 	metric: Callable,
 	root: Node,
-	include_negative: bool = False,
+	include_negative: bool = True,
 	top_n: int = 100,
 	max_time: int = 300,
 ) -> list[tuple[torch.Tensor, list[Node]]]:
@@ -614,8 +661,8 @@ def PathAttributionPatching_LimitedLevelWidth(
 	model: HookedTransformer,
 	metric: Callable,
 	root: Node,
-	max_width: int = 20000,
-	include_negative: bool = False,
+	max_width: int = 2000,
+	include_negative: bool = True,
 ) -> list[tuple[torch.Tensor, list[Node]]]:
 	"""
 	Performs a Breadth-First Search (BFS) starting from a node backwards to identify the most significant paths reaching it from an EMBED_Node. 

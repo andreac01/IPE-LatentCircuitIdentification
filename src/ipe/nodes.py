@@ -1,6 +1,6 @@
 import abc
 import torch
-from torch import Tensor
+import torch
 from transformer_lens import HookedTransformer
 from transformer_lens.HookedTransformerConfig import HookedTransformerConfig
 from ipe.attention import custom_attention_forward
@@ -32,7 +32,7 @@ class Node(abc.ABC):
 			Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
 		cf_cache (dict, default={}): 
 			Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-		gradient (Tensor, default=None): 
+		gradient (torch.Tensor, default=None): 
 			Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
 		input_name (str): 
 			Input activation name. This is the name associated to the cache entry corresponding to the input of this node.
@@ -44,7 +44,7 @@ class Node(abc.ABC):
 	Notes:
 		This is an abstract base class that should not be instantiated directly. Concrete implementations should inherit from this class and implement the required abstract methods.
 	"""
-	def __init__(self, model: HookedTransformer, layer: int, msg_cache: dict, input_name: str, output_name: str, position: int = None, cf_cache: dict = {}, parent = None, children: set = set(), gradient: Tensor = None, patch_type: str = 'zero'):
+	def __init__(self, model: HookedTransformer, layer: int, msg_cache: dict, input_name: str, output_name: str, position: int = None, cf_cache: dict = {}, parent = None, children: set = set(), gradient: torch.Tensor = None, patch_type: str = 'zero'):
 		"""	 Initializes an Node instance.
 
 		Args:
@@ -62,7 +62,7 @@ class Node(abc.ABC):
 				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
 			cf_cache (dict, default={}): 
 				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-			gradient (Tensor, default=None): 
+			gradient (torch.Tensor, default=None): 
 				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
 			input_name (str): 
 				Input activation name. This is the name associated to the cache entry corresponding to the input of this node.
@@ -88,7 +88,7 @@ class Node(abc.ABC):
 		if patch_type not in ['zero', 'counterfactual']:
 			raise ValueError(f"Unknown patch type: {patch_type}")
 
-	def add_child(self, child: 'Node'):
+	def add_child(self, child: 'Node') -> None:
 		"""Adds a node as a child of self and sets self as its parent. A child can be interpreted as a predecessor in the computational graph.
 		
 		Args:
@@ -102,7 +102,7 @@ class Node(abc.ABC):
 		self.children.add(child)
 		child.parent.add(self)
 
-	def add_parent(self, parent: 'Node'):
+	def add_parent(self, parent: 'Node') -> None:
 		"""Adds a node as a parent of self and update the list of children of the parent node. A parent can be interpreted as a successor in the computational graph.
 		
 		Args:
@@ -118,7 +118,7 @@ class Node(abc.ABC):
 
 	@abc.abstractmethod
 	
-	def forward(self, message: Tensor = None) -> Tensor:
+	def forward(self, message: torch.Tensor = None) -> torch.Tensor:
 		"""
 		Calculate the effect of the message on the output of the node. 
 		
@@ -130,7 +130,7 @@ class Node(abc.ABC):
 
 		Args:
 
-			message (Tensor of shape (batch_size, seq_len, d_model), default=None):
+			message (torch.Tensor of shape (batch_size, seq_len, d_model), default=None):
 				The message whose effect on the node need to be evaluated. If None, returns the normal 
 				output or the difference between normal and counterfactual output depending on patch_type.
 			
@@ -171,14 +171,14 @@ class Node(abc.ABC):
 
 	@abc.abstractmethod
 	
-	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> Tensor:
+	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> torch.Tensor:
 		"""
 		Calculates the gradient of the node's input with respect to the final output.
 		By default the gradient is calculated propagating backwards from the parent node if present,
 		or assuming a gradient of ones if self has no parent. When 'grad_outputs' is specified, it is used instead of the parent's gradient.
 
 		Args:
-			grad_outputs : Tensor, optional (default=None)
+			grad_outputs : torch.Tensor, optional (default=None)
 				Gradient to propagate backwards. If None, uses the gradient from the parent node or ones.
 			
 			save : bool, optional (default=True)
@@ -190,7 +190,7 @@ class Node(abc.ABC):
 				save is True.
 		
 		Returns:
-			gradient : Tensor
+			gradient : torch.Tensor
 				A tensor representing the gradient of the output with respect to the input
 				of this node, passing trough the path from final node to the current one.
 		"""
@@ -207,7 +207,7 @@ class Node(abc.ABC):
 		"""
 		pass
 
-	def _get_sort_key(self):
+	def _get_sort_key(self) -> tuple:
 		"""Helper method to return a tuple for sorting.
 		Sorting order:
 		1. Layer (ascending)
@@ -238,7 +238,7 @@ class Node(abc.ABC):
 			head
 		)
 
-	def __lt__(self, other):
+	def __lt__(self, other) -> bool:
 		"""Defines a total ordering for Node instances based on layer, position, type, key/value position, and head.
 		Args:
 			other (Node): The other Node instance to compare with.
@@ -249,7 +249,7 @@ class Node(abc.ABC):
 			return NotImplemented
 		return self._get_sort_key() < other._get_sort_key()
 
-	def __eq__(self, other):
+	def __eq__(self, other) -> bool:
 		"""Checks equality between two Node instances based on layer, position, type, key/value position, and head.
 		Args:
 			other (Node): The other Node instance to compare with.
@@ -265,7 +265,7 @@ class Node(abc.ABC):
 		return True
 		
 
-	def __hash__(self):
+	def __hash__(self) -> int:
 		"""Generates a hash based on layer, position and type.
 		Returns:
 			int: The hash value of the Node instance.
@@ -294,7 +294,7 @@ class MLP_Node(Node):
 			Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
 		cf_cache (dict, default={}): 
 			Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-		gradient (Tensor, default=None): 
+		gradient (torch.Tensor, default=None): 
 			Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
 		input_name (str): 
 			Input activation name. This is the name associated to the cache entry corresponding to the input of this node.
@@ -320,7 +320,7 @@ class MLP_Node(Node):
 				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
 			cf_cache (dict, default={}): 
 				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-			gradient (Tensor, default=None): 
+			gradient (torch.Tensor, default=None): 
 				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
 			patch_type (str, default='zero'): 
 				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
@@ -332,7 +332,7 @@ class MLP_Node(Node):
 	
 
 	
-	def forward(self, message: Tensor) -> Tensor:
+	def forward(self, message: torch.Tensor) -> torch.Tensor:
 		"""
 		Calculate the effect of the message on the output of the node. 
 		
@@ -344,12 +344,12 @@ class MLP_Node(Node):
 
 		Args:
 
-			message (Tensor of shape (batch_size, seq_len, d_model), default=None):
+			message (torch.Tensor of shape (batch_size, seq_len, d_model), default=None):
 				The message whose effect on the node need to be evaluated. If None, returns the normal 
 				output or the difference between normal and counterfactual output depending on patch_type.
 			
 		Returns:
-			Tensor:
+			torch.Tensor:
 				A tensor representing the effect of the message on the output of the node.
 
 		Notes:
@@ -464,7 +464,7 @@ class MLP_Node(Node):
 		prev_nodes = list(set(prev_nodes))
 		return prev_nodes
 
-	def __repr__(self):
+	def __repr__(self) -> str:
 		"""Returns a string representation of the MLP node.
 		Returns:
 			str:
@@ -472,7 +472,7 @@ class MLP_Node(Node):
 		"""
 		return f"MLP_Node(layer={self.layer}, position={self.position})"
 
-	def __hash__(self):
+	def __hash__(self) -> int:
 		"""Generates a hash based on layer, position and type.
 		Returns:
 			int: The hash value of the MLP_Node instance.
@@ -480,14 +480,14 @@ class MLP_Node(Node):
 		return hash((type(self).__name__, self.layer, self.position))
 	
 	
-	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> Tensor:
+	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> torch.Tensor:
 		"""
 		Calculates the gradient of the node's input with respect to the final output.
 		By default the gradient is calculated propagating backwards from the parent node if present,
 		or assuming a gradient of ones if self has no parent. When 'grad_outputs' is specified, it is used instead of the parent's gradient.
 
 		Args:
-			grad_outputs : Tensor, optional (default=None)
+			grad_outputs : torch.Tensor, optional (default=None)
 				Gradient to propagate backwards. If None, uses the gradient from the parent node or ones.
 			
 			save : bool, optional (default=True)
@@ -499,7 +499,7 @@ class MLP_Node(Node):
 				save is True.
 		
 		Returns:
-			gradient : Tensor
+			gradient : torch.Tensor
 				A tensor representing the gradient of the output with respect to the input
 				of this node, passing trough the path from final node to the current one.
 		"""
@@ -568,7 +568,7 @@ class ATTN_Node(Node):
 			Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
 		cf_cache (dict, default={}): 
 			Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-		gradient (Tensor, default=None): 
+		gradient (torch.Tensor, default=None): 
 			Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
 		attn_scores (str):
 			Attention scores activation name. This is the name associated to the cache entry corresponding to the attention scores of this attention block. It is used to only recompute the attention scores of relevant positions when patching, drastically reducing computation.
@@ -610,7 +610,7 @@ class ATTN_Node(Node):
 				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
 			cf_cache (dict, default={}): 
 				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-			gradient (Tensor, default=None): 
+			gradient (torch.Tensor, default=None): 
 				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
 			patch_type (str, default='zero'): 
 				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
@@ -639,7 +639,7 @@ class ATTN_Node(Node):
 			assert msg_cache[self.input_name].shape == msg_cache[self.output_name].shape, "Input and output shapes must match"
 
 	
-	def forward(self, message: Tensor) -> Tensor:
+	def forward(self, message: torch.Tensor) -> torch.Tensor:
 		"""
 		Calculate the effect of the message on the output of the node. 
 		
@@ -651,12 +651,12 @@ class ATTN_Node(Node):
 
 		Args:
 
-			message (Tensor of shape (batch_size, seq_len, d_model), default=None):
+			message (torch.Tensor of shape (batch_size, seq_len, d_model), default=None):
 				The message whose effect on the node need to be evaluated. If None, returns the normal 
 				output or the difference between normal and counterfactual output depending on patch_type.
 			
 		Returns:
-			Tensor:
+			torch.Tensor:
 				A tensor representing the effect of the message on the output of the node.
 				In simpler terms, it represents the message caused by passing the input message through this node.
 
@@ -811,14 +811,14 @@ class ATTN_Node(Node):
 		return self.msg_cache[self.output_name].detach().clone() - out
 	
 	
-	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> Tensor:
+	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> torch.Tensor:
 		"""
 		Calculates the gradient of the node's input with respect to the final output.
 		By default the gradient is calculated propagating backwards from the parent node if present,
 		or assuming a gradient of ones if self has no parent. When 'grad_outputs' is specified, it is used instead of the parent's gradient.
 
 		Args:
-			grad_outputs : Tensor, optional (default=None)
+			grad_outputs : torch.Tensor, optional (default=None)
 				Gradient to propagate backwards. If None, uses the gradient from the parent node or ones.
 			
 			save : bool, optional (default=True)
@@ -830,7 +830,7 @@ class ATTN_Node(Node):
 				save is True.
 		
 		Returns:
-			gradient : Tensor
+			gradient : torch.Tensor
 				A tensor representing the gradient of the output with respect to the input
 				of this node, passing trough the path from final node to the current one.
 		"""
@@ -1040,7 +1040,7 @@ class ATTN_Node(Node):
 		prev_nodes = list(set(prev_nodes))
 		return prev_nodes
 
-	def __repr__(self):
+	def __repr__(self) -> str:
 		"""String representation of the ATTN_Node instance.
 		Includes layer, head, position, keyvalue_position, and patching options.
 		
@@ -1050,7 +1050,7 @@ class ATTN_Node(Node):
 		"""
 		return f"ATTN_Node(layer={self.layer}, head={self.head}, position={self.position}, keyvalue_position={self.keyvalue_position}, patch_query={self.patch_query}, patch_key={self.patch_key}, patch_value={self.patch_value})"
 
-	def __hash__(self):
+	def __hash__(self) -> int:
 		"""Hash function for the ATTN_Node instance.
 		
 		Returns:
@@ -1078,7 +1078,7 @@ class EMBED_Node(Node):
 			Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
 		cf_cache (dict, default={}): 
 			Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-		gradient (Tensor, default=None): 
+		gradient (torch.Tensor, default=None): 
 			Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
 		input_name (str): 
 			Input activation name. This is the name associated to the cache entry corresponding to the input of this node.
@@ -1104,7 +1104,7 @@ class EMBED_Node(Node):
 				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
 			cf_cache (dict, default={}): 
 				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-			gradient (Tensor, default=None): 
+			gradient (torch.Tensor, default=None): 
 				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
 			patch_type (str, default='zero'): 
 				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
@@ -1115,7 +1115,7 @@ class EMBED_Node(Node):
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name="hook_embed", output_name="hook_embed", patch_type=patch_type)
 
 	
-	def forward(self, message: Tensor = None) -> Tensor:
+	def forward(self, message: torch.Tensor = None) -> torch.Tensor:
 		"""
 		Calculate the effect of the message on the output of the node. 
 		
@@ -1127,12 +1127,12 @@ class EMBED_Node(Node):
 
 		Args:
 
-			message (Tensor of shape (batch_size, seq_len, d_model), default=None):
+			message (torch.Tensor of shape (batch_size, seq_len, d_model), default=None):
 				The message whose effect on the node need to be evaluated. If None, returns the normal 
 				output or the difference between normal and counterfactual output depending on patch_type.
 			
 		Returns:
-			Tensor:
+			torch.Tensor:
 				A tensor representing the effect of the message on the output of the node.
 				In simpler terms, it represents the message caused by passing the input message through this node.
 
@@ -1156,14 +1156,14 @@ class EMBED_Node(Node):
 		return embedding
 
 	
-	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False):
+	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False) -> torch.Tensor:
 		"""
 		Calculates the gradient of the node's input with respect to the final output.
 		By default the gradient is calculated propagating backwards from the parent node if present,
 		or assuming a gradient of ones if self has no parent. When 'grad_outputs' is specified, it is used instead of the parent's gradient.
 
 		Args:
-			grad_outputs : Tensor, optional (default=None)
+			grad_outputs : torch.Tensor, optional (default=None)
 				Usually the gradient to propagate backwards in this particular case it is never used.
 			
 			save : bool, optional (default=True)
@@ -1175,7 +1175,7 @@ class EMBED_Node(Node):
 				save is True.
 		
 		Returns:
-			gradient : Tensor
+			gradient : torch.Tensor
 				A tensor representing the gradient of the output with respect to the input
 				of this node, passing trough the path from final node to the current one.
 		
@@ -1225,7 +1225,7 @@ class EMBED_Node(Node):
 		"""	
 		return []
 
-	def __repr__(self):
+	def __repr__(self) -> str:
 		"""String representation of the EMBED_Node instance.
 		Includes layer and position.
 
@@ -1235,7 +1235,7 @@ class EMBED_Node(Node):
 		"""
 		return f"EMBED_Node(layer={self.layer}, position={self.position})"
 
-	def __hash__(self):
+	def __hash__(self) -> int:
 		"""Hash function for the EMBED_Node instance.
 		Returns:
 			int:
@@ -1262,7 +1262,7 @@ class FINAL_Node(Node):
 			Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
 		cf_cache (dict, default={}): 
 			Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-		gradient (Tensor, default=None): 
+		gradient (torch.Tensor, default=None): 
 			Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
 		input_name (str): 
 			Input activation name. This is the name associated to the cache entry corresponding to the input of this node.
@@ -1292,7 +1292,7 @@ class FINAL_Node(Node):
 				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
 			cf_cache (dict, default={}): 
 				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-			gradient (Tensor, default=None): 
+			gradient (torch.Tensor, default=None): 
 				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
 			patch_type (str, default='zero'): 
 				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
@@ -1304,7 +1304,7 @@ class FINAL_Node(Node):
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_post", output_name=f"blocks.{layer}.hook_resid_post", patch_type=patch_type)
 		self.metric = metric
 	
-	def forward(self, message: Tensor = None) -> Tensor:
+	def forward(self, message: torch.Tensor = None) -> torch.Tensor:
 		"""
 		Calculate the effect of the message on the output of the node. 
 		
@@ -1316,12 +1316,12 @@ class FINAL_Node(Node):
 
 		Args:
 
-			message (Tensor of shape (batch_size, seq_len, d_model), default=None):
+			message (torch.Tensor of shape (batch_size, seq_len, d_model), default=None):
 				The message whose effect on the node need to be evaluated. If None, returns the normal 
 				output or the difference between normal and counterfactual output depending on patch_type.
 			
 		Returns:
-			Tensor:
+			torch.Tensor:
 				A tensor representing the effect of the message on the output of the node.
 				In simpler terms, it represents the message caused by passing the input message through this node.
 
@@ -1344,14 +1344,14 @@ class FINAL_Node(Node):
 		return res
 
 	
-	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False, metric=None) -> Tensor:
+	def calculate_gradient(self, grad_outputs=None, save=True, use_precomputed=False, metric=None) -> torch.Tensor:
 		"""
 		Calculates the gradient of the node's input with respect to the final output.
 		By default the gradient is calculated propagating backwards from the parent node if present,
 		or assuming a gradient of ones if self has no parent. When 'grad_outputs' is specified, it is used instead of the parent's gradient.
 
 		Args:
-			grad_outputs : Tensor, optional (default=None)
+			grad_outputs : torch.Tensor, optional (default=None)
 				Usually the gradient to propagate backwards in this particular case it is never used.
 			
 			save : bool, optional (default=True)
@@ -1368,7 +1368,7 @@ class FINAL_Node(Node):
 				If None, uses the metric provided at initialization. If neither is provided, raises an error.
 		
 		Returns:
-			gradient : Tensor
+			gradient : torch.Tensor
 				A tensor representing the gradient of the output with respect to the input
 				of this node, passing trough the path from final node to the current one.
 		"""
@@ -1463,7 +1463,7 @@ class FINAL_Node(Node):
 		prev_nodes = list(set(prev_nodes))
 		return prev_nodes
 
-	def __repr__(self):
+	def __repr__(self) -> str:
 		"""Returns a string representation of the FINAL_Node instance.
 		Includes layer and position if specified.
 		Returns:
@@ -1473,7 +1473,7 @@ class FINAL_Node(Node):
 		pos_str = f", position={self.position}" if self.position is not None else ""
 		return f"FINAL_Node(layer={self.layer}{pos_str})"
 
-	def __hash__(self):
+	def __hash__(self) -> int:
 		"""Hash function for the FINAL_Node instance.
 		Returns:
 			int:

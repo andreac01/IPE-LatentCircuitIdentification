@@ -59,7 +59,7 @@ def run_model():
 	data = request.json
 	model_name = data.get('model_name', 'gpt2-small')
 	model_config = models_config[model_name]
-	tokenizer = load_tokenizer(model_name, model_config)
+	tokenizer = load_tokenizer(model_config)
 	
 	try:
 		model = load_model(model_name, required_bytes=model_config['required_bytes'], device=device, cache_dir=MODEL_DIR)
@@ -169,7 +169,7 @@ def run_model():
 
 	# --- Final Response Preparation (this part is now common to both modes) ---
 	img_node_paths = [get_image_path(p, divide_heads=data.get('divide_heads', True)) for p in paths]
-	config = load_model_config(model_name=model_name, config=model_config)
+	config = load_model_config(config=model_config)
 	graph_data = create_graph_data(
 		img_node_paths, config.n_layer, config.n_head, 
 		paths[0][1][-1].position + 1, data.get('divide_heads', True), 

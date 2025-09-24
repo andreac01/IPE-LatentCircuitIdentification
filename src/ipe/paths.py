@@ -1,8 +1,8 @@
-from typing import List, Tuple
-from torch import Tensor
 from ipe.nodes import Node, FINAL_Node
+import torch
+from transformer_lens import HookedTransformer
 
-def evaluate_path(path, metric):
+def evaluate_path(path: list[Node], metric: callable[[torch.Tensor], float]) -> float:
 	"""
 	Evaluates the contribution of a given path by executing the forward methods of each node in the path and then applying the provided metric function to the final output.
 	
@@ -22,7 +22,7 @@ def evaluate_path(path, metric):
 
 	return metric(corrupted_resid=path[-1].forward() - message)
 
-def get_path(node):
+def get_path(node: Node) -> list[Node]:
 	"""
 	Constructs the path from the given node back to the root by following parent links.
 
@@ -39,7 +39,7 @@ def get_path(node):
 	return path
 
 
-def get_path_msg(path, message=None):
+def get_path_msg(path: list[Node], message: torch.Tensor = None) -> torch.Tensor:
 	"""
 	Recursively computes the message by applying the forward method of each node in the path.
 
@@ -58,7 +58,7 @@ def get_path_msg(path, message=None):
 	message = path[0].forward(message=message)
 	return get_path_msg(path[1:], message=message)
 
-def get_path_msgs(path, messages=[], msg_cache=None, model=None):
+def get_path_msgs(path: list[Node], messages: list[torch.Tensor] = [], msg_cache: dict = None, model: HookedTransformer = None) -> list[torch.Tensor]:
 	"""
 	Recursively computes and collects messages by applying the forward method of each node in the path.
 	
@@ -66,7 +66,7 @@ def get_path_msgs(path, messages=[], msg_cache=None, model=None):
 		path (list of Node): 
 			The sequence of nodes representing the path.
 		messages (list of torch.Tensor, default=[]):
-			List to collect messages at each step.
+			list to collect messages at each step.
 		msg_cache (dict, optional):
 			Cache for messages to optimize computation.
 		model (HookedTransformer, optional):
@@ -91,14 +91,14 @@ def get_path_msgs(path, messages=[], msg_cache=None, model=None):
 	# Recurse with the rest of the path
 	return get_path_msgs(path[1:], messages=messages, msg_cache=msg_cache, model=model)
 
-def clean_paths(paths: List[Tuple[float, List]]) -> List[Tuple[float, List]]:
+def clean_paths(paths: list[tuple[float, list]]) -> list[tuple[float, list]]:
 	"""Cleans up the paths by removing references to models, parents, children, and caches to save memory. It is useful to call this function before saving the outputs of graph search to a file, avoiding saving cache, gradients, and model.
 	
 	Args:
-		paths (List[Tuple[float, List]]): 
+		paths (list[tuple[float, list]]): 
 			A list of tuples where each tuple contains a path weight and a list of Node instances representing the path.
 	Returns:
-		List[Tuple[float, List]]: 
+		list[tuple[float, list]]: 
 			The cleaned list of paths with unnecessary references removed.
 	"""
 	cleaned = []

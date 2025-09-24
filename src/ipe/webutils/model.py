@@ -52,7 +52,7 @@ def download_model(model_name: str, cache_dir: str = "/app/models") -> None:
 		cache_dir=cache_dir
 	)
 
-def load_model(model_name: str, required_bytes: int = 0, device='cpu', cache_dir = "/app/models") -> HookedTransformer:
+def load_model(model_name: str, required_bytes: int = 0, device: str = 'cpu', cache_dir: str = "/app/models") -> HookedTransformer:
 	"""Load (and cache) a HookedTransformer, but first check memory.
 	Args:
 		model_name (str):
@@ -96,7 +96,7 @@ def load_model(model_name: str, required_bytes: int = 0, device='cpu', cache_dir
 	
 	return model
 
-def load_tokenizer(model_name: str, config: dict):
+def load_tokenizer(str, config: dict) -> AutoTokenizer:
 	"""Load the tokenizer for a given model. The tokenizer is fetched from Hugging Face using the model's configuration, to avoiding loading the entire model as required by HookedTransformer.
 	
 	Args:
@@ -110,7 +110,7 @@ def load_tokenizer(model_name: str, config: dict):
 	"""
 	return AutoTokenizer.from_pretrained(config['huggingface_name'], trust_remote_code=True)
 
-def load_model_config(model_name: str, config: dict) -> AutoConfig:
+def load_model_config(config: dict) -> AutoConfig:
 	"""Load the configuration of a model from Hugging Face.
 	Args:
 		model_name (str):

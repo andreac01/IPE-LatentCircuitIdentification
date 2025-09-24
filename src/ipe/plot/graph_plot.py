@@ -152,6 +152,9 @@ def plot_transformer_paths(G: nx.MultiDiGraph,
 	norm_cap = max_w if max_w is not None else graph_max_abs_weight
 	if norm_cap == 0:
 		norm_cap = 1.0
+	
+	max_width = G.graph.get('max_weight', 1)
+	min_width = G.graph.get('min_weight', 0)
 
 
 
@@ -188,7 +191,7 @@ def plot_transformer_paths(G: nx.MultiDiGraph,
 
 		# Edge Color
 		if color_scheme == 'path_weight':
-			normalized_abs_contribution = abs(contribution) / norm_cap
+			normalized_abs_contribution = (contribution - min_width) / (max_width - min_width)
 			if normalized_abs_contribution > 1.0:
 				normalized_abs_contribution = 1.0
 
