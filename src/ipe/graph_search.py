@@ -146,7 +146,7 @@ def find_relevant_heads(
 
 
 
-def PathActivationPatching(
+def PathMessagePatching(
 	model: HookedTransformer,
 	metric: Callable,
 	root: Node,
@@ -252,7 +252,7 @@ def PathActivationPatching(
 		frontier = sorted(cur_depth_frontier, key=lambda x: x[0], reverse=True)
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
 
-def PathActivationPatching_BestFirstSearch(
+def PathMessagePatching_BestFirstSearch(
 	model: HookedTransformer,
 	metric: Callable,
 	root: Node,
@@ -352,7 +352,7 @@ def PathActivationPatching_BestFirstSearch(
 	pbar.close()
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
 
-def PathActivationPatching_LimitedLevelWidth(
+def PathMessagePatching_LimitedLevelWidth(
     model: HookedTransformer,
     metric: Callable,
     root: Node,
