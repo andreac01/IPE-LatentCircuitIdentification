@@ -14,7 +14,9 @@ dependencies = [
 	"torch",
 	"transformer-lens",
 	"matplotlib",
-	"tqdm"
+	"tqdm",
+	"numpy",
+	"pytest"
 ]
 
 [tool.setuptools.packages.find]

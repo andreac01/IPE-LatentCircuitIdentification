@@ -38,22 +38,9 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         # This command reads your pyproject.toml and installs all dependencies.
-        python -m pip install -v .
-    
-    - name: Debug Info
-      run: |
-        echo "--- Python executable location ---"
-        which python
-        echo
-        echo "--- List of installed packages ---"
-        pip list
-        echo
-        echo "--- List of installed packages bis ---"
-        python -m pip list
-        echo
-        echo "--- Current directory structure ---"
-        ls -R
+        pip install .
+
     # 4. Runs pytest. Pytest will automatically discover and run the tests in the ./test directory.
     - name: Run tests with pytest
       run: |
-        python -m pytest ./test
+        pytest ./test
