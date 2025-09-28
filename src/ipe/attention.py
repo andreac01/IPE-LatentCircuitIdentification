@@ -141,7 +141,7 @@ def custom_attention_forward(
 			for j in range(attn_scores[0][0].shape[1]):
 				plt.text(j, i, f'{attn_scores[0,0][i,j].item():.2f}', ha='center', va='center', color='white')
 		plt.colorbar()
-		title = f'Head {head} Modified Scores' if head is not None else 'Pattern'
+		title = f'Head {head} Modified Scores' if head is not None else 'Modified Scores'
 		plt.title(title)
 		kv_pos = 'Key Position' if keyvalue_position is None else f'Key Position {keyvalue_position}'
 		q_pos = 'Query Position' if query_position is None else f'Query Position {query_position}'
@@ -169,10 +169,10 @@ def custom_attention_forward(
 			plt.ylabel(q_pos)
 			plt.show()
 
-	z = torch.zeros((z_head.shape[0], z_head.shape[1], attention_module.cfg.n_heads, attention_module.cfg.d_head), device=z_head.device, dtype=z_head.dtype)
 	if head is None:
 		z = z_head
 	else:
+		z = torch.zeros((z_head.shape[0], z_head.shape[1], attention_module.cfg.n_heads, attention_module.cfg.d_head), device=z_head.device, dtype=z_head.dtype)
 		z[:, :, head, :] = z_head[:, :, 0, :]
 	w = einops.rearrange(
 		attention_module.W_O, "head_index d_head d_model -> d_model (head_index d_head)"

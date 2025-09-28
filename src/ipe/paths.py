@@ -113,7 +113,7 @@ def clean_paths(paths: list[tuple[float, list]]) -> list[tuple[float, list]]:
 			node.gradient = None  # remove gradient reference to save memory
 			if isinstance(node, FINAL_Node):
 				node.metric = None  # remove metric reference to save memory
-		if isinstance(c, Tensor):
+		if isinstance(c, torch.Tensor):
 			c = c.item()  # convert tensor to float for serialization
 		cleaned.append((c, path))
 	return cleaned

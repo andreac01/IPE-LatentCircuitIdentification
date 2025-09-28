@@ -370,7 +370,7 @@ class MLP_Node(Node):
 					return self.msg_cache[self.output_name].detach().clone() - self.cf_cache[self.output_name].detach().clone()
 				else:
 					out = torch.zeros_like(self.msg_cache[self.input_name], device=self.msg_cache[self.input_name].device)
-					out[:, self.position, :] =  self.msg_cache[self.output_name][:, self.position, :].detach().clone() - self.cf_cache[self.output_name][:, self.position, :].detach().clone()
+					out[:, self.position, :] = self.msg_cache[self.output_name][:, self.position, :].detach().clone() - self.cf_cache[self.output_name][:, self.position, :].detach().clone()
 					return out
 		else:
 			if self.position is None:
@@ -742,6 +742,7 @@ class ATTN_Node(Node):
 		value_residual = self.model.blocks[self.layer].ln1(value_residual)
 		query_residual = self.model.blocks[self.layer].ln1(query_residual)
 		if self.head is not None:
+			add_bias = False
 			W_Q = self.model.blocks[self.layer].attn.W_Q[self.head].unsqueeze(0)
 			W_K = self.model.blocks[self.layer].attn.W_K[self.head].unsqueeze(0)
 			W_V = self.model.blocks[self.layer].attn.W_V[self.head].unsqueeze(0)
@@ -757,6 +758,7 @@ class ATTN_Node(Node):
 			else:
 				value = torch.einsum('bsd,ndh->bsnh', value_residual, W_V) + b_V[None, None, :, :]
 		else:
+			add_bias = True
 			if self.model.cfg.positional_embedding_type == 'rotary':
 				step = self.model.cfg.n_heads // self.model.cfg.n_key_value_heads
 			else:
@@ -784,7 +786,8 @@ class ATTN_Node(Node):
 			precomputed_attention_scores=self.msg_cache.get(self.attn_scores, None).detach().clone(),
 			query_position=self.position,
 			keyvalue_position=self.keyvalue_position,
-			plot_patterns=self.plot_patterns
+			plot_patterns=self.plot_patterns,
+			add_bias=add_bias
 		)
 		
 
@@ -869,6 +872,7 @@ class ATTN_Node(Node):
 			value_residual = self.model.blocks[self.layer].ln1(value_residual)
 			query_residual = self.model.blocks[self.layer].ln1(query_residual)
 			if self.head is not None:
+				add_bias = False
 				W_Q = self.model.blocks[self.layer].attn.W_Q[self.head].unsqueeze(0)
 				W_K = self.model.blocks[self.layer].attn.W_K[self.head].unsqueeze(0)
 				W_V = self.model.blocks[self.layer].attn.W_V[self.head].unsqueeze(0)
@@ -884,6 +888,7 @@ class ATTN_Node(Node):
 				else:
 					value = torch.einsum('bsd,ndh->bsnh', value_residual, W_V) + b_V[None, None, :, :]
 			else:
+				add_bias = True
 				if self.model.cfg.positional_embedding_type == 'rotary':
 					step = self.model.cfg.n_heads // self.model.cfg.n_key_value_heads
 				else:
@@ -911,7 +916,8 @@ class ATTN_Node(Node):
 				precomputed_attention_scores=self.msg_cache.get(self.attn_scores, None).detach().clone(),
 				query_position=self.position,
 				keyvalue_position=self.keyvalue_position,
-				plot_patterns=self.plot_patterns
+				plot_patterns=self.plot_patterns,
+				add_bias=add_bias
 			)
 			if self.position is not None:
 				resized_out = torch.zeros_like(self.msg_cache[self.input_name], device=out.device)
@@ -959,20 +965,30 @@ class ATTN_Node(Node):
 		"""	
 		prev_nodes = []
 		common_args = {"model": self.model, "msg_cache": self.msg_cache, "parent": self, "patch_type": self.patch_type, "cf_cache": self.cf_cache}
-
 		# MLPs
 		for l in range(self.layer):
 			if self.patch_query:
 				prev_nodes.append(MLP_Node(layer=l, position=self.position, **common_args))
 			if (self.patch_key or self.patch_value) and (not self.patch_query or self.position != self.keyvalue_position):
-				prev_nodes.append(MLP_Node(layer=l, position=self.keyvalue_position, **common_args))
+				if self.keyvalue_position is not None:
+					prev_nodes.append(MLP_Node(layer=l, position=self.keyvalue_position, **common_args))
+				elif self.position is not None:
+					for pos in range(self.position + 1):
+						prev_nodes.append(MLP_Node(layer=l, position=pos, **common_args))
+				else:
+					prev_nodes.append(MLP_Node(layer=l, position=None, **common_args))
 
 		# EMBED node
 		if self.patch_query:
 			prev_nodes.append(EMBED_Node(layer=0, position=self.position, **common_args))
 		if (self.patch_key or self.patch_value) and (not self.patch_query or self.position != self.keyvalue_position):
-			prev_nodes.append(EMBED_Node(layer=0, position=self.keyvalue_position, **common_args))
-
+			if self.keyvalue_position is not None:
+				prev_nodes.append(EMBED_Node(layer=0, position=self.keyvalue_position, **common_args))
+			elif self.position is not None:
+				for pos in range(self.position + 1):
+					prev_nodes.append(EMBED_Node(layer=0, position=pos, **common_args))
+			else:
+				prev_nodes.append(EMBED_Node(layer=0, position=None, **common_args))
 		# ATTN nodes patching current query position
 		if self.patch_query:
 			for l in range(self.layer):
@@ -1012,31 +1028,41 @@ class ATTN_Node(Node):
 							prev_nodes.append(ATTN_Node(layer=l, head=None, position=None, keyvalue_position=None, patch_key=True, patch_value=True, patch_query=False, **common_args))
 
 		# ATTN nodes patching current key-value position
-		if self.patch_key or self.patch_value:
-			keyvalue_positions = range(self.keyvalue_position + 1) if self.keyvalue_position is not None else [None]
-			for l in range(self.layer):
-				# prev ATTN query positions
-				if include_head:
-					prev_nodes.extend([ATTN_Node(layer=l, head=h, position=self.keyvalue_position, keyvalue_position=None,  patch_key=False, patch_value=False, patch_query=True, **common_args) for h in range(model_cfg.n_heads)])
+		if (self.patch_key or self.patch_value) and (not self.patch_query or self.position != self.keyvalue_position):
+			if self.keyvalue_position is not None:
+				keyvalue_positions = [self.keyvalue_position]
+			else:
+				if self.position is None:
+					keyvalue_positions = [None]
 				else:
-					prev_nodes.append(ATTN_Node(layer=l, head=None, position=self.keyvalue_position, keyvalue_position=None,  patch_key=False, patch_value=False, patch_query=True, **common_args))
-
+					keyvalue_positions = range(self.position + 1)
+			for l in range(self.layer):
 				# prev ATTN key-value positions
-				for prev_keyvalue_position in keyvalue_positions:
+				for resid_position in keyvalue_positions:
+					# prev ATTN query positions
 					if include_head:
-						if separate_kv:
-							prev_nodes.extend([ATTN_Node(layer=l, head=h, position=self.keyvalue_position, keyvalue_position=prev_keyvalue_position, patch_key=True, patch_value=False, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
-							prev_nodes.extend([ATTN_Node(layer=l, head=h, position=self.keyvalue_position, keyvalue_position=prev_keyvalue_position, patch_key=False, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
-						else:
-							prev_nodes.extend([ATTN_Node(layer=l, head=h, position=self.keyvalue_position, keyvalue_position=prev_keyvalue_position, patch_key=True, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+						prev_nodes.extend([ATTN_Node(layer=l, head=h, position=resid_position, keyvalue_position=None,  patch_key=False, patch_value=False, patch_query=True, **common_args) for h in range(model_cfg.n_heads)])
 					else:
-						if separate_kv:
-							prev_nodes.append(ATTN_Node(layer=l, head=None, position=self.keyvalue_position, keyvalue_position=prev_keyvalue_position, patch_key=True, patch_value=False, patch_query=False, **common_args))
-							prev_nodes.append(ATTN_Node(layer=l, head=None, position=self.keyvalue_position, keyvalue_position=prev_keyvalue_position, patch_key=False, patch_value=True, patch_query=False, **common_args))
+						prev_nodes.append(ATTN_Node(layer=l, head=None, position=resid_position, keyvalue_position=None,  patch_key=False, patch_value=False, patch_query=True, **common_args))
+					for prev_keyvalue_position in ( range(resid_position+1) if resid_position is not None else [None] ):
+						if include_head:
+							if separate_kv:
+								prev_nodes.extend([ATTN_Node(layer=l, head=h, position=resid_position, keyvalue_position=prev_keyvalue_position, patch_key=True, patch_value=False, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+								prev_nodes.extend([ATTN_Node(layer=l, head=h, position=resid_position, keyvalue_position=prev_keyvalue_position, patch_key=False, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
+							else:
+								prev_nodes.extend([ATTN_Node(layer=l, head=h, position=resid_position, keyvalue_position=prev_keyvalue_position, patch_key=True, patch_value=True, patch_query=False, **common_args) for h in range(model_cfg.n_heads)])
 						else:
-							prev_nodes.append(ATTN_Node(layer=l, head=None, position=self.keyvalue_position, keyvalue_position=prev_keyvalue_position, patch_key=True, patch_value=True, patch_query=False, **common_args))
+							if separate_kv:
+								prev_nodes.append(ATTN_Node(layer=l, head=None, position=resid_position, keyvalue_position=prev_keyvalue_position, patch_key=True, patch_value=False, patch_query=False, **common_args))
+								prev_nodes.append(ATTN_Node(layer=l, head=None, position=resid_position, keyvalue_position=prev_keyvalue_position, patch_key=False, patch_value=True, patch_query=False, **common_args))
+							else:
+								prev_nodes.append(ATTN_Node(layer=l, head=None, position=resid_position, keyvalue_position=prev_keyvalue_position, patch_key=True, patch_value=True, patch_query=False, **common_args))
 
 		# Remove duplicates
+		if self.position == 0 and self.keyvalue_position == None: # Avoid the case of overlapping duplicates 
+			for node in prev_nodes:
+				if node.position is None:
+					node.position = 0
 		prev_nodes = list(set(prev_nodes))
 		return prev_nodes
 
@@ -1149,7 +1175,7 @@ class EMBED_Node(Node):
 			else:
 				raise ValueError(f"Unknown patch type: {self.patch_type}")
 		else:
-			embedding = self.msg_cache["hook_embed"].detach().clone() - message
+			embedding = message
 		if self.position is not None:
 			embedding[:, :self.position, :] = torch.zeros_like(embedding[:, :self.position, :], device=embedding.device)
 			embedding[:, self.position + 1:, :] = torch.zeros_like(embedding[:, self.position + 1:, :], device=embedding.device)
@@ -1160,7 +1186,7 @@ class EMBED_Node(Node):
 		"""
 		Calculates the gradient of the node's input with respect to the final output.
 		By default the gradient is calculated propagating backwards from the parent node if present,
-		or assuming a gradient of ones if self has no parent. When 'grad_outputs' is specified, it is used instead of the parent's gradient.
+		or assuming a gradient of ones if self has no parent. When 'grad_outputs' is specified this is used.
 
 		Args:
 			grad_outputs : torch.Tensor, optional (default=None)
@@ -1190,11 +1216,12 @@ class EMBED_Node(Node):
 			out[:, self.position, :] = gradient[:, self.position, :]
 			return out
 		if grad_outputs is None:
-			gradient = self.parent.calculate_gradient(grad_outputs, save=True, use_precomputed=True) if self.parent is not None else torch.ones_like(self.msg_cache[self.input_name])
+			gradient = self.parent.calculate_gradient(grad_outputs=None, save=True, use_precomputed=True) if self.parent is not None else torch.ones_like(self.msg_cache[self.input_name])
 		else:
-			gradient = self.parent.calculate_gradient(grad_outputs, save=True, use_precomputed=False) if self.parent is not None else torch.ones_like(self.msg_cache[self.input_name])
-		gradient[:, :self.position, :] = torch.zeros_like(gradient[:, :self.position, :], device=gradient.device)
-		gradient[:, self.position + 1:, :] = torch.zeros_like(gradient[:, self.position + 1:, :], device=gradient.device)
+			gradient = grad_outputs
+		if self.position is not None:
+			gradient[:, :self.position, :] = torch.zeros_like(gradient[:, :self.position, :], device=gradient.device)
+			gradient[:, self.position + 1:, :] = torch.zeros_like(gradient[:, self.position + 1:, :], device=gradient.device)
 		if save:
 			if self.position is None:
 				self.gradient = gradient.detach().clone()
@@ -1203,7 +1230,7 @@ class EMBED_Node(Node):
 		return gradient.detach().clone()
 
 
-	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, sequence_length: int, include_head: bool = False, separate_kv: bool = False) -> list[Node]:
+	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, include_head: bool = False, separate_kv: bool = False) -> list[Node]:
 		"""
 		Returns the list of predecessors nodes in the computational graph whose outputs influence the
 		output of this node. 
@@ -1301,6 +1328,8 @@ class FINAL_Node(Node):
 			self (FINAL_Node):
 				An instance of the FINAL_Node class.
 		"""
+		if layer != model.cfg.n_layers - 1:
+			print(f"WARNING: FINAL_Node should be initialized with the last layer index ({model.cfg.n_layers - 1}), got {layer}")
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_post", output_name=f"blocks.{layer}.hook_resid_post", patch_type=patch_type)
 		self.metric = metric
 	
