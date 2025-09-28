@@ -1,33 +1,46 @@
-name: Python CI with Pytest
+# This is the name of the workflow, which will be displayed on GitHub.
+name: Run Python Tests
 
+# This section defines when the workflow should run.
 on:
+  # Run on pushes to the 'main' branch.
   push:
-    branches: [ "main", "master", "develop" ]
+    branches: [ "main", "develop" ]
+  # Run on pull requests targeting the 'main' branch.
   pull_request:
-    branches: [ "main", "master", "develop" ]
+    branches: [ "main", "develop" ]
 
+# This section defines the jobs to be executed.
 jobs:
   test:
+    # Use the latest version of Ubuntu as the operating system for the job.
     runs-on: ubuntu-latest
+    
+    # This strategy creates a matrix to run the tests on multiple Python versions.
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    # These are the individual steps the job will perform.
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+    # 1. Checks out your repository's code so the job can access it.
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
+    # 2. Sets up the specific Python version from the matrix.
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
 
-      # Install Poetry (essential first step for the new workflow)
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: 1.8.3 # Use the version you prefer
+    # 3. Installs your project's dependencies.
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # This command reads your pyproject.toml and installs all dependencies.
+        pip install .
 
-      # Install all project and development dependencies from pyproject.toml
-      - name: Install Dependencies
-        run: poetry install --no-root # '--no-root' is faster if you aren't installing the package itself
-
-      # Run the test command within the environment managed by Poetry
-      - name: Run pytest
-        run: poetry run pytest
+    # 4. Runs pytest. Pytest will automatically discover and run the tests in the ./test directory.
+    - name: Run tests with pytest
+      run: |
+        pytest ./test
