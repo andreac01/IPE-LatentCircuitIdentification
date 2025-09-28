@@ -206,7 +206,7 @@ def logit_difference(corrupted_resid: Tensor,
 					model: HookedTransformer,
 					target_tokens: List[int],
 					cf_target_tokens: List[int],
-					baseline_value: float) -> Tensor:
+					baseline_value: float = 0.) -> Tensor:
 	"""
 	Compute logit difference: y' - y between the logit associated with the target token of the
 	clean prompt y and y', the answer associated with the counterfactual prompt.

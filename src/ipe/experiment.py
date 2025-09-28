@@ -130,10 +130,10 @@ class ExperimentManager:
 		"""
 		if self.positional_search:
 			for p in self.prompts:
-				assert self.prompt_length == len(self.model.to_str_tokens(p, prepend_bos=True))
+				assert self.prompt_length == len(self.model.to_str_tokens(p, prepend_bos=True)), f'Prompt {p} length "{len(self.model.to_str_tokens(p, prepend_bos=True))}" does not match length of other prompts.'
 			if self.cf_prompts:
 				for p in self.cf_prompts:
-					assert self.prompt_length == len(self.model.to_str_tokens(p, prepend_bos=True))
+					assert self.prompt_length == len(self.model.to_str_tokens(p, prepend_bos=True)), f'Counterfactual prompt {p} length "{len(self.model.to_str_tokens(p, prepend_bos=True))}" does not match length of other prompts.'
 		if self.metric != 'kl_divergence':
 			for t in self.targets:
 				assert len(self.model.to_str_tokens(t, prepend_bos=False)) == 1, f"Target '{t}' is not a single token."
@@ -270,10 +270,11 @@ class ExperimentManager:
 		if clean:
 			cleaned_paths = deepcopy(self.paths)
 			cleaned_paths = clean_paths(cleaned_paths)
-			pkl.dump(cleaned_paths, filepath)
+			with open(filepath, 'wb') as f:
+				pkl.dump(cleaned_paths, f)
 		else:
-			pkl.dump(self.paths, filepath)
-		
+			with open(filepath, 'wb') as f:
+				pkl.dump(self.paths, f)
 
 	def set_custom_metric(
 		self,
@@ -339,9 +340,13 @@ class ExperimentManager:
 		if required_params.pop('corrupted_resid', 'error')=='error':
 			raise ValueError(f"The metric function must have a 'corrupted_resid' parameter.")
 		optional_params = get_function_params(function, which='default')
-
 		missing_parameters = set(required_params.keys()) - set(metric_params.keys())
 		self_parameters = self.__dict__.keys()
+		provided_params = list(metric_params.keys())
+		for param in provided_params:
+			if param not in required_params and param not in optional_params:
+				print(f"WARNING: '{param}' is not a valid parameter for metric '{metric}'. It will be ignored.")
+				metric_params.pop(param)
 		for param in missing_parameters:
 			if param in self_parameters:
 				if len(str(self.__dict__[param])) > 40:
@@ -360,11 +365,12 @@ class ExperimentManager:
 		for k, v in non_modified_defaults.items():
 			if k == 'baseline_value' and require_baseline:
 				baseline = partial(function, **metric_params_complete)(self.cache[f'blocks.{self.model.cfg.n_layers - 1}.hook_resid_post'])
-				metric_params_complete['baseline'] = baseline
+				metric_params_complete['baseline_value'] = baseline
 				self.metric = partial(function, **metric_params_complete)
 				print(f"WARNING: [load_metric] Using computed baseline for '{k}': {baseline}")
 			else:
 				print(f"WARNING: [load_metric] Using default parameter for '{k}': {v}")
+		metric_params = {}
 
 	def load_algorithm(
 		self, 
