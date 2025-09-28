@@ -43,4 +43,4 @@ jobs:
     # 4. Runs pytest. Pytest will automatically discover and run the tests in the ./test directory.
     - name: Run tests with pytest
       run: |
-        pytest ./test
+        python -m pytest ./test
