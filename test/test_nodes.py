@@ -84,7 +84,7 @@ def get_cache_bwd(model, prompt, completion, metric):
             model.add_hook(hook, forward_cache_hook, "fwd")
             model.add_hook(hook, backward_cache_hook, "bwd")
     
-        model.run_with_hooks(prompt)
+        model.run_with_hooks(prompt, prepend_bos=True)
         target_token_id = model.to_single_token(completion)
 
         final_residual = cache[f"blocks.{model.cfg.n_layers - 1}.hook_resid_post"]
@@ -99,8 +99,14 @@ def get_cache_bwd(model, prompt, completion, metric):
 ################################################ Fixtures and Tests #####################################################
 
 @pytest.fixture(scope="module")
-def model():
+def gpt2_model():
     model = transformer_lens.HookedTransformer.from_pretrained("gpt2-small")
+    return model
+
+# Note: Test also with qwen to ensure compatibility with grouped query attention
+@pytest.fixture(scope="module")
+def qwen_model():
+    model = transformer_lens.HookedTransformer.from_pretrained("Qwen/Qwen2.5-0.5B")
     return model
 
 
@@ -115,26 +121,52 @@ def corrupted_prompt():
 
 
 @pytest.fixture(scope="module")
-def msg_cache(model, clean_prompt):
-    _, cache = model.run_with_cache(clean_prompt)
-    return dict(cache)
-
-
-@pytest.fixture(scope="module")
-def cf_cache(model, corrupted_prompt):
-    _, cache = model.run_with_cache(corrupted_prompt)
+def gpt2_msg_cache(gpt2_model, clean_prompt):
+    _, cache = gpt2_model.run_with_cache(clean_prompt, prepend_bos=True)
+    assert cache['hook_embed'].shape[1] == 3, f"The prompt should be tokenized into 3 tokens. Got {cache['hook_embed'].shape[1]} for prompt '{clean_prompt}'"
     return dict(cache)
 
 @pytest.fixture(scope="module")
-def grad_cache(model):
-    return get_cache_bwd(model, "Hello world", "!", simple_logit_diff)
+def qwen_msg_cache(qwen_model, clean_prompt):
+    _, cache = qwen_model.run_with_cache(clean_prompt, prepend_bos=True)
+    assert cache['hook_embed'].shape[1] == 3, f"The prompt should be tokenized into 3 tokens. Got {cache['hook_embed'].shape[1]} for prompt '{clean_prompt}'"
+    return dict(cache)
 
+@pytest.fixture(scope="module")
+def gpt2_cf_cache(gpt2_model, corrupted_prompt):
+    _, cache = gpt2_model.run_with_cache(corrupted_prompt, prepend_bos=True)
+    assert cache['hook_embed'].shape[1] == 3, f"The prompt should be tokenized into 3 tokens. Got {cache['hook_embed'].shape[1]} for prompt '{corrupted_prompt}'"
+    return dict(cache)
 
+@pytest.fixture(scope="module")
+def qwen_cf_cache(qwen_model, corrupted_prompt):
+    _, cache = qwen_model.run_with_cache(corrupted_prompt, prepend_bos=True)
+    assert cache['hook_embed'].shape[1] == 3, f"The prompt should be tokenized into 3 tokens. Got {cache['hook_embed'].shape[1]} for prompt '{corrupted_prompt}'"
+    return dict(cache)
 
+@pytest.fixture(scope="module")
+def gpt2_grad_cache(gpt2_model):
+    return get_cache_bwd(gpt2_model, "Hello world", "!", simple_logit_diff)
+
+@pytest.fixture(scope="module")
+def qwen_grad_cache(qwen_model):
+    return get_cache_bwd(qwen_model, "Hello world", "!", simple_logit_diff)
+
+@pytest.mark.parametrize("model_name", ["gpt2", "qwen"])
 @pytest.mark.parametrize("node_class", [MLP_Node, ATTN_Node, EMBED_Node, FINAL_Node])
 @pytest.mark.parametrize("patch_type", ["zero", "counterfactual"])
 @pytest.mark.parametrize("position", [None, 2])
-def test_forward_none_message(node_class, patch_type, model, msg_cache, cf_cache, position):
+def test_forward_none_message(node_class, patch_type, model_name, gpt2_model, qwen_model, gpt2_msg_cache, qwen_msg_cache, gpt2_cf_cache, qwen_cf_cache, position):
+    if model_name == "gpt2":
+        model = gpt2_model
+        msg_cache = gpt2_msg_cache
+        cf_cache = gpt2_cf_cache
+    elif model_name == "qwen":
+        model = qwen_model
+        msg_cache = qwen_msg_cache
+        cf_cache = qwen_cf_cache
+    else:
+        raise ValueError(f"Unknown model name: {model_name}")
     if node_class == MLP_Node:
         node = MLP_Node(model, layer=1, position=position, msg_cache=msg_cache, cf_cache=cf_cache, patch_type=patch_type)
 
@@ -197,12 +229,12 @@ def test_forward_none_message(node_class, patch_type, model, msg_cache, cf_cache
                         model.add_hook(f"blocks.1.attn.hook_z", lambda z, hook: single_head_hook(z, hook, head=head))
                     if keyvalue_position is not None:
                         model.add_hook(f"blocks.1.attn.hook_v", lambda value_resid, hook: single_value_pos_hook(value_resid, hook, keyvalue_position=keyvalue_position))
-                    
-                    clean_msg = model.run_with_cache("Hello world")[1][f"blocks.1.hook_attn_out"]
+
+                    clean_msg = model.run_with_cache("Hello world", prepend_bos=True)[1][f"blocks.1.hook_attn_out"]
                     if head is not None:
                         clean_msg -= model.b_O[1]
                     if patch_type == "counterfactual":
-                        corrupted_msg = model.run_with_cache("Hi John")[1][f"blocks.1.hook_attn_out"]
+                        corrupted_msg = model.run_with_cache("Hi John", prepend_bos=True)[1][f"blocks.1.hook_attn_out"]
                         if head is not None:
                             corrupted_msg -= model.b_O[1]
                     model.reset_hooks()
@@ -248,10 +280,21 @@ def test_forward_none_message(node_class, patch_type, model, msg_cache, cf_cache
 
 
 
-
+@pytest.mark.parametrize("model_name", ["gpt2", "qwen"])
 @pytest.mark.parametrize("node_class", [MLP_Node, ATTN_Node, EMBED_Node, FINAL_Node])
 @pytest.mark.parametrize("position", [None, 2])
-def test_forward_with_message(node_class, model, msg_cache, cf_cache, position):
+def test_forward_with_message(node_class, model_name, gpt2_model, qwen_model, gpt2_msg_cache, qwen_msg_cache, gpt2_cf_cache, qwen_cf_cache, position):
+    if model_name == "gpt2":
+        model = gpt2_model
+        msg_cache = gpt2_msg_cache
+        cf_cache = gpt2_cf_cache
+    elif model_name == "qwen":
+        model = qwen_model
+        msg_cache = qwen_msg_cache
+        cf_cache = qwen_cf_cache
+    else:
+        raise ValueError(f"Unknown model name: {model_name}")
+
     if node_class == MLP_Node:
         node = MLP_Node(model, layer=1, position=position, msg_cache=msg_cache, cf_cache=cf_cache, patch_type="zero")
         node_cf = MLP_Node(model, layer=1, position=position, msg_cache=msg_cache, cf_cache=cf_cache, patch_type="counterfactual")
@@ -332,8 +375,8 @@ def test_forward_with_message(node_class, model, msg_cache, cf_cache, position):
 @pytest.mark.parametrize("position", [None, 10])
 @pytest.mark.parametrize("include_heads", [True, False])
 @pytest.mark.parametrize("separate_kv", [True, False])
-def test_get_previous_node(node_class, model, position, include_heads, separate_kv):
-    
+def test_get_previous_node(node_class, gpt2_model, position, include_heads, separate_kv):
+    model = gpt2_model
     nodes_per_attn = model.cfg.n_heads if include_heads else 1
     kv_per_attn = 2 if separate_kv else 1
 
@@ -423,14 +466,25 @@ def test_get_previous_node(node_class, model, position, include_heads, separate_
 
 
 
-
+@pytest.mark.parametrize("model_name", ["gpt2", "qwen"])
 @pytest.mark.parametrize("node_class", [MLP_Node, ATTN_Node, EMBED_Node, FINAL_Node])
 @pytest.mark.parametrize("position", [None, 2])
-def test_gradient(node_class, model, msg_cache, grad_cache, position):
+def test_gradient(node_class, model_name, gpt2_model, qwen_model, gpt2_msg_cache, qwen_msg_cache, gpt2_grad_cache, qwen_grad_cache, position):
+    if model_name == "gpt2":
+        model = gpt2_model
+        msg_cache = gpt2_msg_cache
+        grad_cache = gpt2_grad_cache
+    elif model_name == "qwen":
+        model = qwen_model
+        msg_cache = qwen_msg_cache
+        grad_cache = qwen_grad_cache
+    else:
+        raise ValueError(f"Unknown model name: {model_name}")
+
     if node_class == MLP_Node:
         node = MLP_Node(model, layer=1, position=position, msg_cache=msg_cache, cf_cache={}, patch_type="zero")
 
-        gradient_precomputed = grad_cache['blocks.1.hook_resid_mid'] - grad_cache['blocks.1.hook_resid_post']
+        gradient_precomputed = grad_cache['blocks.1.hook_resid_mid'].detach().clone() - grad_cache['blocks.1.hook_resid_post'].detach().clone()
         gradient_from_node = node.calculate_gradient(grad_outputs=grad_cache['blocks.1.hook_resid_post'].detach().clone())
 
         if position is not None:
@@ -443,7 +497,7 @@ def test_gradient(node_class, model, msg_cache, grad_cache, position):
     elif node_class == ATTN_Node:
         node = ATTN_Node(model, layer=1, head=None, position=position, msg_cache=msg_cache, cf_cache={}, keyvalue_position=None, patch_type="zero", patch_query=True, patch_key=True, patch_value=True)
 
-        gradient_precomputed = grad_cache['blocks.1.hook_resid_pre'] - grad_cache['blocks.1.hook_resid_mid']
+        gradient_precomputed = grad_cache['blocks.1.hook_resid_pre'].detach().clone() - grad_cache['blocks.1.hook_resid_mid'].detach().clone()
         gradient_from_node = node.calculate_gradient(grad_outputs=grad_cache['blocks.1.hook_resid_mid'].detach().clone())
 
         if position is None:
@@ -460,7 +514,7 @@ def test_gradient(node_class, model, msg_cache, grad_cache, position):
     elif node_class == EMBED_Node:
         node = EMBED_Node(model, layer=0, position=position, msg_cache=msg_cache, cf_cache={})
 
-        gradient_precomputed = grad_cache['hook_embed']
+        gradient_precomputed = grad_cache['hook_embed'].detach().clone()
         gradient_from_node = node.calculate_gradient(grad_outputs=grad_cache['blocks.0.hook_resid_pre'].detach().clone())
 
         if position is not None:
@@ -471,11 +525,11 @@ def test_gradient(node_class, model, msg_cache, grad_cache, position):
             assert torch.allclose(gradient_from_node, gradient_precomputed, atol=1e-5), f"{node} gradient calculation failed. Expected {gradient_precomputed}, got {gradient_from_node}"
 
     elif node_class == FINAL_Node:
-        metric = partial(simple_logit_diff, model=model, clean_residual=msg_cache['blocks.11.hook_resid_post'], target_token_id=model.to_single_token("!"))
+        metric = partial(simple_logit_diff, model=model, clean_residual=msg_cache[f'blocks.{model.cfg.n_layers - 1}.hook_resid_post'], target_token_id=model.to_single_token("!"))
         node = FINAL_Node(model, layer=model.cfg.n_layers-1, position=position, msg_cache=msg_cache, cf_cache={}, metric=metric)
         
         with torch.enable_grad():
-            corr = msg_cache['blocks.11.hook_resid_post'].detach().clone()
+            corr = msg_cache[f'blocks.{model.cfg.n_layers - 1}.hook_resid_post'].detach().clone()
             corr.requires_grad_(True)
             value = metric(corrupted_resid=corr)
             value.backward()

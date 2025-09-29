@@ -16,7 +16,9 @@ dependencies = [
 	"matplotlib",
 	"tqdm",
 	"numpy",
-	"pytest"
+	"pytest",
+	"plotly",
+	"ipywidgets",
 ]
 
 [tool.setuptools.packages.find]
