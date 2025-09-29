@@ -9,6 +9,7 @@ authors = [
 	{ name="Andrea Cerutti", email="andrea01.cerutti@gmail.com" }
 ]
 description = "Implementation of IPE: Isolating Path Effect for Latent Circuit Identification. This module implements an interface to handle complex patching of transformer nodes, a path-wise backpropagation algorithm and various graph search strategies to identify task specific circuits in transformer models."
+readme = "README.md"
 requires-python = ">=3.12"
 keywords = ["llm", "interpretability", "circuits", "computational paths"]
 license = "MIT"
