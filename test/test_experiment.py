@@ -10,7 +10,6 @@ from ipe.graph_search import (
     PathMessagePatching_BestFirstSearch,
     PathMessagePatching_LimitedLevelWidth,
 )
-from ipe.miscellanea import get_function_params
 import pickle as pkl
 import os
 from ipe.experiment import ExperimentManager

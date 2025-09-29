@@ -1,13 +1,19 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ipe"
-version = "0.1.0"
-description = "Implementation of IPE: Isolating Path Effect for Latent Circuit Identification. This module implements an interface to handle complex patching of transformer nodes, a path-wise backpropagation algorithm and various graph search strategies to identify task specific circuits in transformer models."
+version = "0.0.0"
 authors = [
 	{ name="Andrea Cerutti", email="andrea01.cerutti@gmail.com" }
+]
+description = "Implementation of IPE: Isolating Path Effect for Latent Circuit Identification. This module implements an interface to handle complex patching of transformer nodes, a path-wise backpropagation algorithm and various graph search strategies to identify task specific circuits in transformer models."
+requires-python = ">=3.12"
+keywords = ["llm", "interpretability", "circuits", "computational paths"]
+license = "MIT"
+classifiers = [
+    "Programming Language :: Python :: 3",
 ]
 dependencies = [
 	"einops",
@@ -20,6 +26,11 @@ dependencies = [
 	"plotly",
 	"ipywidgets",
 ]
+
+[project.urls]
+Homepage = "https://github.com/andreac01/IPE-LatentCircuitIdentification"
+Documentation = "https://ipe-documentation.ceru-sh.site/"
+"Bug Tracker" = "https://github.com/andreac01/IPE-LatentCircuitIdentification/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -4,3 +4,8 @@ dist/
 documentation/build/
 web_app/data/*
 web_app/app/*
+*.ipynb_checkpoints
+.env
+temp.py
+various_tests.ipynb
+*.vscode

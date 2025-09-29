@@ -2,7 +2,7 @@
 Nodes Module
 ===================
 
-.. automodule:: src.nodes
+.. automodule:: ipe.nodes
    :members:
    :undoc-members:
    :show-inheritance:

@@ -8,4 +8,4 @@ This section contains guides on how to get started with the project.
    :maxdepth: 2
 
    quickstart
-   quickstart_nb
+   understanding_search_methods

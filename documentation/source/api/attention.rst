@@ -2,7 +2,7 @@
 Attention Module
 ===================
 
-.. automodule:: src.attention
+.. automodule:: ipe.attention
    :members:
    :undoc-members:
    :show-inheritance:

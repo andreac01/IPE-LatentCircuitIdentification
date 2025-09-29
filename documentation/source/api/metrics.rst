@@ -2,7 +2,7 @@
 Metrics Module
 ===================
 
-.. automodule:: src.metrics
+.. automodule:: ipe.metrics
    :members:
    :undoc-members:
    :show-inheritance:
