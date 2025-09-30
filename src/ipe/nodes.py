@@ -275,7 +275,7 @@ class Node(abc.ABC):
 		return hash((type(self).__name__, self.layer, self.position))
 
 class MLP_Node(Node):
-	"""Represents an Multi Layer Perceptron (also referred as Feed-Forward Networl) node in the transformer. 
+	"""Represents an Multi Layer Perceptron (also referred as Feed-Forward Network) node in the transformer. 
 	This node operates on the residual stream within a specific layer and position.
 	Note that an MLP output in a specific position is independent from the outputs in other positions, allowing for easier caching and patching.
 	

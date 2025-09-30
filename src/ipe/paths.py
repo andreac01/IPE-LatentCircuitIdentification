@@ -92,7 +92,7 @@ def get_path_msgs(path: list[Node], messages: list[torch.Tensor] = [], msg_cache
 	# Recurse with the rest of the path
 	return get_path_msgs(path[1:], messages=messages, msg_cache=msg_cache, model=model)
 
-def clean_paths(paths: list[tuple[float, list]]) -> list[tuple[float, list]]:
+def clean_paths(paths: list[tuple[float, list]], inplace: bool = False) -> list[tuple[float, list]]:
 	"""Cleans up the paths by removing references to models, parents, children, and caches to save memory. It is useful to call this function before saving the outputs of graph search to a file, avoiding saving cache, gradients, and model.
 	
 	Args:
@@ -103,17 +103,38 @@ def clean_paths(paths: list[tuple[float, list]]) -> list[tuple[float, list]]:
 			The cleaned list of paths with unnecessary references removed.
 	"""
 	cleaned = []
-	for c, path in paths:
-		for node in path:
-			node.model = None  # remove model reference to save memory
-			node.parent = None  # remove parent reference to save memory
-			node.children = []  # remove children reference to save memory
-			node.msg_cache = None  # remove msg_cache reference to save memory
-			node.cf_cache = None  # remove cf_cache reference to save memorys
-			node.gradient = None  # remove gradient reference to save memory
-			if isinstance(node, FINAL_Node):
-				node.metric = None  # remove metric reference to save memory
-		if isinstance(c, torch.Tensor):
-			c = c.item()  # convert tensor to float for serialization
-		cleaned.append((c, path))
+	if inplace:
+		for c, path in paths:
+			for node in path:
+				node.model = None  # remove model reference to save memory
+				node.parent = None  # remove parent reference to save memory
+				node.children = []  # remove children reference to save memory
+				node.msg_cache = None  # remove msg_cache reference to save memory
+				node.cf_cache = None  # remove cf_cache reference to save memorys
+				node.gradient = None  # remove gradient reference to save memory
+				if isinstance(node, FINAL_Node):
+					node.metric = None  # remove metric reference to save memory
+			if isinstance(c, torch.Tensor):
+				c = c.item()  # convert tensor to float for serialization
+			cleaned.append((c, path))
+	else:
+		for c, path in paths:
+			cleaned_path = []
+			for node in path:
+				cleaned_node = type(node)(
+					model=node.model,
+					layer=node.layer,
+					position=node.position,
+					patch_type=node.patch_type
+				)
+				cleaned_node.model = None  # remove model reference to save memory
+				# Copy other attributes if they exist
+				if hasattr(node, 'head'):
+					cleaned_node.head = node.head
+				if hasattr(node, 'keyvalue_position'):
+					cleaned_node.keyvalue_position = node.keyvalue_position
+				cleaned_path.append(cleaned_node)
+			if isinstance(c, torch.Tensor):
+				c = c.item()  # convert tensor to float for serialization
+			cleaned.append((c, cleaned_path))
 	return cleaned

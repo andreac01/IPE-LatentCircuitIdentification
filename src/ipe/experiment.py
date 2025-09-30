@@ -268,8 +268,7 @@ class ExperimentManager:
 		if not self.paths:
 			self.run()
 		if clean:
-			cleaned_paths = deepcopy(self.paths)
-			cleaned_paths = clean_paths(cleaned_paths)
+			cleaned_paths = clean_paths(self.paths, inplace=False)
 			with open(filepath, 'wb') as f:
 				pkl.dump(cleaned_paths, f)
 		else:

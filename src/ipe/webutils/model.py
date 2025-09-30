@@ -26,6 +26,8 @@ def has_enough_memory(device: torch.device, required_bytes: int) -> bool:
 		return free >= required_bytes
 	else:
 		vm = psutil.virtual_memory()
+		if vm.available < required_bytes:
+			print(f"⚠️ Warning: Not enough RAM available. Required: {required_bytes / 1e9:.2f} GB, Available: {vm.available / 1e9:.2f} GB")
 		return vm.available >= required_bytes
 
 def download_model(model_name: str, cache_dir: str = "/app/models") -> None:
@@ -96,7 +98,7 @@ def load_model(model_name: str, required_bytes: int = 0, device: str = 'cpu', ca
 	
 	return model
 
-def load_tokenizer(str, config: dict) -> AutoTokenizer:
+def load_tokenizer(config: dict) -> AutoTokenizer:
 	"""Load the tokenizer for a given model. The tokenizer is fetched from Hugging Face using the model's configuration, to avoiding loading the entire model as required by HookedTransformer.
 	
 	Args:
