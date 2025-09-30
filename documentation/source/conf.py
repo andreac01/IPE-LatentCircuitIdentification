@@ -98,7 +98,6 @@ html_theme_options = {
 	"navbar_align": "left",
 	"navbar_end": ["theme-switcher", "navbar-icon-links"],
 	"secondary_sidebar_items": ["page-toc", "edit-this-page", "sourcelink"],
-	"footer_items": ["copyright", "last-updated"],
 	"show_toc_level": 2,
 	"use_edit_page_button": True,
 }

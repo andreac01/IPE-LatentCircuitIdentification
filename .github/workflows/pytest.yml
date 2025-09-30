@@ -5,10 +5,10 @@ name: Run Python Tests
 on:
   # Run on pushes to the 'main' branch.
   push:
-    branches: [ "main", "develop" ]
+    branches: [ "main" ]
   # Run on pull requests targeting the 'main' branch.
   pull_request:
-    branches: [ "main", "develop" ]
+    branches: [ "main" ]
 
 # This section defines the jobs to be executed.
 jobs:
