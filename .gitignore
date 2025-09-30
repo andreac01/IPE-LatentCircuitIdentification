@@ -3,6 +3,7 @@ src/ipe.egg-info/
 dist/
 documentation/build/
 web_app/data/*
+web_app/models/*
 web_app/app/*
 *.ipynb_checkpoints
 .env

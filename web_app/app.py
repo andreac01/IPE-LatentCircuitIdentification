@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_from_directory
 from flask_cors import CORS
 import pickle
 import os
@@ -15,6 +15,8 @@ from ipe.miscellanea import get_topk
 from ipe.graph_search import PathAttributionPatching
 from ipe.metrics import target_logit_percentage
 from ipe.webutils.model import load_model, load_model_config, load_tokenizer
+from ipe.experiment import ExperimentManager
+import uuid
 
 # load the evnironment
 load_dotenv()
@@ -38,6 +40,57 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def index():
 	return render_template('index.html')
 
+@app.route('/api/download_paths', methods=['POST'])
+def download_paths():
+	"""
+	Handles downloading the precomputed .pkl path file.
+	This endpoint is designed to work when the user has selected a precomputed visualization.
+	It locates the corresponding .pkl file on the server and sends it for download.
+	"""
+	payload = request.get_json(silent=True)
+	if not payload or 'params' not in payload:
+		return jsonify({'error': 'Invalid or empty JSON payload'}), 400
+
+	params = payload.get('params', {})
+
+	try:
+		if not params.get('precomputed'):
+			uuid = params['uuid']
+			path_file = os.path.join(DATA_DIR, 'temp', f'{uuid}.pkl')
+			base_dir = os.path.join(DATA_DIR, 'temp')
+			filename = f'{uuid}.pkl'
+		else:
+			model_name = params['model_name']
+			task_name = params['task_name']
+			search_mode = params['mode']
+			task_shortname = sample_prompts[task_name]['shortname']
+			
+			# Construct the path to the .pkl file, mirroring the logic in run_model
+			base_dir = os.path.join(DATA_DIR, model_name, task_shortname)
+			filename = f'paths{search_mode}.pkl'
+			path_file = os.path.join(base_dir, filename)
+
+
+		if not os.path.exists(path_file):
+			app.logger.error(f"Precomputed file not found at: {path_file}")
+			return jsonify({'error': 'The requested precomputed path file was not found on the server.'}), 404
+
+		data_dir = os.path.abspath(DATA_DIR)
+		base_dir = os.path.abspath(base_dir)
+		if not base_dir.startswith(data_dir):
+			app.logger.error(f"Attempted access outside of DATA_DIR: {base_dir}")
+			return jsonify({'error': 'Invalid file path.'}), 400
+
+		app.logger.debug(f"Sending file for download: {path_file}")
+		return send_from_directory(directory=base_dir, path=filename, as_attachment=True)
+
+	except KeyError as e:
+		app.logger.error(f"Missing parameter in download request: {e}")
+		return jsonify({'error': f'Missing required parameter for download: {e}'}), 400
+	except Exception as e:
+		app.logger.exception("An unexpected error occurred during file download.")
+		return jsonify({'error': f'An internal error occurred: {str(e)}'}), 500
+
 
 @app.route('/api/run_model', methods=['POST'])
 def run_model():
@@ -57,6 +110,7 @@ def run_model():
 	- pathDetails: Details for each path including component info and top token probabilities"""
 	app.logger.debug("received")
 	data = request.json
+	app.logger.debug(f"Request data: {data}")
 	model_name = data.get('model_name', 'gpt2-small')
 	model_config = models_config[model_name]
 	tokenizer = load_tokenizer(model_config)
@@ -126,32 +180,35 @@ def run_model():
 		except KeyError as e:
 			return jsonify({'error': f'Missing field: {str(e)}'}), 400
 		
-		_, cache = model.run_with_cache(prompt)
-		prompt_tokenized = model.to_tokens(prompt, prepend_bos=True)
-		target_tokenized = model.to_tokens(target, prepend_bos=False)
-
-		if len(target_tokenized[0]) > 1:
-			return jsonify({'error': 'Target token must be a single token.'}), 400
-		
-		metric = partial(target_logit_percentage, clean_final_resid=cache[f'blocks.{model.cfg.n_layers - 1}.hook_resid_post'], model=model, target_tokens=target_tokenized[0])
-		paths= PathAttributionPatching(
+		metric = 'target_logit_percentage' if target != "" else 'kl_divergence'
+		if target == "":
+			target = "out"
+			target_list = []
+		else:
+			target_list = [target]
+		experiment = ExperimentManager(
 			model=model,
+			prompts=[prompt],
+			targets=target_list,
+			positional_search=True,
 			metric=metric,
-			root=FINAL_Node(
-				model=model,
-				layer=model.cfg.n_layers - 1,
-				position=prompt_tokenized.shape[1] - 1,
-				msg_cache=dict(cache),
-				metric=metric
-			),
-			min_contribution=0.65,
-			include_negative=True,
+			patch_type='zero',
+			search_strategy='BestFirstSearch',
+			algorithm='PathAttributionPatching',
+			algorithm_params={"top_n": 100}
 		)
+		
+		paths = experiment.run()
+		request_random_uuid_string = str(uuid.uuid1())
+		# Save the paths for potential later download
+		experiment.save_paths(clean=True, filepath=os.path.join('./data', 'temp', f'{request_random_uuid_string}.pkl'))
+		with open(os.path.join('./data', 'temp', f'{request_random_uuid_string}_request.json'), 'w') as f:
+			json.dump({'prompt': prompt, 'target': target, 'model': model_name}, f)
 		
 		# We still compute details directly, but we don't save them in this mode
 		img_node_paths_runtime = [get_image_path(p, divide_heads=data.get('divide_heads', True)) for p in paths]
 		for i, path_tuple in enumerate(paths):
-			messages = get_path_msgs(path=path_tuple[1], messages=[], msg_cache=dict(cache), model=model)
+			messages = get_path_msgs(path=path_tuple[1], messages=[], msg_cache=dict(experiment.cache), model=model)
 			image_path = img_node_paths_runtime[i][1]
 			decoding_info = [get_topk(model, messages[j][0][image_path[j].position], topk=10) for j in range(len(image_path))]
 			
@@ -166,20 +223,24 @@ def run_model():
 				for j, n in enumerate(image_path)
 			]
 			path_details_store[str(i)] = path_data
+		experiment = None  # Free memory
 
-	# --- Final Response Preparation (this part is now common to both modes) ---
 	img_node_paths = [get_image_path(p, divide_heads=data.get('divide_heads', True)) for p in paths]
 	config = load_model_config(config=model_config)
+	n_layer = config.n_layer if hasattr(config, 'n_layer') else config.num_hidden_layers
+	n_head = config.n_head if hasattr(config, 'n_head') else config.num_attention_heads
 	graph_data = create_graph_data(
-		img_node_paths, config.n_layer, config.n_head, 
+		img_node_paths, n_layer, n_head, 
 		paths[0][1][-1].position + 1, data.get('divide_heads', True), 
 		['|<bos>|'] + tokenizer.tokenize(prompt), 
 		['' for _ in tokenizer.tokenize(prompt)] + tokenizer.tokenize(target)
 	)
-
+	paths = None  # Free memory
+	torch.cuda.empty_cache()
 	return jsonify({
 		'graphData': graph_data,
-		'pathDetails': path_details_store
+		'pathDetails': path_details_store,
+		'uuid': request_random_uuid_string if not data.get('precomputed', False) else None
 	})
 
 

@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	const secondaryPlotDiv = document.getElementById('secondary-plot');
 	const loader = document.getElementById('loader');
 	const showSecondaryPlotSwitch = document.getElementById('show-secondary-plot-switch');
-	const edgePrioritySwitch = document.getElementById('edge-priority-switch'); // New switch
+	const edgePrioritySwitch = document.getElementById('edge-priority-switch');
 
 	// --- State ---
 	let fullPlotData = null; // Will store all data from the backend
@@ -50,11 +50,103 @@ document.addEventListener('DOMContentLoaded', function() {
 			modelTaskView.style.display = 'none';
 			promptTargetView.style.display = 'flex';
 			runButton.textContent = 'Compute and Visualize';
+			runButton.title = 'Find the top-100 paths using a Best First Search approach. If a target is provided the percentage of change in this logit will be used as metric. If target is empty use KL divergence.'
 		} else {
 			// Model & Task Mode (Default)
 			modelTaskView.style.display = 'flex';
 			promptTargetView.style.display = 'none';
 			runButton.textContent = 'Visualize Circuit';
+			runButton.title = 'Visualize the pre-computed paths.'
+		}
+	});
+
+	// Download paths button
+	const downloadButton = document.getElementById('download-button');
+	downloadButton.addEventListener('click', async () => {
+		// Ensure we have data to send
+		if (!fullPlotData || !fullPlotData.graphData) {
+			alert('No path data available to download. Run a visualization first.');
+			return;
+		}
+
+		loader.style.display = 'block';
+		downloadButton.disabled = true;
+
+		try {
+			// Reconstruct the exact parameters used for the last "run" request from the current UI state
+			let lastRunParams = {};
+			if (modeSwitch.checked) {
+				lastRunParams = {
+					model_name: document.getElementById('model-select-run').value,
+					precomputed: false,
+					prompt: promptInput.value,
+					target: targetTokenInput.value,
+					divide_heads: divideHeadsSwitch.checked,
+					uuid: fullPlotData.uuid,
+				};
+			} else {
+				lastRunParams = {
+					model_name: document.getElementById('model-select').value,
+					precomputed: true,
+					task_name: document.getElementById('task-select').value,
+					mode: document.getElementById('mode-select').value,
+					divide_heads: divideHeadsSwitch.checked,
+					uuid: fullPlotData.uuid,
+				};
+			}
+			// Also include the current num_paths selection to make intent explicit
+			lastRunParams.num_paths = parseInt(numPathsSlider.value, 10);
+
+			// Send the data to backend for packaging (adjust endpoint if needed)
+			const resp = await fetch('/api/download_paths', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					params: lastRunParams,
+				})
+			});
+
+			if (!resp.ok) throw new Error(`Server responded with ${resp.status}`);
+
+			const blob = await resp.blob();
+
+			// Prefer a .pkl filename for this endpoint; try to extract from headers first
+			let filename = 'paths.pkl';
+			const cd = resp.headers.get('Content-Disposition') || '';
+			const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="([^"]+)"|filename=([^;]+)/);
+			if (m) {
+				try {
+					// pick the first non-undefined capture group and decode safely
+					const rawName = m[1] || m[2] || m[3];
+					filename = decodeURIComponent(rawName.trim().replace(/^["']|["']$/g, ''));
+				} catch (e) {
+					// fallback to default if decode fails
+					console.warn('Failed to decode filename from header, using default paths.pkl', e);
+					filename = 'paths.pkl';
+				}
+			} else {
+				// fallback based on content-type
+				const ct = resp.headers.get('Content-Type') || '';
+				if (ct.includes('zip')) filename = 'paths.zip';
+				else if (ct.includes('json')) filename = 'paths.json';
+				else filename = 'paths.pkl'; // explicit default per requirement
+			}
+
+			// Trigger download
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = filename;
+			document.body.appendChild(a);
+			a.click();
+			a.remove();
+			URL.revokeObjectURL(url);
+		} catch (err) {
+			console.error('Download failed:', err);
+			primaryPlotDiv.innerHTML = `<div class="alert alert-danger">Download failed: ${err.message}</div>`;
+		} finally {
+			loader.style.display = 'none';
+			downloadButton.disabled = false;
 		}
 	});
 
@@ -197,6 +289,7 @@ document.addEventListener('DOMContentLoaded', function() {
 			let body = {};
 			if (modeSwitch.checked) {
 				body = {
+					model_name: document.getElementById('model-select-run').value,
 					precomputed: false,
 					prompt: promptInput.value,
 					target: targetTokenInput.value,
@@ -204,8 +297,8 @@ document.addEventListener('DOMContentLoaded', function() {
 				};
 			} else {
 				body = {
-					precomputed: true,
 					model_name: document.getElementById('model-select').value,
+					precomputed: true,
 					task_name: document.getElementById('task-select').value,
 					mode: document.getElementById('mode-select').value,
 					divide_heads: divideHeadsSwitch.checked,

@@ -58,7 +58,7 @@ def main():
         with open(".env", "w") as f:
             f.write(env_content)
         print("\n🎉 Success! Configuration saved to a new '.env' file.")
-        print("You can now run the application locally or with Docker.")
+        print("You can now run the application locally `pip install -r requirements.txt && gunicorn --workers 1 --timeout 2000 --bind 0.0.0.0:8000 app:app` or with Docker `docker-compose up`.")
     except IOError as e:
         print(f"\n❌ Critical Error: Could not write to .env file: {e}")
 
