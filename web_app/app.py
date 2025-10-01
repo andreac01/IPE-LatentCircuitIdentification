@@ -12,8 +12,6 @@ from ipe.webutils.image_nodes import get_image_path, create_graph_data
 from ipe.nodes import FINAL_Node
 from ipe.paths import get_path_msgs
 from ipe.miscellanea import get_topk
-from ipe.graph_search import PathAttributionPatching
-from ipe.metrics import target_logit_percentage
 from ipe.webutils.model import load_model, load_model_config, load_tokenizer
 from ipe.experiment import ExperimentManager
 import uuid
@@ -166,11 +164,13 @@ def run_model():
 					for j, n in enumerate(image_path)
 				]
 				path_details_store[str(i)] = path_data
+			path_details_store['predictions'] = get_topk(model, cache[f'blocks.{model.cfg.n_layers - 1}.hook_resid_post'][0][-1], topk=10)
 			
 			# Save the newly computed decodings to the file for next time
 			with open(decoding_file, 'wb') as f:
 				pickle.dump(path_details_store, f)
 			app.logger.debug(f"Saved decodings to {decoding_file}")
+		predictions = path_details_store.pop('predictions')
 			
 	else: # This is the on-the-fly computation case
 		app.logger.debug("Computing paths and details on the fly")
@@ -182,7 +182,6 @@ def run_model():
 		
 		metric = 'target_logit_percentage' if target != "" else 'kl_divergence'
 		if target == "":
-			target = "out"
 			target_list = []
 		else:
 			target_list = [target]
@@ -195,9 +194,11 @@ def run_model():
 			patch_type='zero',
 			search_strategy='BestFirstSearch',
 			algorithm='PathAttributionPatching',
-			algorithm_params={"top_n": 100}
+			algorithm_params={"top_n": 100, "include_negative": True}
 		)
-		
+		predictions = get_topk(model, experiment.cache[f'blocks.{model.cfg.n_layers- 1}.hook_resid_post'][0][-1], topk=10)
+		if target == "":
+			target = predictions['topk_strtokens'][0].replace('Ġ', '_').replace(' ', '_')
 		paths = experiment.run()
 		request_random_uuid_string = str(uuid.uuid1())
 		# Save the paths for potential later download
@@ -223,6 +224,7 @@ def run_model():
 				for j, n in enumerate(image_path)
 			]
 			path_details_store[str(i)] = path_data
+		
 		experiment = None  # Free memory
 
 	img_node_paths = [get_image_path(p, divide_heads=data.get('divide_heads', True)) for p in paths]
@@ -236,11 +238,14 @@ def run_model():
 		['' for _ in tokenizer.tokenize(prompt)] + tokenizer.tokenize(target)
 	)
 	paths = None  # Free memory
+	model = None  # Free memory
 	torch.cuda.empty_cache()
 	return jsonify({
 		'graphData': graph_data,
 		'pathDetails': path_details_store,
-		'uuid': request_random_uuid_string if not data.get('precomputed', False) else None
+		'uuid': request_random_uuid_string if not data.get('precomputed', False) else None,
+		'predicted_tokens': predictions['topk_strtokens'],
+		'predicted_probabilities': predictions['topk_probs'],
 	})
 
 

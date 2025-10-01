@@ -287,6 +287,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 		try {
 			let body = {};
+			let suffix = '';
 			if (modeSwitch.checked) {
 				body = {
 					model_name: document.getElementById('model-select-run').value,
@@ -295,6 +296,7 @@ document.addEventListener('DOMContentLoaded', function() {
 					target: targetTokenInput.value,
 					divide_heads: divideHeadsSwitch.checked,
 				};
+				suffix = '-run';
 			} else {
 				body = {
 					model_name: document.getElementById('model-select').value,
@@ -311,7 +313,12 @@ document.addEventListener('DOMContentLoaded', function() {
 			});
 			if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 			const data = await response.json();
-			fullPlotData = data; // Store full data { graphData: {...}, pathDetails: {...} }
+			fullPlotData = data; // Store full data { graphData: {...}, pathDetails: {...}, predicted_tokens: [...], predicted_probabilities: [...] }
+
+			// Update predicted token and probability fields
+			if (data.predicted_tokens && data.predicted_probabilities) {
+				updatePredictedTokenAndProbability(data.predicted_tokens, data.predicted_probabilities, suffix);
+			}
 
 			// Access num_paths from the nested graphData object
 			const numPathsAvailable = fullPlotData.graphData ? fullPlotData.graphData.num_paths : 0;
@@ -329,6 +336,37 @@ document.addEventListener('DOMContentLoaded', function() {
 		} finally {
 			loader.style.display = 'none';
 			window.dispatchEvent(new Event('resize'));
+		}
+	}
+
+	/**
+	 * Updates the predicted token and probability fields in the UI.
+	 */
+	function updatePredictedTokenAndProbability(predictedTokens, predictedProbabilities, el_id_suffix='') {
+		const predictedTokenInput = document.getElementById(`predicted-token${el_id_suffix}`);
+		const predictedProbabilityInput = document.getElementById(`predicted-probability${el_id_suffix}`);
+
+		if (predictedTokens && predictedTokens.length > 0 && predictedProbabilities && predictedProbabilities.length > 0) {
+			// Set the top predicted token and its probability
+			predictedTokenInput.value = predictedTokens[0];
+			predictedProbabilityInput.value = predictedProbabilities[0].toFixed(4);
+
+			// Update tooltips with the top 10 predictions
+			const tooltipContent = predictedTokens
+				.map((token, index) => `${token.replace(/\s/g, '_')}: ${predictedProbabilities[index].toFixed(4)}\n`)
+				.join('\n');
+			predictedTokenInput.setAttribute('title', tooltipContent);
+			predictedProbabilityInput.setAttribute('title', tooltipContent);
+
+			// Reinitialize Bootstrap tooltips to reflect the updated content
+			new bootstrap.Tooltip(predictedTokenInput);
+			new bootstrap.Tooltip(predictedProbabilityInput);
+		} else {
+			// Clear fields if no predictions are available
+			predictedTokenInput.value = '';
+			predictedProbabilityInput.value = '';
+			predictedTokenInput.setAttribute('title', 'No predictions available.');
+			predictedProbabilityInput.setAttribute('title', 'No predictions available.');
 		}
 	}
 

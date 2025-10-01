@@ -77,21 +77,21 @@
 					</div>                    
                     <div class="col">
                         <div id="model-task-view" class="row g-3">
-                            <div class="col-md">
+                            <div class="col-md-3">
                                 <label for="model-select" class="form-label small">Model</label>
                                 <select id="model-select" class="form-select form-select-lg" data-bs-toggle="tooltip" title="Select a model to visualize.">
                                     <option selected>gpt2-small</option>
                                     <option>qwen2.5-0.5B</option>
                                 </select>
                             </div>
-                            <div class="col-md">
+                            <div class="col-md-3">
                                 <label for="task-select" class="form-label small">Task</label>
                                 <select id="task-select" class="form-select form-select-lg" data-bs-toggle="tooltip" title="Select a task circuit to visualize.">
                                     <option selected>Indirect Object Identification</option>
                                     <option>Multiple Choice Question Answer</option>
                                 </select>
                             </div>
-							<div class="col-md">
+							<div class="col-md-3">
                                 <label for="mode-select" class="form-label small">Metric</label>
                                 <select id="mode-select" class="form-select form-select-lg" data-bs-toggle="tooltip" title="Select the evaluation metric.">
                                     <option selected>Probability</option>
@@ -99,6 +99,15 @@
 									<option>KL divergence</option>
                                 </select>
                             </div>
+							<div class="col-md-1">
+								<label for="predicted-token" class="form-label small">Prediction</label>
+								<input type="text" class="form-control form-control-lg" id="predicted-token" readonly data-bs-toggle="tooltip" title="The token predicted by the model. Hover to see the top 10 predictions with their probabilities.">
+							</div>
+							<div class="col-md-1">
+								<label for="predicted-probability" class="form-label small">Probability</label>
+								<input type="text" class="form-control form-control-lg" id="predicted-probability" readonly data-bs-toggle="tooltip" title="The probability of the predicted token. Hover to see the top 10 predictions with their probabilities.">
+							</div>
+
                         </div>
 
                         <div id="prompt-target-view" class="row g-3" style="display: none;">
@@ -117,6 +126,14 @@
                                 <label for="target-token-input" class="form-label small">Target Token</label>
                                 <input type="text" class="form-control form-control-lg" id="target-token-input" value=" Mary" data-bs-toggle="tooltip" title="Enter the target token you expect the model to predict. Remember that often tokens starts with a blanck space. If left blanck no token will be targeted and KL-Divergence will be used">
                             </div>
+							<div class="col-md-1">
+								<label for="predicted-token-run" class="form-label small">Prediction</label>
+								<input type="text" class="form-control form-control-lg" id="predicted-token-run" readonly data-bs-toggle="tooltip" title="The token predicted by the model. Hover to see the top 10 predictions with their probabilities.">
+							</div>
+							<div class="col-md-1">
+								<label for="predicted-probability-run" class="form-label small">Probability</label>
+								<input type="text" class="form-control form-control-lg" id="predicted-probability-run" readonly data-bs-toggle="tooltip" title="The probability of the predicted token. Hover to see the top 10 predictions with their probabilities.">
+							</div>
                         </div>
                     </div>
 

@@ -48,7 +48,7 @@ def main():
     # Get the data directory path
     data_path = get_validated_path(
         prompt_message="Enter the path to your 'data' directory",
-        default_path="./backend/data" # Matches your existing structure
+        default_path="./data" # Matches your existing structure
     )
     
     # Create the .env file
