@@ -50,7 +50,7 @@ def download_model(model_name: str, cache_dir: str = "/app/models") -> None:
 		device="cpu",  # Download to CPU first
 		center_unembed=False,
 		center_writing_weights=False,
-		torch_dtype=torch.float32,
+		dtype=torch.float32,
 		cache_dir=cache_dir
 	)
 
@@ -82,7 +82,7 @@ def load_model(model_name: str, required_bytes: int = 0, device: str = 'cpu', ca
 			device=device,
 			center_unembed=False,
 			center_writing_weights=False,
-			torch_dtype=torch.float32,
+			dtype=torch.float32,
 			cache_dir=cache_dir
 		)
 	except Exception as e:
@@ -92,7 +92,7 @@ def load_model(model_name: str, required_bytes: int = 0, device: str = 'cpu', ca
 			device=device,
 			center_unembed=False,
 			center_writing_weights=False,
-			torch_dtype=torch.float32,
+			dtype=torch.float32,
 			cache_dir=cache_dir
 		)
 	

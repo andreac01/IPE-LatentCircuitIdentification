@@ -66,7 +66,7 @@ import torch
 from transformer_lens import HookedTransformer
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = HookedTransformer.from_pretrained('gpt2-small', device=device, torch_dtype=torch.float32, center_unembed=True)
+model = HookedTransformer.from_pretrained('gpt2-small', device=device, dtype=torch.float32, center_unembed=True)
 ```
 
     Loaded pretrained model gpt2-small into HookedTransformer

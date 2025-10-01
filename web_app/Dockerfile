@@ -9,6 +9,7 @@ COPY requirements.txt .
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/  ipe==0.0.2
 
 # Copy entire backend code into the container
 COPY ./ /app
