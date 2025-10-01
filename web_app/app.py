@@ -15,11 +15,17 @@ from ipe.miscellanea import get_topk
 from ipe.webutils.model import load_model, load_model_config, load_tokenizer
 from ipe.experiment import ExperimentManager
 import uuid
+import threading
 
 # load the evnironment
 load_dotenv()
-DATA_DIR = os.getenv('DATA_DIR', './data')
-MODEL_DIR = os.getenv('MODEL_DIR', './app/models')
+DATA_DIR = './data'
+MODEL_DIR = './models'
+# A directory to store job results as files
+JOB_RESULTS_DIR = os.path.join(DATA_DIR, 'job_results')
+os.makedirs(JOB_RESULTS_DIR, exist_ok=True)
+DATA_TEMP = os.path.join(DATA_DIR, 'temp')
+os.makedirs(DATA_TEMP, exist_ok=True)
 
 app = Flask(__name__)
 app.logger.setLevel(logging.DEBUG) 
@@ -90,163 +96,160 @@ def download_paths():
 		return jsonify({'error': f'An internal error occurred: {str(e)}'}), 500
 
 
+def run_model_background(data, job_id):
+	"""
+	This function runs the model computation in a background thread.
+	It's a refactored version of the original run_model logic.
+	"""
+	with app.app_context():
+		try:
+			app.logger.debug(f"[{job_id}] Starting background computation.")
+			model_name = data.get('model_name', 'gpt2-small')
+			model_config = models_config[model_name]
+			tokenizer = load_tokenizer(model_config)
+			try:
+				model = load_model(model_name, required_bytes=model_config['required_bytes'], device=device, cache_dir=MODEL_DIR)
+			except Exception as e:
+				job_result = {'status': 'error', 'message': str(e)}
+				with open(os.path.join(JOB_RESULTS_DIR, f'{job_id}.json'), 'w') as f:
+					json.dump(job_result, f)
+				return
+
+			path_details_store = {}
+			request_random_uuid_string = None
+			predictions = {}
+
+			if data.get('precomputed', False):
+				app.logger.debug(f"[{job_id}] Using precomputed paths")
+				task_name = data.get('task_name', 'Indirect Object Identification')
+				task_shortname = sample_prompts[task_name]['shortname']
+				search_mode = data.get('mode', 'Probability')
+				prompt = sample_prompts[task_name]["prompt"]
+				target = sample_prompts[task_name]["target"]
+				
+				base_dir = os.path.join(DATA_DIR, model_name, task_shortname)
+				path_file = os.path.join(base_dir, f'paths{search_mode}.pkl')
+				decoding_file = os.path.join(base_dir, f'top10{search_mode}.pkl')
+
+				if not os.path.exists(path_file):
+					app.logger.error(f"Precomputed paths file not found at: {path_file}")
+					raise FileNotFoundError("Precomputed paths not found")
+				paths = pickle.load(open(path_file, 'rb'))
+				
+				if os.path.exists(decoding_file):
+					with open(decoding_file, 'rb') as f:
+						path_details_store = pickle.load(f)
+				else:
+					_, cache = model.run_with_cache(prompt)
+					img_node_paths = [get_image_path(p, divide_heads=data.get('divide_heads', True)) for p in paths]
+					for i, path_tuple in enumerate(paths):
+						messages = get_path_msgs(path=path_tuple[1], messages=[], msg_cache=dict(cache), model=model)
+						image_path = img_node_paths[i][1]
+						decoding_info = [get_topk(model, messages[j][0][image_path[j].position].detach().clone(), topk=10) for j in range(len(image_path))]
+						path_data = [{'cmpt': n.cmpt, 'layer': n.layer, 'head': n.head_idx, 'position': n.position, 'in_type': n.in_type, 'shape': 'square' if n.cmpt in ['EMBED', 'FINAL', 'MLP'] else 'circle', 'probs': decoding_info[j]['topk_probs'], 'tokens': decoding_info[j]['topk_strtokens']} for j, n in enumerate(image_path)]
+						path_details_store[str(i)] = {'path': path_data, 'weight': float(path_tuple[0])}
+					path_details_store['predictions'] = get_topk(model, cache[f'blocks.{model.cfg.n_layers - 1}.hook_resid_post'][0][-1], topk=10)
+					with open(decoding_file, 'wb') as f:
+						pickle.dump(path_details_store, f)
+				predictions = path_details_store.pop('predictions')
+					
+			else:
+				app.logger.debug(f"[{job_id}] Computing paths and details on the fly")
+				prompt = data['prompt']
+				target = data['target']
+				metric = 'target_logit_percentage' if target != "" else 'kl_divergence'
+				target_list = [target] if target != "" else []
+				
+				experiment = ExperimentManager(model=model, prompts=[prompt], targets=target_list, positional_search=True, metric=metric, patch_type='zero', search_strategy='BestFirstSearch', algorithm='PathAttributionPatching', algorithm_params={"top_n": 100, "include_negative": True, "max_time": 120})
+				predictions = get_topk(model, experiment.cache[f'blocks.{model.cfg.n_layers- 1}.hook_resid_post'][0][-1], topk=10)
+				if target == "":
+					target = predictions['topk_strtokens'][0].replace('Ġ', '_').replace(' ', '_')
+				paths = experiment.run()
+				request_random_uuid_string = str(uuid.uuid1())
+				experiment.save_paths(clean=True, filepath=os.path.join(DATA_TEMP, f'{request_random_uuid_string}.pkl'))
+				with open(os.path.join(DATA_DIR, 'temp', f'{request_random_uuid_string}_request.json'), 'w') as f:
+					json.dump({'prompt': prompt, 'target': target, 'model': model_name}, f)
+				
+				img_node_paths_runtime = [get_image_path(p, divide_heads=data.get('divide_heads', True)) for p in paths]
+				for i, path_tuple in enumerate(paths):
+					messages = get_path_msgs(path=path_tuple[1], messages=[], msg_cache=dict(experiment.cache), model=model)
+					image_path = img_node_paths_runtime[i][1]
+					decoding_info = [get_topk(model, messages[j][0][image_path[j].position], topk=10) for j in range(len(image_path))]
+					path_data = [{'cmpt': n.cmpt, 'layer': n.layer, 'head': n.head_idx, 'position': n.position, 'in_type': n.in_type, 'shape': 'square' if n.cmpt in ['EMBED', 'FINAL', 'MLP'] else 'circle', 'probs': decoding_info[j]['topk_probs'], 'tokens': decoding_info[j]['topk_strtokens']} for j, n in enumerate(image_path)]
+					path_details_store[str(i)] = {'path': path_data, 'weight': float(path_tuple[0])}
+				experiment = None
+
+			img_node_paths = [get_image_path(p, divide_heads=data.get('divide_heads', True)) for p in paths]
+			config = load_model_config(config=model_config)
+			n_layer = config.n_layer if hasattr(config, 'n_layer') else config.num_hidden_layers
+			n_head = config.n_head if hasattr(config, 'n_head') else config.num_attention_heads
+			graph_data = create_graph_data(img_node_paths, n_layer, n_head, paths[0][1][-1].position + 1, data.get('divide_heads', True), ['|<bos>|'] + tokenizer.tokenize(prompt), ['' for _ in tokenizer.tokenize(prompt)] + tokenizer.tokenize(target))
+			
+			final_result = {
+				'graphData': graph_data,
+				'pathDetails': path_details_store,
+				'uuid': request_random_uuid_string,
+				'predicted_tokens': predictions['topk_strtokens'],
+				'predicted_probabilities': predictions['topk_probs'],
+			}
+			job_result = {'status': 'complete', 'result': final_result}
+			with open(os.path.join(JOB_RESULTS_DIR, f'{job_id}.json'), 'w') as f:
+				json.dump(job_result, f)
+			app.logger.debug(f"[{job_id}] Background computation finished.")
+
+		except Exception as e:
+			app.logger.exception(f"[{job_id}] Error in background job.")
+			job_result = {'status': 'error', 'message': str(e)}
+			with open(os.path.join(JOB_RESULTS_DIR, f'{job_id}.json'), 'w') as f:
+				json.dump(job_result, f)
+		finally:
+			# Clean up to free memory
+			model = None
+			paths = None
+			torch.cuda.empty_cache()
+
 @app.route('/api/run_model', methods=['POST'])
 def run_model():
-	"""API endpoint to run the model and compute paths.
-	
-	Expects a JSON payload with:
-	- model_name: Name of the model to use (default: 'gpt2-small')
-	- prompt: The input prompt string
-	- target: The target token string
-	- precomputed: Boolean indicating whether to use precomputed paths (default: False)
-	- task_name: If precomputed is True, the name of the task to load paths for (default: 'Indirect Object Identification')
-	- mode: If precomputed is True, the search mode ('Probability' or 'Marginalization', default: 'Probability')
-	- divide_heads: Boolean indicating whether to divide head contributions (default: True)
-	
-	Returns a JSON response with:
-	- graphData: Data for visualizing the graph
-	- pathDetails: Details for each path including component info and top token probabilities"""
-	app.logger.debug("received")
+	"""
+	Starts a model computation job in the background.
+	Immediately returns a job ID.
+	"""
+	job_id = str(uuid.uuid4())
 	data = request.json
-	app.logger.debug(f"Request data: {data}")
-	model_name = data.get('model_name', 'gpt2-small')
-	model_config = models_config[model_name]
-	tokenizer = load_tokenizer(model_config)
+	app.logger.debug(f"Received job {job_id} with data: {data}")
+
+	# Set initial status by creating a file
+	job_result = {'status': 'processing'}
+	with open(os.path.join(JOB_RESULTS_DIR, f'{job_id}.json'), 'w') as f:
+		json.dump(job_result, f)
+
+	# Start the background task
+	thread = threading.Thread(target=run_model_background, args=(data, job_id))
+	thread.daemon = True
+	thread.start()
+
+	# Return acknowledgment with job ID
+	return jsonify({'status': 'processing', 'job_id': job_id}), 202
+
+@app.route('/api/get_result/<job_id>', methods=['GET'])
+def get_result(job_id):
+	"""
+	Poll this endpoint to get the result of a computation job.
+	"""
+	app.logger.debug(f"Polling for job_id: {job_id}")
+	job_file = os.path.join(JOB_RESULTS_DIR, f'{job_id}.json')
+	if not os.path.exists(job_file):
+		return jsonify({'status': 'error', 'message': 'Job ID not found'}), 404
 	
-	try:
-		model = load_model(model_name, required_bytes=model_config['required_bytes'], device=device, cache_dir=MODEL_DIR)
-	except Exception as e:
-		return jsonify({'error': str(e)}), 500
-
-	path_details_store = {} # Initialize the dictionary to store path details
-
-	if data.get('precomputed', False):
-		app.logger.debug("Using precomputed paths")
-		task_name = data.get('task_name', 'Indirect Object Identification')
-		task_shortname = sample_prompts[task_name]['shortname']
-		search_mode = data.get('mode', 'Probability')
-
-		prompt = sample_prompts[task_name]["prompt"]
-		target = sample_prompts[task_name]["target"]
-		
-		base_dir = os.path.join(DATA_DIR, model_name, task_shortname)
-		path_file = os.path.join(base_dir, f'paths{search_mode}.pkl')
-		decoding_file = os.path.join(base_dir, f'top10{search_mode}.pkl')
-
-		if not os.path.exists(path_file):
-			return jsonify({'error': 'Precomputed paths not found'}), 404
-		paths = pickle.load(open(path_file, 'rb'))
-		
-		if os.path.exists(decoding_file):
-			app.logger.debug("Found and loading precomputed decodings.")
-			with open(decoding_file, 'rb') as f:
-				path_details_store = pickle.load(f)
-		else:
-			app.logger.debug("Precomputed decodings not found. Computing and saving them now.")
-			# We need the model's cache to compute messages
-			_, cache = model.run_with_cache(prompt)
-			img_node_paths = [get_image_path(p, divide_heads=data.get('divide_heads', True)) for p in paths]
-
-			# The computation logic is the same as before
-			for i, path_tuple in enumerate(paths):
-				messages = get_path_msgs(path=path_tuple[1], messages=[], msg_cache=dict(cache), model=model)
-				image_path = img_node_paths[i][1]
-				decoding_info = [get_topk(model, messages[j][0][image_path[j].position].detach().clone(), topk=10) for j in range(len(image_path))]
-			
-				path_data = [
-					{
-						'cmpt': n.cmpt, 'layer': n.layer, 'head': n.head_idx, 
-						'position': n.position, 'in_type': n.in_type,
-						'shape': 'square' if n.cmpt in ['EMBED', 'FINAL', 'MLP'] else 'circle',
-						'probs': decoding_info[j]['topk_probs'],
-						'tokens': decoding_info[j]['topk_strtokens'],
-					}
-					for j, n in enumerate(image_path)
-				]
-				path_details_store[str(i)] = path_data
-			path_details_store['predictions'] = get_topk(model, cache[f'blocks.{model.cfg.n_layers - 1}.hook_resid_post'][0][-1], topk=10)
-			
-			# Save the newly computed decodings to the file for next time
-			with open(decoding_file, 'wb') as f:
-				pickle.dump(path_details_store, f)
-			app.logger.debug(f"Saved decodings to {decoding_file}")
-		predictions = path_details_store.pop('predictions')
-			
-	else: # This is the on-the-fly computation case
-		app.logger.debug("Computing paths and details on the fly")
-		try:
-			prompt = data['prompt']
-			target = data['target']
-		except KeyError as e:
-			return jsonify({'error': f'Missing field: {str(e)}'}), 400
-		
-		metric = 'target_logit_percentage' if target != "" else 'kl_divergence'
-		if target == "":
-			target_list = []
-		else:
-			target_list = [target]
-		experiment = ExperimentManager(
-			model=model,
-			prompts=[prompt],
-			targets=target_list,
-			positional_search=True,
-			metric=metric,
-			patch_type='zero',
-			search_strategy='BestFirstSearch',
-			algorithm='PathAttributionPatching',
-			algorithm_params={"top_n": 100, "include_negative": True}
-		)
-		predictions = get_topk(model, experiment.cache[f'blocks.{model.cfg.n_layers- 1}.hook_resid_post'][0][-1], topk=10)
-		if target == "":
-			target = predictions['topk_strtokens'][0].replace('Ġ', '_').replace(' ', '_')
-		paths = experiment.run()
-		request_random_uuid_string = str(uuid.uuid1())
-		# Save the paths for potential later download
-		experiment.save_paths(clean=True, filepath=os.path.join('./data', 'temp', f'{request_random_uuid_string}.pkl'))
-		with open(os.path.join('./data', 'temp', f'{request_random_uuid_string}_request.json'), 'w') as f:
-			json.dump({'prompt': prompt, 'target': target, 'model': model_name}, f)
-		
-		# We still compute details directly, but we don't save them in this mode
-		img_node_paths_runtime = [get_image_path(p, divide_heads=data.get('divide_heads', True)) for p in paths]
-		for i, path_tuple in enumerate(paths):
-			messages = get_path_msgs(path=path_tuple[1], messages=[], msg_cache=dict(experiment.cache), model=model)
-			image_path = img_node_paths_runtime[i][1]
-			decoding_info = [get_topk(model, messages[j][0][image_path[j].position], topk=10) for j in range(len(image_path))]
-			
-			path_data = [
-				{
-					'cmpt': n.cmpt, 'layer': n.layer, 'head': n.head_idx, 
-					'position': n.position, 'in_type': n.in_type,
-					'shape': 'square' if n.cmpt in ['EMBED', 'FINAL', 'MLP'] else 'circle',
-					'probs': decoding_info[j]['topk_probs'],
-					'tokens': decoding_info[j]['topk_strtokens'],
-				}
-				for j, n in enumerate(image_path)
-			]
-			path_details_store[str(i)] = path_data
-		
-		experiment = None  # Free memory
-
-	img_node_paths = [get_image_path(p, divide_heads=data.get('divide_heads', True)) for p in paths]
-	config = load_model_config(config=model_config)
-	n_layer = config.n_layer if hasattr(config, 'n_layer') else config.num_hidden_layers
-	n_head = config.n_head if hasattr(config, 'n_head') else config.num_attention_heads
-	graph_data = create_graph_data(
-		img_node_paths, n_layer, n_head, 
-		paths[0][1][-1].position + 1, data.get('divide_heads', True), 
-		['|<bos>|'] + tokenizer.tokenize(prompt), 
-		['' for _ in tokenizer.tokenize(prompt)] + tokenizer.tokenize(target)
-	)
-	paths = None  # Free memory
-	model = None  # Free memory
-	torch.cuda.empty_cache()
-	return jsonify({
-		'graphData': graph_data,
-		'pathDetails': path_details_store,
-		'uuid': request_random_uuid_string if not data.get('precomputed', False) else None,
-		'predicted_tokens': predictions['topk_strtokens'],
-		'predicted_probabilities': predictions['topk_probs'],
-	})
+	with open(job_file, 'r') as f:
+		result = json.load(f)
+	
+	if result['status'] == 'complete':
+		# Optionally remove the file after retrieval
+		os.remove(job_file)
+		return jsonify(result)
+	
+	return jsonify(result)
 
 
 if __name__ == '__main__':

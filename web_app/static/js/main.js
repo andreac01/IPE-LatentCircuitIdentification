@@ -191,7 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 			// When hiding the secondary plot, reset the highlight on the primary plot
 			if (primaryPlotDiv.innerHTML.trim() && sortedEdgesCache.length > 0) {
-				const opacities = Array(sortedEdgesCache.length).fill(0.85);
+				const opacities = Array(sortedEdgesCache.length).fill(0.95);
 				const traceIndices = Array.from({ length: sortedEdgesCache.length }, (_, i) => i);
 				Plotly.restyle(primaryPlotDiv, { opacity: opacities }, traceIndices);
 			}
@@ -288,6 +288,7 @@ document.addEventListener('DOMContentLoaded', function() {
 		try {
 			let body = {};
 			let suffix = '';
+			let delta_time = 1000;
 			if (modeSwitch.checked) {
 				body = {
 					model_name: document.getElementById('model-select-run').value,
@@ -297,6 +298,7 @@ document.addEventListener('DOMContentLoaded', function() {
 					divide_heads: divideHeadsSwitch.checked,
 				};
 				suffix = '-run';
+				delta_time = 10000;
 			} else {
 				body = {
 					model_name: document.getElementById('model-select').value,
@@ -305,19 +307,44 @@ document.addEventListener('DOMContentLoaded', function() {
 					mode: document.getElementById('mode-select').value,
 					divide_heads: divideHeadsSwitch.checked,
 				};
+				delta_time = 1000;
 			}
-			const response = await fetch('/api/run_model', {
+
+			// Start the job
+			const runResponse = await fetch('/api/run_model', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ ...body })
 			});
-			if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-			const data = await response.json();
-			fullPlotData = data; // Store full data { graphData: {...}, pathDetails: {...}, predicted_tokens: [...], predicted_probabilities: [...] }
+
+			if (!runResponse.ok) throw new Error(`HTTP error! status: ${runResponse.status}`);
+			const runData = await runResponse.json();
+			const { job_id } = runData;
+
+			if (!job_id) throw new Error('Failed to start computation job.');
+
+			// Poll for the result
+			let data;
+			while (true) {
+				await new Promise(resolve => setTimeout(resolve, delta_time)); // Wait 1.5 seconds between polls
+				const resultResponse = await fetch(`/api/get_result/${job_id}`);
+				if (!resultResponse.ok) throw new Error(`Error polling for result: ${resultResponse.status}`);
+				
+				const resultData = await resultResponse.json();
+				if (resultData.status === 'complete') {
+					data = resultData;
+					break;
+				} else if (resultData.status === 'error') {
+					throw new Error(`Computation failed: ${resultData.message}`);
+				}
+				// If status is 'processing', the loop continues
+			}
+			console.log("Received data:", data);
+			fullPlotData = data['result']; // Store full data { graphData: {...}, pathDetails: {...}, predicted_tokens: [...], predicted_probabilities: [...] }
 
 			// Update predicted token and probability fields
-			if (data.predicted_tokens && data.predicted_probabilities) {
-				updatePredictedTokenAndProbability(data.predicted_tokens, data.predicted_probabilities, suffix);
+			if (fullPlotData.predicted_tokens && fullPlotData.predicted_probabilities) {
+				updatePredictedTokenAndProbability(fullPlotData.predicted_tokens, fullPlotData.predicted_probabilities, suffix);
 			}
 
 			// Access num_paths from the nested graphData object
@@ -446,13 +473,18 @@ document.addEventListener('DOMContentLoaded', function() {
 		pathSlider.value = initialValue;
 		pathSlider.title = "Select a specific path to view its details in the secondary plot below.";
 
-		const valueDisplay = document.createElement('span');
-		valueDisplay.id = 'selected-path-value';
-		valueDisplay.className = 'badge bg-secondary ms-2';
-		valueDisplay.textContent = initialValue;
+		const textInput = document.createElement('input');
+		textInput.type = 'number';
+		textInput.className = 'form-control form-control-sm ms-2';
+		textInput.style.width = '60px';
+		textInput.min = 0;
+		textInput.max = numPaths > 0 ? numPaths - 1 : 0;
+		textInput.value = initialValue;
+		textInput.title = "Enter path index directly.";
 
-		sliderGroup.append(label, pathSlider);
-		wrapper.append(sliderGroup, valueDisplay);
+
+		sliderGroup.append(label, pathSlider, textInput);
+		wrapper.append(sliderGroup);
 		container.append(wrapper);
 
 		const debouncedUpdate = debounce((pathIdx) => {
@@ -465,7 +497,16 @@ document.addEventListener('DOMContentLoaded', function() {
 		// Add event listener to the newly created slider
 		pathSlider.addEventListener('input', (event) => {
 			const pathIdx = parseInt(event.target.value, 10);
-			valueDisplay.textContent = pathIdx; // Update value immediately for responsiveness
+			textInput.value = pathIdx; // Sync text input
+			debouncedUpdate(pathIdx);
+		});
+
+		// Add event listener to the text input
+		textInput.addEventListener('input', (event) => {
+			let pathIdx = parseInt(event.target.value, 10);
+			if (isNaN(pathIdx) || pathIdx < 0) pathIdx = 0;
+			if (pathIdx > parseInt(pathSlider.max)) pathIdx = parseInt(pathSlider.max);
+			pathSlider.value = pathIdx;
 			debouncedUpdate(pathIdx);
 		});
 	}
@@ -705,11 +746,13 @@ document.addEventListener('DOMContentLoaded', function() {
 			if (!sourceNode || !targetNode) return;
 
 			let color;
-			const normWeight = Math.abs(edge.weight) / max_abs_weight;
+			const normWeight = 0.5 + 0.5*(edge.weight / max_abs_weight);
 			switch (colorScheme) {
 				case 'path_weight':
-					const intensity = Math.round(255 * Math.pow(normWeight, 1/4));
-					color = edge.weight > 0 ? `rgb(0, ${intensity}, ${255-intensity})` : `rgb(${intensity}, 0, ${255-intensity})`;
+					const r = Math.round(100 + (255 - 100) * normWeight);
+					const g = Math.round(160 + (140 - 160) * normWeight);
+					const b = Math.round(230 + (0 - 230) * normWeight);
+					color = `rgb(${r}, ${g}, ${b})`;
 					break;
 				case 'input_position':
 					color = inputPosColors[edge.start_pos % n_positions];
@@ -721,7 +764,7 @@ document.addEventListener('DOMContentLoaded', function() {
 			}
 			const minWidth = 1;
 			const maxWidth = 30;
-			const edgeWidth = minWidth + (normWeight * (maxWidth - minWidth));
+			const edgeWidth = minWidth + 2 * (Math.abs(normWeight-0.5) * (maxWidth - minWidth));
 			baseEdgeWidths.push(edgeWidth);
 
 			const parallelEdgeDrawn = drawPrimaryPlot.parallelEdgeDrawn;
@@ -782,7 +825,7 @@ document.addEventListener('DOMContentLoaded', function() {
 				type: 'scatter', hoverinfo: 'text',
 				hovertext: `Path: ${edge.path_idx}<br>Weight: ${edge.weight.toFixed(4)}<br>Click to view details`,
 				customdata: Array(3).fill(edge.path_idx),
-				opacity: 0.85,
+				opacity: 0.95,
 				meta: { type: 'edge' }
 			});
 		});
@@ -868,7 +911,7 @@ document.addEventListener('DOMContentLoaded', function() {
 					loadSecondaryPlot(pathIdx);
 				}
 			} else {
-				const opacities = Array(sortedEdgesCache.length).fill(0.85);
+				const opacities = Array(sortedEdgesCache.length).fill(0.95);
 				const traceIndices = Array.from({ length: sortedEdgesCache.length }, (_, i) => i);
 				Plotly.restyle(primaryPlotDiv, { opacity: opacities }, traceIndices);
 			}
@@ -910,8 +953,8 @@ document.addEventListener('DOMContentLoaded', function() {
 		sortedEdgesCache.forEach(edge => {
 			const isSelected = edge.path_idx === pathIdx;
 			
-			mainOpacities.push(isSelected ? 0.85 : 0.3);
-			borderOpacities.push(isSelected ? 0.7 : 0.25);
+			mainOpacities.push(isSelected ? 0.95 : 0.5);
+			borderOpacities.push(isSelected ? 0.7 : 0.3);
 			borderColors.push(isSelected ? '#8B0000' : themeLayout.edgeBorderColor);
 			borderWidths.push(isSelected ? 5 : 1);
 		});
@@ -937,8 +980,6 @@ document.addEventListener('DOMContentLoaded', function() {
 		currentSecondaryPlotPathIdx = pathIdx;
 		if (pathSlider) {
 			pathSlider.value = pathIdx;
-			const valueDisplay = document.getElementById('selected-path-value');
-			if (valueDisplay) valueDisplay.textContent = pathIdx;
 		}
 		secondaryPlotWrapper.style.display = 'block';
 
@@ -946,7 +987,8 @@ document.addEventListener('DOMContentLoaded', function() {
 		// No more fetching. Get details directly from the stored data.
 		if (fullPlotData && fullPlotData.pathDetails && fullPlotData.pathDetails[pathIdx]) {
 			const details = {
-				path_data: fullPlotData.pathDetails[pathIdx]
+				path: fullPlotData.pathDetails[pathIdx].path,
+				weight: fullPlotData.pathDetails[pathIdx].weight,
 			};
 			currentSecondaryPlotDetails = details; // Store details
 			drawSecondaryPlot(details, pathIdx);
@@ -962,8 +1004,8 @@ document.addEventListener('DOMContentLoaded', function() {
 	 * Renders the secondary plot with path and token details.
 	 */
 	function drawSecondaryPlot(details, pathIdx) {
-		const { path_data } = details;
-		console.log("Drawing secondary plot for path index:", pathIdx, "with data:", path_data);
+		const path_data = details.path;
+		const weight = details.weight;
 		secondaryPlotDiv.innerHTML = '';
 	
 		const container = document.createElement('div');
@@ -978,7 +1020,7 @@ document.addEventListener('DOMContentLoaded', function() {
 		createPathSlider(pathSliderContainer, currentPrimaryPlotData.num_paths, pathIdx);
 
 		const pathHeader = document.createElement('h6');
-		pathHeader.textContent = `Path ${pathIdx} Components`;
+		pathHeader.textContent = `Path ${pathIdx} Components (w: ${weight.toFixed(3)})`;
 		pathHeader.className = 'px-2 pt-2 text-center border-top';
 	
 		const pathVizContainer = document.createElement('div');
@@ -1058,7 +1100,7 @@ document.addEventListener('DOMContentLoaded', function() {
 		const tokenHeader = document.createElement('h6');
 		tokenHeader.id = 'token-header';
 		tokenHeader.textContent = 'Top Tokens at Node';
-		tokenHeader.className = 'px-2';
+		tokenHeader.className = 'px-2 pt-2 text-center border-top';
 	
 		const tokenChart = document.createElement('div');
 		tokenChart.id = 'token-chart';
