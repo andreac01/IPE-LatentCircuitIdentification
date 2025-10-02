@@ -838,17 +838,32 @@ class ATTN_Node(Node):
 				of this node, passing trough the path from final node to the current one.
 		"""
 		if self.gradient is not None and use_precomputed:
-			if self.position is None or self.keyvalue_position is None:
+			if self.gradient.shape[1] == 1:
+				out = torch.zeros_like(self.msg_cache[self.input_name])
+				if self.patch_query:
+					out[:, self.position, :] = self.gradient.detach().clone().squeeze(1)
+				else:
+					out[:, self.keyvalue_position, :] = self.gradient.detach().clone().squeeze(1)
+				return out
+			else:
 				return self.gradient.detach().clone()
-			gradient = self.gradient.detach().clone()
-			out = torch.zeros_like(gradient, device=gradient.device)
-			if self.patch_value or self.patch_key:
-				out[:, self.keyvalue_position, :] = gradient[:, self.keyvalue_position, :]
-			if self.patch_query:
-				out[:, self.position, :] = gradient[:, self.position, :]
-			return out
 		input_residual = self.msg_cache[self.input_name].detach().clone()
-		input_residual.requires_grad_(True)
+
+		if self.position is not None and not (self.patch_query and (self.patch_key or self.patch_value)):
+			if self.patch_query:
+				target = input_residual[:, self.position, :].detach().clone().unsqueeze(1)
+				target.requires_grad_(True)
+				input_residual = torch.cat([input_residual[:, :self.position, :], target, input_residual[:, self.position+1:, :]], dim=1)
+			elif self.keyvalue_position is not None:
+				target = input_residual[:, self.keyvalue_position, :].detach().clone().unsqueeze(1)
+				target.requires_grad_(True)
+				input_residual = torch.cat([input_residual[:, :self.keyvalue_position, :], target, input_residual[:, self.keyvalue_position+1:, :]], dim=1)
+			else:
+				target = input_residual
+				target.requires_grad_(True)
+		else:
+			target = input_residual
+			target.requires_grad_(True)
 
 		with torch.enable_grad():
 			length = self.position+1 if self.position is not None else self.msg_cache[self.input_name].shape[1]
@@ -929,12 +944,21 @@ class ATTN_Node(Node):
 			grad_outputs = self.parent.calculate_gradient(save=True, use_precomputed=True) if self.parent is not None else torch.ones_like(input_residual)
 		gradient = torch.autograd.grad(
 			resized_out,
-			input_residual,
+			target,
 			grad_outputs=grad_outputs,
 			allow_unused=True,
 		)[0]
 		if save:
-			self.gradient = gradient
+			self.gradient = gradient.detach().clone()
+		if self.position is not None and not (self.patch_query and (self.patch_key or self.patch_value)):
+			out = torch.zeros_like(self.msg_cache[self.input_name])
+			if self.patch_query:
+				out[:, self.position, :] = gradient.detach().clone().squeeze(1)
+			elif self.keyvalue_position is not None:
+				out[:, self.keyvalue_position, :] = gradient.detach().clone().squeeze(1)
+			else:
+				out = gradient.detach().clone()
+			return out
 		return gradient
 
 
@@ -1213,7 +1237,7 @@ class EMBED_Node(Node):
 				return self.gradient.detach().clone()
 			gradient = self.gradient.detach().clone()
 			out = torch.zeros_like(self.msg_cache[self.input_name], device=gradient.device)
-			out[:, self.position, :] = gradient[:, self.position, :]
+			out[:, self.position, :] = gradient
 			return out
 		if grad_outputs is None:
 			gradient = self.parent.calculate_gradient(grad_outputs=None, save=True, use_precomputed=True) if self.parent is not None else torch.ones_like(self.msg_cache[self.input_name])
@@ -1402,7 +1426,12 @@ class FINAL_Node(Node):
 				of this node, passing trough the path from final node to the current one.
 		"""
 		if self.gradient is not None and use_precomputed:
-			return self.gradient.detach().clone()
+			if self.position is None:
+				return self.gradient.detach().clone()
+			gradient = self.gradient.detach().clone()
+			out = torch.zeros_like(self.msg_cache[self.input_name], device=gradient.device)
+			out[:, self.position, :] = gradient
+			return out
 		if metric is None:
 			metric = self.metric
 		if metric is None:
@@ -1419,7 +1448,10 @@ class FINAL_Node(Node):
 		)[0]
 		
 		if save:
-			self.gradient = -gradient
+			if self.position is None:
+				self.gradient = -gradient.detach().clone()
+			else:
+				self.gradient = -gradient[:, self.position, :].detach().clone()
 		return -gradient
 
 	def get_expansion_candidates(self, model_cfg: HookedTransformerConfig, include_head: bool = True, separate_kv: bool = False) -> list[Node]:
