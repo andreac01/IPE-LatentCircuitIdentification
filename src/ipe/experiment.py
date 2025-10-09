@@ -1,4 +1,3 @@
-from ipe import metrics
 from ipe.metrics import target_logit_percentage, target_probability_percentage, logit_difference, kl_divergence, indirect_effect
 from ipe.nodes import FINAL_Node, Node
 from ipe.graph_search import (
@@ -17,7 +16,6 @@ from ipe.paths import clean_paths
 
 from transformer_lens import HookedTransformer
 from functools import partial
-from copy import deepcopy
 import pickle as pkl
 from torch import Tensor
 

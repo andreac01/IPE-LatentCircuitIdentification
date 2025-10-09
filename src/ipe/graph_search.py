@@ -95,6 +95,7 @@ def find_relevant_positions(
 	return relevant_extensions
 
 
+
 def find_relevant_heads(
 		candidate: ATTN_Node,
 		incomplete_path: list[Node],
@@ -363,12 +364,13 @@ def PathMessagePatching_BestFirstSearch(
 	pbar.close()
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
 
+
 def PathMessagePatching_LimitedLevelWidth(
 	model: HookedTransformer,
 	metric: Callable,
 	root: Node,
 	max_width: int = 20000,
-	include_negative: bool = False,
+	include_negative: bool = True,
 	batch_positions: bool = False,
 	batch_heads: bool = False
 ) -> list[tuple[torch.Tensor, list[Node]]]:
@@ -414,6 +416,7 @@ def PathMessagePatching_LimitedLevelWidth(
 			target_position = cur_path_start.position
 
 			if batch_positions:
+				assert cur_path_start.position is not None, f"Current path start must have a defined position when batch_positions is True! {path}"
 				backup_position = cur_path_start.position
 				if cur_path_start.__class__.__name__ == 'ATTN_Node' and (cur_path_start.patch_key or cur_path_start.patch_value):
 					target_position = cur_path_start.keyvalue_position
@@ -427,7 +430,7 @@ def PathMessagePatching_LimitedLevelWidth(
 				cur_path_start.position = backup_position
 				if cur_path_start.__class__.__name__ == 'ATTN_Node' and (cur_path_start.patch_key or cur_path_start.patch_value):
 					cur_path_start.keyvalue_position = backup_kv_position
-			
+			assert cur_path_start.position is not None or not batch_positions, f"Current path start must have a defined position when batch_positions is True! {path}"
 			for candidate in candidate_components:
 				if candidate.__class__.__name__ == 'EMBED_Node':
 					if batch_positions:
@@ -464,16 +467,16 @@ def PathMessagePatching_LimitedLevelWidth(
 					expansions = []
 					if batch_heads and path[0].head is None:
 						expansions = find_relevant_heads(path[0], path[1:], metric, 0, include_negative, batch_positions)
-					elif batch_positions and path[0].position is None:
+					elif batch_positions and path[0].position is None or (path[0].keyvalue_position is None and (path[0].patch_key or path[0].patch_value)):
 						expansions = find_relevant_positions(path[0], path[1:], metric, 0, include_negative)
+					else: # Already non batched ATTN node, keep as is
+						new_frontier.append((abs(evaluate_path(path, metric).item()), path))
 
 					if expansions:
 						# Convert tensor contributions to floats for ranking
 						for contrib, expanded_path in expansions:
 							val = abs(contrib.item()) if include_negative else contrib.item()
 							new_frontier.append((val, expanded_path))
-					else:
-						new_frontier.append((abs(evaluate_path(path, metric).item()), path))
 				else:
 					# Not an expandable ATTN node, keep it as is.
 					new_frontier.append((abs(evaluate_path(path, metric).item()), path))
@@ -482,6 +485,7 @@ def PathMessagePatching_LimitedLevelWidth(
 			frontier = heapq.nlargest(max_width, new_frontier, key=lambda x: x[0])
 
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
+
 
 def PathAttributionPatching(
 	model: HookedTransformer,
@@ -533,8 +537,15 @@ def PathAttributionPatching(
 			candidate_components = node.get_expansion_candidates(model.cfg, include_head=True) 
 
 			# Get the meaningful candidates for expansion
-			for candidate_batch in batch_iterable(candidate_components, 100):
-				candidate_contributions = torch.stack([candidate.forward(message=None) for candidate in candidate_batch], dim=0)
+			for candidate_batch in batch_iterable(candidate_components, 128):
+				msgs_list = []
+				for candidate in candidate_batch:
+					backup_pos = candidate.position
+					candidate.position = None
+					msg = candidate.forward(message=None)
+					msgs_list.append(msg)
+					candidate.position = backup_pos
+				candidate_contributions = torch.stack(msgs_list, dim=0)
 
 				approx_contributions = torch.einsum('xbsd,bsd->x', candidate_contributions, grad)
 				for i, candidate in enumerate(candidate_batch):
@@ -542,19 +553,17 @@ def PathAttributionPatching(
 					# EMBED is the base case
 					if candidate.__class__.__name__ == 'EMBED_Node':
 						candidate_path = get_path(candidate)
+						contribution = evaluate_path(candidate_path, metric)
 						if return_all:
-							contribution = evaluate_path(candidate_path, metric)
 							completed_paths.append((contribution, candidate_path))
 						elif include_negative:
-							if abs(approx_contribution.item()) >= min_contribution:
-								contribution = evaluate_path(candidate_path, metric)
+							if abs(contribution.item()) >= min_contribution:
 								if confirm_relevance:
 									if abs(contribution) >= min_contribution:
 										completed_paths.append((contribution, candidate_path))
 								else:
 									completed_paths.append((contribution, candidate_path))
-						elif approx_contribution >= min_contribution:
-							contribution = evaluate_path(candidate_path, metric)
+						elif contribution >= min_contribution:
 							if confirm_relevance:
 								if contribution >= min_contribution:
 									completed_paths.append((contribution, candidate_path))
@@ -593,7 +602,6 @@ def PathAttributionPatching(
 		frontier = cur_depth_frontier
 
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
-
 
 
 def PathAttributionPatching_BestFirstSearch(
@@ -655,19 +663,28 @@ def PathAttributionPatching_BestFirstSearch(
 		candidate_components = node.get_expansion_candidates(model.cfg, include_head=True) 
 
 		# Get the meaningful candidates for expansion
-		for candidate_batch in batch_iterable(candidate_components, 100):
-			candidate_contributions = torch.stack([candidate.forward(message=None) for candidate in candidate_batch], dim=0)
+		for candidate_batch in batch_iterable(candidate_components, 128):
+			msgs_list = []
+			for candidate in candidate_batch:
+				backup_pos = candidate.position
+				candidate.position = None
+				msg = candidate.forward(message=None)
+				msgs_list.append(msg)
+				candidate.position = backup_pos
+			candidate_contributions = torch.stack(msgs_list, dim=0)
 
 			approx_contributions = torch.einsum('xbsd,bsd->x', candidate_contributions, grad)
+			approx_contributions = approx_contributions.detach().cpu().numpy()
 			for i, candidate in enumerate(candidate_batch):
 				approx_contribution = approx_contributions[i]
 				if include_negative or approx_contribution > 0:
-					approx_contribution = -abs(approx_contribution.item())
+					approx_contribution = -abs(approx_contribution)
 					heapq.heappush(frontier, (approx_contribution, candidate))
 	pbar.n = min(len(completed_paths), top_n)
 	pbar.refresh()
 	pbar.close()
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
+
 
 def PathAttributionPatching_LimitedLevelWidth(
 	model: HookedTransformer,
@@ -713,8 +730,15 @@ def PathAttributionPatching_LimitedLevelWidth(
 			candidate_components = node.get_expansion_candidates(model.cfg, include_head=True) 
 
 			# Get the meaningful candidates for expansion
-			for candidate_batch in batch_iterable(candidate_components, 100):
-				candidate_contributions = torch.stack([candidate.forward(message=None) for candidate in candidate_batch], dim=0)
+			for candidate_batch in batch_iterable(candidate_components, 128):
+				msgs_list = []
+				for candidate in candidate_batch:
+					backup_pos = candidate.position
+					candidate.position = None
+					msg = candidate.forward(message=None)
+					msgs_list.append(msg)
+					candidate.position = backup_pos
+				candidate_contributions = torch.stack(msgs_list, dim=0)
 
 				approx_contributions = torch.einsum('xbsd,bsd->x', candidate_contributions, grad)
 				for i, candidate in enumerate(candidate_batch):
