@@ -10,3 +10,4 @@ web_app/app/*
 temp.py
 various_tests.ipynb
 *.vscode
+./local/*
