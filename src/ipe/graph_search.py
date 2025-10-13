@@ -9,7 +9,6 @@ import gc
 import heapq
 import time
 
-
 def find_relevant_positions(
 		candidate: ATTN_Node,
 		incomplete_path: list[Node],
@@ -187,77 +186,73 @@ def PathMessagePatching(
 		A list of tuples containing the contribution score and the corresponding path, 
 		sorted by contribution in descending order.
 	"""
-	if root.position is None:
-		print("Warning: Starting node has no position defined. Batch positions will not be used.")
-		batch_positions = False
+	with torch.no_grad():
+		if root.position is None:
+			print("Warning: Starting node has no position defined. Batch positions will not be used.")
+			batch_positions = False
 
-	last_node_contribution = evaluate_path([root], metric)
-	frontier = [(last_node_contribution, [root])]
-	completed_paths = []
-	while frontier:
-		if len(frontier) > 2:
-			print(f"(total {len(frontier)})    Frontier: {frontier[:2]}... ]")
-		else:
-			print(f"(total {len(frontier)})    Frontier: {frontier}")
+		last_node_contribution = evaluate_path([root], metric)
+		frontier = [(last_node_contribution, [root])]
+		completed_paths = []
+		while frontier:
+			# Cur depth frontier contains a list of all the path continuations found in the current depth
+			# So all these paths have 1 more node than the paths in the frontier
+			cur_depth_frontier = []
 
-		# Cur depth frontier contains a list of all the path continuations found in the current depth
-		# So all these paths have 1 more node than the paths in the frontier
-		cur_depth_frontier = []
-
-		# For each incomplete path in the frontier, find all valuable continuations
-		for _, incomplete_path in tqdm(frontier):
-			
-			cur_path_start = incomplete_path[0]
-			cur_path_continuations = []
-
-			# Use a proxy compenent where heads and positions are not yet defined (declare a component of the same class)
-			if batch_positions:
-				backup_position = cur_path_start.position
-				target_position = cur_path_start.position
-				if cur_path_start.__class__.__name__ == 'ATTN_Node' and (cur_path_start.patch_key or cur_path_start.patch_value):
-					target_position = cur_path_start.keyvalue_position
-					backup_kv_position = cur_path_start.keyvalue_position
-					cur_path_start.keyvalue_position = None
-				cur_path_start.position = None
-			
-			candidate_components = cur_path_start.get_expansion_candidates(model.cfg, include_head=not batch_heads)
-			if batch_positions:
-				cur_path_start.position = backup_position
-				if cur_path_start.__class__.__name__ == 'ATTN_Node' and (cur_path_start.patch_key or cur_path_start.patch_value):
-					cur_path_start.keyvalue_position = backup_kv_position
-			# Get the meaningful candidates for expansion
-			for candidate in candidate_components:
-				# EMBED is the base case, the path is complete and after evaluation can be added to the completed paths
-				if candidate.__class__.__name__ == 'EMBED_Node':
-					candidate.position = target_position if batch_positions else candidate.position
-					
-					contribution = evaluate_path([candidate] + incomplete_path, metric)
-					if return_all:
-						completed_paths.append((contribution, [candidate] + incomplete_path))
-					elif (contribution >= min_contribution) or (include_negative and abs(contribution) >= min_contribution):
-						completed_paths.append((contribution, [candidate] + incomplete_path))
+			# For each incomplete path in the frontier, find all valuable continuations
+			for _, incomplete_path in tqdm(frontier):
 				
-				# ATTNs and MLPs are possible expansions of the current path to be added to the frontier
-				elif candidate.__class__.__name__ == 'MLP_Node':
-					candidate.position = target_position if batch_positions else candidate.position
-					contribution = evaluate_path([candidate] + incomplete_path, metric)
-					if include_negative:
-						if abs(contribution) >= min_contribution:
+				cur_path_start = incomplete_path[0]
+				cur_path_continuations = []
+
+				# Use a proxy compenent where heads and positions are not yet defined (declare a component of the same class)
+				if batch_positions:
+					backup_position = cur_path_start.position
+					target_position = cur_path_start.position
+					if cur_path_start.__class__.__name__ == 'ATTN_Node' and (cur_path_start.patch_key or cur_path_start.patch_value):
+						target_position = cur_path_start.keyvalue_position
+						backup_kv_position = cur_path_start.keyvalue_position
+						cur_path_start.keyvalue_position = None
+					cur_path_start.position = None
+				
+				candidate_components = cur_path_start.get_expansion_candidates(model.cfg, include_head=not batch_heads)
+				if batch_positions:
+					cur_path_start.position = backup_position
+					if cur_path_start.__class__.__name__ == 'ATTN_Node' and (cur_path_start.patch_key or cur_path_start.patch_value):
+						cur_path_start.keyvalue_position = backup_kv_position
+				# Get the meaningful candidates for expansion
+				for candidate in candidate_components:
+					# EMBED is the base case, the path is complete and after evaluation can be added to the completed paths
+					if candidate.__class__.__name__ == 'EMBED_Node':
+						candidate.position = target_position if batch_positions else candidate.position
+						
+						contribution = evaluate_path([candidate] + incomplete_path, metric)
+						if return_all:
+							completed_paths.append((contribution, [candidate] + incomplete_path))
+						elif (contribution >= min_contribution) or (include_negative and abs(contribution) >= min_contribution):
+							completed_paths.append((contribution, [candidate] + incomplete_path))
+					
+					# ATTNs and MLPs are possible expansions of the current path to be added to the frontier
+					elif candidate.__class__.__name__ == 'MLP_Node':
+						candidate.position = target_position if batch_positions else candidate.position
+						contribution = evaluate_path([candidate] + incomplete_path, metric)
+						if include_negative:
+							if abs(contribution) >= min_contribution:
+								cur_path_continuations.append((contribution, [candidate] + incomplete_path))
+						elif contribution >= min_contribution:
 							cur_path_continuations.append((contribution, [candidate] + incomplete_path))
-					elif contribution >= min_contribution:
-						cur_path_continuations.append((contribution, [candidate] + incomplete_path))
-				elif candidate.__class__.__name__ == 'ATTN_Node':
-					contribution = evaluate_path([candidate] + incomplete_path, metric)
-					if (contribution >= min_contribution) or (include_negative and abs(contribution) >= min_contribution):
-						if batch_heads:
-							cur_path_continuations.extend(find_relevant_heads(candidate, incomplete_path, metric, min_contribution, include_negative, batch_positions))
-						elif batch_positions:
-							cur_path_continuations.extend(find_relevant_positions(candidate, incomplete_path, metric, min_contribution, include_negative))
-						else:
-							cur_path_continuations.append((contribution, [candidate] + incomplete_path))
-			cur_depth_frontier.extend(cur_path_continuations)
-		# Sort the frontier just for visualization purposes
-		frontier = sorted(cur_depth_frontier, key=lambda x: x[0], reverse=True)
+					elif candidate.__class__.__name__ == 'ATTN_Node':
+						contribution = evaluate_path([candidate] + incomplete_path, metric)
+						if (contribution >= min_contribution) or (include_negative and abs(contribution) >= min_contribution):
+							if batch_heads:
+								cur_path_continuations.extend(find_relevant_heads(candidate, incomplete_path, metric, min_contribution, include_negative, batch_positions))
+							elif batch_positions:
+								cur_path_continuations.extend(find_relevant_positions(candidate, incomplete_path, metric, min_contribution, include_negative))
+							else:
+								cur_path_continuations.append((contribution, [candidate] + incomplete_path))
+				cur_depth_frontier.extend(cur_path_continuations)
+			# Sort the frontier just for visualization purposes
+			frontier = sorted(cur_depth_frontier, key=lambda x: x[0], reverse=True)
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
 
 def PathMessagePatching_BestFirstSearch(
@@ -298,70 +293,71 @@ def PathMessagePatching_BestFirstSearch(
 		A list of tuples containing the contribution score and the corresponding path, 
 		sorted by contribution in descending order.
 	"""
-	if root.position is None:
-		print("Warning: Starting node has no position defined. Batch positions will not be used.")
-		batch_positions = False
+	with torch.no_grad():
+		if root.position is None:
+			print("Warning: Starting node has no position defined. Batch positions will not be used.")
+			batch_positions = False
 
-	frontier = [(0, [root])]
-	completed_paths = []
-	start_time = time.time()
-	pbar = tqdm(total=top_n, desc="Completed paths")
-	while frontier and (len(completed_paths) < top_n) and (time.time() - start_time < max_time):
-		# ensure the bar reflects current number of completed paths
+		frontier = [(0, [root])]
+		completed_paths = []
+		start_time = time.time()
+		pbar = tqdm(total=top_n, desc="Completed paths")
+		while frontier and (len(completed_paths) < top_n) and (time.time() - start_time < max_time):
+			# ensure the bar reflects current number of completed paths
+			pbar.n = min(len(completed_paths), top_n)
+			pbar.refresh()
+			
+			_, best_incomplete_path = heapq.heappop(frontier)
+			cur_path_start = best_incomplete_path[0]
+
+			if cur_path_start.__class__.__name__ == 'ATTN_Node':
+				expansions = []
+				flag = False
+				if batch_heads and cur_path_start.head is None:
+					expansions = find_relevant_heads(cur_path_start, best_incomplete_path[1:], metric, 0, include_negative, batch_positions)
+					flag = True
+				elif batch_positions and cur_path_start.keyvalue_position and (cur_path_start.patch_key or cur_path_start.patch_value) is None:
+					expansions = find_relevant_positions(cur_path_start, best_incomplete_path[1:], metric, 0, include_negative)
+					flag = True
+				for expansion in expansions:
+					if include_negative:
+						heapq.heappush(frontier, (-abs(expansion[0].item()), expansion[1]))
+					else:
+						heapq.heappush(frontier, (-expansion[0].item(), expansion[1]))
+				if flag:
+					continue
+			elif cur_path_start.__class__.__name__ == 'EMBED_Node':
+				contribution = evaluate_path(best_incomplete_path, metric)
+				if include_negative or contribution > 0:
+					completed_paths.append((contribution, best_incomplete_path))
+				continue
+
+			if batch_positions:
+				backup_position = cur_path_start.position
+				target_position = cur_path_start.position
+				if cur_path_start.__class__.__name__ == 'ATTN_Node' and (cur_path_start.patch_key or cur_path_start.patch_value):
+					target_position = cur_path_start.keyvalue_position
+					backup_kv_position = cur_path_start.keyvalue_position
+					cur_path_start.keyvalue_position = None
+				cur_path_start.position = None
+			
+			candidate_components = cur_path_start.get_expansion_candidates(model.cfg, include_head=not batch_heads)
+
+			if batch_positions:
+				cur_path_start.position = backup_position
+				if cur_path_start.__class__.__name__ == 'ATTN_Node' and (cur_path_start.patch_key or cur_path_start.patch_value):
+					cur_path_start.keyvalue_position = backup_kv_position
+			
+			for candidate in candidate_components:			
+				candidate.position = target_position if batch_positions else candidate.position
+				contribution = evaluate_path([candidate] + best_incomplete_path, metric)
+				if include_negative:
+					heapq.heappush(frontier, (-abs(contribution.item()), [candidate] + best_incomplete_path))
+				else:
+					heapq.heappush(frontier, (-contribution.item(), [candidate] + best_incomplete_path))
 		pbar.n = min(len(completed_paths), top_n)
 		pbar.refresh()
-		
-		_, best_incomplete_path = heapq.heappop(frontier)
-		cur_path_start = best_incomplete_path[0]
-
-		if cur_path_start.__class__.__name__ == 'ATTN_Node':
-			expansions = []
-			flag = False
-			if batch_heads and cur_path_start.head is None:
-				expansions = find_relevant_heads(cur_path_start, best_incomplete_path[1:], metric, 0, include_negative, batch_positions)
-				flag = True
-			elif batch_positions and cur_path_start.keyvalue_position and (cur_path_start.patch_key or cur_path_start.patch_value) is None:
-				expansions = find_relevant_positions(cur_path_start, best_incomplete_path[1:], metric, 0, include_negative)
-				flag = True
-			for expansion in expansions:
-				if include_negative:
-					heapq.heappush(frontier, (-abs(expansion[0].item()), expansion[1]))
-				else:
-					heapq.heappush(frontier, (-expansion[0].item(), expansion[1]))
-			if flag:
-				continue
-		elif cur_path_start.__class__.__name__ == 'EMBED_Node':
-			contribution = evaluate_path(best_incomplete_path, metric)
-			if include_negative or contribution > 0:
-				completed_paths.append((contribution, best_incomplete_path))
-			continue
-
-		if batch_positions:
-			backup_position = cur_path_start.position
-			target_position = cur_path_start.position
-			if cur_path_start.__class__.__name__ == 'ATTN_Node' and (cur_path_start.patch_key or cur_path_start.patch_value):
-				target_position = cur_path_start.keyvalue_position
-				backup_kv_position = cur_path_start.keyvalue_position
-				cur_path_start.keyvalue_position = None
-			cur_path_start.position = None
-		
-		candidate_components = cur_path_start.get_expansion_candidates(model.cfg, include_head=not batch_heads)
-
-		if batch_positions:
-			cur_path_start.position = backup_position
-			if cur_path_start.__class__.__name__ == 'ATTN_Node' and (cur_path_start.patch_key or cur_path_start.patch_value):
-				cur_path_start.keyvalue_position = backup_kv_position
-		
-		for candidate in candidate_components:			
-			candidate.position = target_position if batch_positions else candidate.position
-			contribution = evaluate_path([candidate] + best_incomplete_path, metric)
-			if include_negative:
-				heapq.heappush(frontier, (-abs(contribution.item()), [candidate] + best_incomplete_path))
-			else:
-				heapq.heappush(frontier, (-contribution.item(), [candidate] + best_incomplete_path))
-	pbar.n = min(len(completed_paths), top_n)
-	pbar.refresh()
-	pbar.close()
+		pbar.close()
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
 
 
@@ -399,90 +395,89 @@ def PathMessagePatching_LimitedLevelWidth(
 		A list of tuples containing the contribution score and the corresponding path, 
 		sorted by contribution in descending order.
 	"""
-	if root.position is None and batch_positions:
-		print("Warning: Starting node has no position defined. Batch positions will be disabled.")
-		batch_positions = False
+	with torch.no_grad():
+		if root.position is None and batch_positions:
+			print("Warning: Starting node has no position defined. Batch positions will be disabled.")
+			batch_positions = False
 
-	frontier = [(1.0, [root])]
-	completed_paths = []
-	
-	while frontier:
-		# BUG FIX: This list must be initialized *before* the loop, not inside it.
-		# This ensures we collect expansions from ALL paths in the current frontier.
-		current_depth_frontier = []
+		frontier = [(1.0, [root])]
+		completed_paths = []
 		
-		for _, path in tqdm(frontier, desc=f"Expanding level (size {len(frontier)})"):
-			cur_path_start = path[0]
-			target_position = cur_path_start.position
-
-			if batch_positions:
-				assert cur_path_start.position is not None, f"Current path start must have a defined position when batch_positions is True! {path}"
-				backup_position = cur_path_start.position
-				if cur_path_start.__class__.__name__ == 'ATTN_Node' and (cur_path_start.patch_key or cur_path_start.patch_value):
-					target_position = cur_path_start.keyvalue_position
-					backup_kv_position = cur_path_start.keyvalue_position
-					cur_path_start.keyvalue_position = None
-				cur_path_start.position = None
+		while frontier:
+			current_depth_frontier = []
 			
-			candidate_components = cur_path_start.get_expansion_candidates(model.cfg, include_head=not batch_heads)
+			for _, path in tqdm(frontier, desc=f"Expanding level (size {len(frontier)})"):
+				cur_path_start = path[0]
+				target_position = cur_path_start.position
 
-			if batch_positions:
-				cur_path_start.position = backup_position
-				if cur_path_start.__class__.__name__ == 'ATTN_Node' and (cur_path_start.patch_key or cur_path_start.patch_value):
-					cur_path_start.keyvalue_position = backup_kv_position
-			assert cur_path_start.position is not None or not batch_positions, f"Current path start must have a defined position when batch_positions is True! {path}"
-			for candidate in candidate_components:
-				if candidate.__class__.__name__ == 'EMBED_Node':
-					if batch_positions:
-						candidate.position = target_position
-					contribution = evaluate_path([candidate] + path, metric)
-					if include_negative or contribution >= 0:
-						completed_paths.append((contribution, [candidate] + path))
+				if batch_positions:
+					assert cur_path_start.position is not None, f"Current path start must have a defined position when batch_positions is True! {path}"
+					backup_position = cur_path_start.position
+					if cur_path_start.__class__.__name__ == 'ATTN_Node' and (cur_path_start.patch_key or cur_path_start.patch_value):
+						target_position = cur_path_start.keyvalue_position
+						backup_kv_position = cur_path_start.keyvalue_position
+						cur_path_start.keyvalue_position = None
+					cur_path_start.position = None
+				
+				candidate_components = cur_path_start.get_expansion_candidates(model.cfg, include_head=not batch_heads)
 
-				elif candidate.__class__.__name__ == 'MLP_Node' or candidate.__class__.__name__ == 'ATTN_Node':
-					# For batched search, position might be generic here
-					if batch_positions:
-						candidate.position = target_position
-					
-					contribution = evaluate_path([candidate] + path, metric)
-					
-					# Store the contribution magnitude for ranking
-					contribution_val = abs(contribution.item()) if include_negative else contribution.item()
+				if batch_positions:
+					cur_path_start.position = backup_position
+					if cur_path_start.__class__.__name__ == 'ATTN_Node' and (cur_path_start.patch_key or cur_path_start.patch_value):
+						cur_path_start.keyvalue_position = backup_kv_position
+				assert cur_path_start.position is not None or not batch_positions, f"Current path start must have a defined position when batch_positions is True! {path}"
+				for candidate in candidate_components:
+					if candidate.__class__.__name__ == 'EMBED_Node':
+						if batch_positions:
+							candidate.position = target_position
+						contribution = evaluate_path([candidate] + path, metric)
+						if include_negative or contribution >= 0:
+							completed_paths.append((contribution, [candidate] + path))
 
-					if include_negative or contribution >= 0:
-						current_depth_frontier.append((contribution_val, [candidate] + path))
-		
-		if not current_depth_frontier:
-			break
+					elif candidate.__class__.__name__ == 'MLP_Node' or candidate.__class__.__name__ == 'ATTN_Node':
+						# For batched search, position might be generic here
+						if batch_positions:
+							candidate.position = target_position
+						
+						contribution = evaluate_path([candidate] + path, metric)
+						
+						# Store the contribution magnitude for ranking
+						contribution_val = abs(contribution.item()) if include_negative else contribution.item()
 
-		# First Pruning: Keep the top `max_width` general paths
-		frontier = heapq.nlargest(max_width, current_depth_frontier, key=lambda x: x[0])
-		
-		# Second Step: If batching, expand the grouped nodes
-		if batch_heads or batch_positions:
-			new_frontier = []
-			for _, path in frontier:
-				# Check if this node is a generic ATTN node that needs expansion
-				if path[0].__class__.__name__ == 'ATTN_Node':
-					expansions = []
-					if batch_heads and path[0].head is None:
-						expansions = find_relevant_heads(path[0], path[1:], metric, 0, include_negative, batch_positions)
-					elif batch_positions and path[0].position is None or (path[0].keyvalue_position is None and (path[0].patch_key or path[0].patch_value)):
-						expansions = find_relevant_positions(path[0], path[1:], metric, 0, include_negative)
-					else: # Already non batched ATTN node, keep as is
+						if include_negative or contribution >= 0:
+							current_depth_frontier.append((contribution_val, [candidate] + path))
+			
+			if not current_depth_frontier:
+				break
+
+			# First Pruning: Keep the top `max_width` general paths
+			frontier = heapq.nlargest(max_width, current_depth_frontier, key=lambda x: x[0])
+			
+			# Second Step: If batching, expand the grouped nodes
+			if batch_heads or batch_positions:
+				new_frontier = []
+				for _, path in frontier:
+					# Check if this node is a generic ATTN node that needs expansion
+					if path[0].__class__.__name__ == 'ATTN_Node':
+						expansions = []
+						if batch_heads and path[0].head is None:
+							expansions = find_relevant_heads(path[0], path[1:], metric, 0, include_negative, batch_positions)
+						elif batch_positions and path[0].position is None or (path[0].keyvalue_position is None and (path[0].patch_key or path[0].patch_value)):
+							expansions = find_relevant_positions(path[0], path[1:], metric, 0, include_negative)
+						else: # Already non batched ATTN node, keep as is
+							new_frontier.append((abs(evaluate_path(path, metric).item()), path))
+
+						if expansions:
+							# Convert tensor contributions to floats for ranking
+							for contrib, expanded_path in expansions:
+								val = abs(contrib.item()) if include_negative else contrib.item()
+								new_frontier.append((val, expanded_path))
+					else:
+						# Not an expandable ATTN node, keep it as is.
 						new_frontier.append((abs(evaluate_path(path, metric).item()), path))
 
-					if expansions:
-						# Convert tensor contributions to floats for ranking
-						for contrib, expanded_path in expansions:
-							val = abs(contrib.item()) if include_negative else contrib.item()
-							new_frontier.append((val, expanded_path))
-				else:
-					# Not an expandable ATTN node, keep it as is.
-					new_frontier.append((abs(evaluate_path(path, metric).item()), path))
-
-			# Second Pruning: Keep the top `max_width` of the newly expanded, specific paths
-			frontier = heapq.nlargest(max_width, new_frontier, key=lambda x: x[0])
+				# Second Pruning: Keep the top `max_width` of the newly expanded, specific paths
+				frontier = heapq.nlargest(max_width, new_frontier, key=lambda x: x[0])
 
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
 
@@ -531,70 +526,70 @@ def PathAttributionPatching(
 		for node in tqdm(frontier):
 
 			grad = node.calculate_gradient(use_precomputed=True)
+			with torch.no_grad():
+				childrens = []
 
-			childrens = []
+				candidate_components = node.get_expansion_candidates(model.cfg, include_head=True) 
 
-			candidate_components = node.get_expansion_candidates(model.cfg, include_head=True) 
+				# Get the meaningful candidates for expansion
+				for candidate_batch in batch_iterable(candidate_components, 128):
+					msgs_list = []
+					for candidate in candidate_batch:
+						backup_pos = candidate.position
+						candidate.position = None
+						msg = candidate.forward(message=None)
+						msgs_list.append(msg)
+						candidate.position = backup_pos
+					candidate_contributions = torch.stack(msgs_list, dim=0)
 
-			# Get the meaningful candidates for expansion
-			for candidate_batch in batch_iterable(candidate_components, 128):
-				msgs_list = []
-				for candidate in candidate_batch:
-					backup_pos = candidate.position
-					candidate.position = None
-					msg = candidate.forward(message=None)
-					msgs_list.append(msg)
-					candidate.position = backup_pos
-				candidate_contributions = torch.stack(msgs_list, dim=0)
-
-				approx_contributions = torch.einsum('xbsd,bsd->x', candidate_contributions, grad)
-				for i, candidate in enumerate(candidate_batch):
-					approx_contribution = approx_contributions[i]
-					# EMBED is the base case
-					if candidate.__class__.__name__ == 'EMBED_Node':
-						candidate_path = get_path(candidate)
-						contribution = evaluate_path(candidate_path, metric)
-						if return_all:
-							completed_paths.append((contribution, candidate_path))
-						elif include_negative:
-							if abs(contribution.item()) >= min_contribution:
+					approx_contributions = torch.einsum('xbsd,bsd->x', candidate_contributions, grad)
+					for i, candidate in enumerate(candidate_batch):
+						approx_contribution = approx_contributions[i]
+						# EMBED is the base case
+						if candidate.__class__.__name__ == 'EMBED_Node':
+							candidate_path = get_path(candidate)
+							contribution = evaluate_path(candidate_path, metric)
+							if return_all:
+								completed_paths.append((contribution, candidate_path))
+							elif include_negative:
+								if abs(contribution.item()) >= min_contribution:
+									if confirm_relevance:
+										if abs(contribution) >= min_contribution:
+											completed_paths.append((contribution, candidate_path))
+									else:
+										completed_paths.append((contribution, candidate_path))
+							elif contribution >= min_contribution:
 								if confirm_relevance:
-									if abs(contribution) >= min_contribution:
+									if contribution >= min_contribution:
 										completed_paths.append((contribution, candidate_path))
 								else:
 									completed_paths.append((contribution, candidate_path))
-						elif contribution >= min_contribution:
-							if confirm_relevance:
-								if contribution >= min_contribution:
-									completed_paths.append((contribution, candidate_path))
-							else:
-								completed_paths.append((contribution, candidate_path))
-							
-					
-					# MLP requires to check the contribution of the whole component and of the individual layers
-					elif candidate.__class__.__name__ == 'MLP_Node' or candidate.__class__.__name__ == 'ATTN_Node':
-						if include_negative:
-							if abs(approx_contribution.item()) >= min_contribution:
+								
+						
+						# MLP requires to check the contribution of the whole component and of the individual layers
+						elif candidate.__class__.__name__ == 'MLP_Node' or candidate.__class__.__name__ == 'ATTN_Node':
+							if include_negative:
+								if abs(approx_contribution.item()) >= min_contribution:
+									if confirm_relevance:
+										contribution = evaluate_path(get_path(candidate), metric)
+										if abs(contribution) >= min_contribution:
+											childrens.append(candidate)
+									else:
+										childrens.append(candidate)
+							elif approx_contribution >= min_contribution:
 								if confirm_relevance:
 									contribution = evaluate_path(get_path(candidate), metric)
-									if abs(contribution) >= min_contribution:
+									if contribution >= min_contribution:
 										childrens.append(candidate)
 								else:
 									childrens.append(candidate)
-						elif approx_contribution >= min_contribution:
-							if confirm_relevance:
-								contribution = evaluate_path(get_path(candidate), metric)
-								if contribution >= min_contribution:
-									childrens.append(candidate)
-							else:
-								childrens.append(candidate)
-			cur_depth_frontier.extend(childrens)
-			node.children = childrens
-			if len(childrens) == 0:
-				node.gradient = None # Free the gradient of the node if it has no children to save memory
+				cur_depth_frontier.extend(childrens)
+				node.children = childrens
+				if len(childrens) == 0:
+					node.gradient = None # Free the gradient of the node if it has no children to save memory
 		
 		for node in frontier: # Free the gradient of the parent nodes to save memory
-			if node.parent is not None:
+			if node.parent is not None and node.parent.gradient is not None:
 				node.parent.gradient = None
 		gc.collect() # Reclaim memory
 		torch.cuda.empty_cache()
@@ -659,27 +654,27 @@ def PathAttributionPatching_BestFirstSearch(
 			continue
 
 		grad = node.calculate_gradient(use_precomputed=True, save=False) # Initially do not save gradient to save memory, however increase the computation time
+		with torch.no_grad():
+			candidate_components = node.get_expansion_candidates(model.cfg, include_head=True) 
 
-		candidate_components = node.get_expansion_candidates(model.cfg, include_head=True) 
+			# Get the meaningful candidates for expansion
+			for candidate_batch in batch_iterable(candidate_components, 128):
+				msgs_list = []
+				for candidate in candidate_batch:
+					backup_pos = candidate.position
+					candidate.position = None
+					msg = candidate.forward(message=None)
+					msgs_list.append(msg)
+					candidate.position = backup_pos
+				candidate_contributions = torch.stack(msgs_list, dim=0)
 
-		# Get the meaningful candidates for expansion
-		for candidate_batch in batch_iterable(candidate_components, 128):
-			msgs_list = []
-			for candidate in candidate_batch:
-				backup_pos = candidate.position
-				candidate.position = None
-				msg = candidate.forward(message=None)
-				msgs_list.append(msg)
-				candidate.position = backup_pos
-			candidate_contributions = torch.stack(msgs_list, dim=0)
-
-			approx_contributions = torch.einsum('xbsd,bsd->x', candidate_contributions, grad)
-			approx_contributions = approx_contributions.detach().cpu().numpy()
-			for i, candidate in enumerate(candidate_batch):
-				approx_contribution = approx_contributions[i]
-				if include_negative or approx_contribution > 0:
-					approx_contribution = -abs(approx_contribution)
-					heapq.heappush(frontier, (approx_contribution, candidate))
+				approx_contributions = torch.einsum('xbsd,bsd->x', candidate_contributions, grad)
+				approx_contributions = approx_contributions.detach().cpu().numpy()
+				for i, candidate in enumerate(candidate_batch):
+					approx_contribution = approx_contributions[i]
+					if include_negative or approx_contribution > 0:
+						approx_contribution = -abs(approx_contribution)
+						heapq.heappush(frontier, (approx_contribution, candidate))
 	pbar.n = min(len(completed_paths), top_n)
 	pbar.refresh()
 	pbar.close()
@@ -727,34 +722,35 @@ def PathAttributionPatching_LimitedLevelWidth(
 
 			grad = node.calculate_gradient(use_precomputed=True)
 
-			candidate_components = node.get_expansion_candidates(model.cfg, include_head=True) 
+			with torch.no_grad():
+				candidate_components = node.get_expansion_candidates(model.cfg, include_head=True) 
 
-			# Get the meaningful candidates for expansion
-			for candidate_batch in batch_iterable(candidate_components, 128):
-				msgs_list = []
-				for candidate in candidate_batch:
-					backup_pos = candidate.position
-					candidate.position = None
-					msg = candidate.forward(message=None)
-					msgs_list.append(msg)
-					candidate.position = backup_pos
-				candidate_contributions = torch.stack(msgs_list, dim=0)
+				# Get the meaningful candidates for expansion
+				for candidate_batch in batch_iterable(candidate_components, 128):
+					msgs_list = []
+					for candidate in candidate_batch:
+						backup_pos = candidate.position
+						candidate.position = None
+						msg = candidate.forward(message=None)
+						msgs_list.append(msg)
+						candidate.position = backup_pos
+					candidate_contributions = torch.stack(msgs_list, dim=0)
 
-				approx_contributions = torch.einsum('xbsd,bsd->x', candidate_contributions, grad)
-				for i, candidate in enumerate(candidate_batch):
-					approx_contribution = approx_contributions[i]
-					# EMBED is the base case
-					if candidate.__class__.__name__ == 'EMBED_Node':
-						candidate_path = get_path(candidate)
-						contribution = evaluate_path(candidate_path, metric)
-						completed_paths.append((contribution, candidate_path))
-					
-					# MLP requires to check the contribution of the whole component and of the individual layers
-					elif candidate.__class__.__name__ == 'MLP_Node' or candidate.__class__.__name__ == 'ATTN_Node':
-						if include_negative:
-							cur_depth_frontier.append((abs(approx_contribution.item()), candidate))							
-						else:
-							cur_depth_frontier.append((approx_contribution.item(), candidate))
+					approx_contributions = torch.einsum('xbsd,bsd->x', candidate_contributions, grad)
+					for i, candidate in enumerate(candidate_batch):
+						approx_contribution = approx_contributions[i]
+						# EMBED is the base case
+						if candidate.__class__.__name__ == 'EMBED_Node':
+							candidate_path = get_path(candidate)
+							contribution = evaluate_path(candidate_path, metric)
+							completed_paths.append((contribution, candidate_path))
+						
+						# MLP requires to check the contribution of the whole component and of the individual layers
+						elif candidate.__class__.__name__ == 'MLP_Node' or candidate.__class__.__name__ == 'ATTN_Node':
+							if include_negative:
+								cur_depth_frontier.append((abs(approx_contribution.item()), candidate))							
+							else:
+								cur_depth_frontier.append((approx_contribution.item(), candidate))
 		cur_depth_frontier = heapq.nlargest(max_width, cur_depth_frontier, key=lambda x: x[0])
 
 		for _, node in previous_level_nodes:

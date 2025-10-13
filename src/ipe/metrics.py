@@ -128,7 +128,8 @@ def indirect_effect(clean_final_resid: Tensor,
 					model: HookedTransformer,
 					target_tokens: List[int],
 					cf_target_tokens: List[int],
-					verbose = False) -> Tensor:
+					verbose = False,
+     				baseline_value: float = 0.) -> Tensor:
 	"""
 	Compute the Indirect Effect (IE) score.
 	IE(z) = 0.5 * [ (P*z(r) - P(r)) / P(r) + (P(r') - P*z(r')) / P*z(r') ]
@@ -172,15 +173,15 @@ def indirect_effect(clean_final_resid: Tensor,
 	batch_indices = torch.arange(len(target_tokens))
 
 	# P(r'): Probability of the clean target (r') on a clean run.
-	P_r_prime = clean_probs[batch_indices, target_tokens]
+	P_r_prime = clean_probs[batch_indices, cf_target_tokens]
 
 	# P(r): Probability of the corrupt target (r) on a clean run.
-	P_r = clean_probs[batch_indices, cf_target_tokens]
+	P_r = clean_probs[batch_indices, target_tokens]
 
 	# P*z(r'): Probability of the clean target (r') on a corrupted run.
-	P_z_star_r_prime = corrupted_probs[batch_indices, target_tokens]
+	P_z_star_r_prime = corrupted_probs[batch_indices, cf_target_tokens]
 	# P*z(r): Probability of the corrupt target (r) on a corrupted run.
-	P_z_star_r = corrupted_probs[batch_indices, cf_target_tokens]
+	P_z_star_r = corrupted_probs[batch_indices, target_tokens]
 
 	# Term 1: (P*z(r) - P(r)) / P(r)
 	# Relative increase in probability for the new answer (r)
@@ -193,14 +194,14 @@ def indirect_effect(clean_final_resid: Tensor,
 	indirect_effects = 0.5 * (term1 + term2)
 
 	if verbose:
-		print(f"First prompt top 3 tokens: {torch.topk(clean_probs, 3).indices, torch.topk(clean_probs, 3).values}")
-		print(f"Target tokens (r'): {target_tokens}")
-		print(f"Counterfactual tokens (r): {cf_target_tokens}")
+		print(f"First prompt top 3 tokens: {model.to_str_tokens(torch.topk(clean_probs, 3).indices[0]), torch.topk(clean_probs, 3).values[0]}")
+		print(f"Target tokens (r): {target_tokens}")
+		print(f"Counterfactual tokens (r'): {cf_target_tokens}")
 		print(f"P(r): {P_r.mean().item()}, P*z(r): {P_z_star_r.mean().item()}")
 		print(f"P(r'): {P_r_prime.mean().item()}, P*z(r'): {P_z_star_r_prime.mean().item()}")
-		print(f"Indirect effect: {indirect_effects.mean().item()}")
+		print(f"Indirect effect: {indirect_effects.mean().item() - baseline_value}")
 
-	return torch.mean(indirect_effects)
+	return torch.mean(indirect_effects) - baseline_value
 
 def logit_difference(corrupted_resid: Tensor, 
 					model: HookedTransformer,

@@ -133,6 +133,12 @@ def clean_paths(paths: list[tuple[float, list]], inplace: bool = False) -> list[
 					cleaned_node.head = node.head
 				if hasattr(node, 'keyvalue_position'):
 					cleaned_node.keyvalue_position = node.keyvalue_position
+				if hasattr(node, 'patch_query'):
+					cleaned_node.patch_query = node.patch_query
+				if hasattr(node, 'patch_key'):
+					cleaned_node.patch_key = node.patch_key
+				if hasattr(node, 'patch_value'):
+					cleaned_node.patch_value = node.patch_value
 				cleaned_path.append(cleaned_node)
 			if isinstance(c, torch.Tensor):
 				c = c.item()  # convert tensor to float for serialization
