@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.abspath('../../../'))
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'IPE'
-copyright = '2025, Andrea Cerutti. Released under the GNU General Public License v3.0'
+copyright = '2025, Andrea Cerutti. Released under the MIT License.'
 author = 'Andrea Cerutti'
 release = '0.0.1'
 

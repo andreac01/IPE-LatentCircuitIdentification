@@ -2,12 +2,20 @@
 API Reference
 ===================
 
-This is an auto-generated API reference for the project's codebase.
+API reference for the project's codebase.
 
 .. toctree::
    :maxdepth: 2
+   :caption: API Reference
 
-   attention
-   graph_search
-   metrics
-   nodes
+   Attention <attention>
+   Decoding Plot <plot/decoding_plot>
+   Experiment <experiment>
+   Graph Plot <plot/graph_plot>
+   Graph Search <graph_search>
+   Image Nodes <webutils/image_nodes>
+   Metrics <metrics>
+   Miscellanea <miscellanea>
+   Model <webutils/model>
+   Nodes <nodes>
+   Paths <paths>

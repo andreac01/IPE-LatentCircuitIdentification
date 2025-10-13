@@ -390,8 +390,8 @@ class MLP_Node(Node):
 		Returns the list of predecessors nodes in the computational graph whose outputs influence the
 		output of this node. 
 		Previous nodes of an MLP are:
-			- MLP, EMBED and ATTN nodes in self.position from previous layers.
-			- ATTN nodes in self.position from current layers.
+		- MLP, EMBED and ATTN nodes in self.position from previous layers.
+		- ATTN nodes in self.position from current layers.
 		ATTN nodes are always patched both in query and key-value positions separately.
 		Args:
 
@@ -967,8 +967,8 @@ class ATTN_Node(Node):
 		Returns the list of predecessors nodes in the computational graph whose outputs influence the
 		output of this node. 
 		Previous nodes are:
-			- MLP, EMBED and ATTN nodes in self.position from previous layers if patch_query=True.
-			- MLP, EMBED and ATTN nodes in all previous positions from previous layers if patch_key=True or patch_value=True.
+		- MLP, EMBED and ATTN nodes in self.position from previous layers if patch_query=True.
+		- MLP, EMBED and ATTN nodes in all previous positions from previous layers if patch_key=True or patch_value=True.
 		Args:
 
 			model_cfg (HookedTransformerConfig):

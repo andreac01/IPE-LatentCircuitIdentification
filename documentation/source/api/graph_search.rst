@@ -1,6 +1,6 @@
-===================
+======================
 Graph Search Module
-===================
+======================
 
 .. automodule:: ipe.graph_search
    :members:

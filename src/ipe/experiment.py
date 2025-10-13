@@ -40,19 +40,20 @@ class ExperimentManager:
 
 		It helps in the definition of the metric, the algorithm, running the experiment, plotting the results and decoding the residuals along the paths.
 		In the setup it allows you to:
-			1. Choose the metric in between:
-				- :func:`ipe.metrics.target_logit_percentage` (metric = 'target_logit_percentage')
-				- :func:`ipe.metrics.target_probability_percentage` (metric = 'target_probability_percentage') (default)
-				- :func:`ipe.metrics.logit_difference` (metric = 'logit_difference')
-				- :func:`ipe.metrics.kl_divergence` (metric = 'kl_divergence')
-				- :func:`ipe.metrics.indirect_effect` (metric = 'indirect_effect')
-			2. Choose the seach algorithm in between:
-				- :func:`ipe.graph_search.PathAttributionPatching` (alorithm = 'PathAttributionPatching', method = 'Threshold')
-				- :func:`ipe.graph_search.PathMessagePatching` (alorithm = 'PathMessagePatching', method = 'Threshold')
-				- :func:`ipe.graph_search.PathAttributionPatching_BestFirstSearch` (alorithm = 'PathAttributionPatching', method = 'BestFirstSearch') (default)
-				- :func:`ipe.graph_search.PathMessagePatching_BestFirstSearch` (alorithm = 'PathMessagePatching', method = 'BestFirstSearch')
-				- :func:`ipe.graph_search.PathAttributionPatching_LimitedLevelWidth` (alorithm = 'PathAttributionPatching', method = 'LimitedLevelWidth')
-				- :func:`ipe.graph_search.PathMessagePatching_LimitedLevelWidth` (alorithm = 'PathMessagePatching', method = 'LimitedLevelWidth')
+		1. Choose the metric in between:
+		- :func:`ipe.metrics.target_logit_percentage` (metric = 'target_logit_percentage')
+		- :func:`ipe.metrics.target_probability_percentage` (metric = 'target_probability_percentage') (default)
+		- :func:`ipe.metrics.logit_difference` (metric = 'logit_difference')
+		- :func:`ipe.metrics.kl_divergence` (metric = 'kl_divergence')
+		- :func:`ipe.metrics.indirect_effect` (metric = 'indirect_effect')
+		2. Choose the seach algorithm in between:
+		- :func:`ipe.graph_search.PathAttributionPatching` (alorithm = 'PathAttributionPatching', method = 'Threshold')
+		- :func:`ipe.graph_search.PathMessagePatching` (alorithm = 'PathMessagePatching', method = 'Threshold')
+		- :func:`ipe.graph_search.PathAttributionPatching_BestFirstSearch` (alorithm = 'PathAttributionPatching', method = 'BestFirstSearch') (default)
+		- :func:`ipe.graph_search.PathMessagePatching_BestFirstSearch` (alorithm = 'PathMessagePatching', method = 'BestFirstSearch')
+		- :func:`ipe.graph_search.PathAttributionPatching_LimitedLevelWidth` (alorithm = 'PathAttributionPatching', method = 'LimitedLevelWidth')
+		- :func:`ipe.graph_search.PathMessagePatching_LimitedLevelWidth` (alorithm = 'PathMessagePatching', method = 'LimitedLevelWidth')
+		
 		You can also provide custom parameters to the metric and the algorithm as a dictionary.
 		
 		Args:

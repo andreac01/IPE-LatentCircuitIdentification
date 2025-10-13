@@ -1,6 +1,6 @@
-===================
+=======================
 Decoding Plot Module
-===================
+=======================
 
 .. automodule:: ipe.plot.decoding_plot
    :members:
