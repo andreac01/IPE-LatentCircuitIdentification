@@ -34,8 +34,9 @@ class ExperimentManager:
 		metric: str = 'target_logit_percentage',
 		metric_params: dict = {},
 		positional_search: bool = True,
-		patch_type: str = 'auto'
-	):
+		patch_type: str = 'auto',
+		patch_clean_into_cf: bool = True
+		):
 		"""Manages the setup and execution of path-finding experiments using a easier interface, that employs default parameters and sensible checks.
 
 		It helps in the definition of the metric, the algorithm, running the experiment, plotting the results and decoding the residuals along the paths.
@@ -82,7 +83,8 @@ class ExperimentManager:
 				Whether to perform positional search. If True, all prompts (and cf_prompts if provided) must have the same length. Defaults to True.
 			patch_type (str, optional):
 				The type of patching to use. Options are 'zero', 'counterfactual', or 'auto'. If 'auto', uses 'counterfactual' if cf_prompts are provided, otherwise uses 'zero'. Defaults to 'auto'.
-		
+			patch_clean_into_cf (bool, optional):
+				If True and patch_type is 'counterfactual', patches clean residuals into counterfactual runs. If False, patches counterfactual residuals into clean runs. Defaults to True.
 		Raises:
 			AssertionError: If inconsistencies in the parameters are found.
 			ValueError: If an unknown metric, algorithm, or search strategy is provided, or if required parameters are missing.
@@ -114,6 +116,9 @@ class ExperimentManager:
 			self.patch_type = 'counterfactual' if cf_prompts else 'zero'
 		else:
 			self.patch_type = patch_type
+   
+		self.denoising = patch_clean_into_cf
+		self.noising = not patch_clean_into_cf
 
 		self.load_metric(metric, metric_params)
 		self.load_root()
@@ -127,6 +132,8 @@ class ExperimentManager:
 		Raises:
 			AssertionError: If any of the validity checks fail.
 		"""
+		if self.denoising and self.patch_type == 'zero':
+			print("WARNING: denoising is True but patch_type is 'zero'. This parameter will be ignored.")
 		if self.positional_search:
 			for p in self.prompts:
 				assert self.prompt_length == len(self.model.to_str_tokens(p, prepend_bos=True)), f'Prompt {p} length "{len(self.model.to_str_tokens(p, prepend_bos=True))}" does not match length of other prompts.'
@@ -250,7 +257,14 @@ class ExperimentManager:
 		Returns:
 			list: A list of found paths if return_paths is True.
 		"""
+		if self.denoising and self.patch_type == 'counterfactual':
+			print("Patching clean residuals into counterfactual runs.")
+		# 	self.cache, self.cf_cache = self.cf_cache, self.cache
+		# else:
+		# 	print("Patching counterfactual residuals into clean runs.")
 		self.paths = self.algorithm()
+		# if self.denoising and self.patch_type == 'counterfactual':
+		# 	self.cache, self.cf_cache = self.cf_cache, self.cache
 		if return_paths:
 			return self.paths
 	
@@ -292,12 +306,14 @@ class ExperimentManager:
 		self,
 	):
 		"""Initialize the root node for the path-finding algorithm. The root node represents the starting point of the search process and is configured based on the model, metric, position and other relevant parameters."""
+		root_cache = self.cf_cache if (self.denoising and self.patch_type == 'counterfactual') else self.cache
+		root_cf_cache = self.cache if (self.denoising and self.patch_type == 'counterfactual') else self.cf_cache
 		self.root = FINAL_Node(
 			model=self.model,
 			layer=self.model.cfg.n_layers - 1,
 			position=self.cache['blocks.0.hook_resid_post'].shape[1] - 1 if self.positional_search else None,
-			msg_cache=self.cache,
-			cf_cache=self.cf_cache,
+			msg_cache=root_cache,
+			cf_cache=root_cf_cache,
 			metric=self.metric,
 			patch_type=self.patch_type
 		)
@@ -322,6 +338,8 @@ class ExperimentManager:
 		require_baseline = False
 		if metric == 'indirect_effect':
 			function = indirect_effect
+			if self.denoising:
+				require_baseline = True
 		elif metric == 'target_logit_percentage':
 			function = target_logit_percentage
 		elif metric == 'target_probability_percentage':
@@ -355,6 +373,13 @@ class ExperimentManager:
 		missing_parameters = set(required_params.keys()) - set(metric_params.keys())
 		if missing_parameters:
 			raise ValueError(f"Missing required parameters for metric '{metric}': {missing_parameters}")
+
+		optional_missing = set(optional_params.keys()) - set(metric_params.keys())
+		for param in optional_missing:
+			if param in self_parameters:
+				print(f"WARNING: [load_metric] Using ExperimentManager attribute for optional parameter '{param}': {self.__dict__[param]}")
+				metric_params[param] = self.__dict__[param]
+    
 		non_modified_defaults = {k: v for k, v in optional_params.items() if k not in metric_params}
 
 		metric_params_complete = {**non_modified_defaults, **metric_params}
@@ -362,7 +387,10 @@ class ExperimentManager:
 
 		for k, v in non_modified_defaults.items():
 			if k == 'baseline_value' and require_baseline:
-				baseline = partial(function, **metric_params_complete)(self.cache[f'blocks.{self.model.cfg.n_layers - 1}.hook_resid_post'])
+				if self.denoising:
+					baseline = self.metric(corrupted_resid = self.cf_cache[f'blocks.{self.model.cfg.n_layers - 1}.hook_resid_post'])
+				else:
+					baseline = self.metric(corrupted_resid = self.cache[f'blocks.{self.model.cfg.n_layers - 1}.hook_resid_post'])
 				metric_params_complete['baseline_value'] = baseline
 				self.metric = partial(function, **metric_params_complete)
 				print(f"WARNING: [load_metric] Using computed baseline for '{k}': {baseline}")
