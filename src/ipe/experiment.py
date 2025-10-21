@@ -116,7 +116,11 @@ class ExperimentManager:
 			self.patch_type = 'counterfactual' if cf_prompts else 'zero'
 		else:
 			self.patch_type = patch_type
-   
+
+		if patch_clean_into_cf and metric in ['indirect_effect', 'logit_difference']:
+			print("WARNING: patch_clean_into_cf is True but the chosen metric requires patching counterfactual into clean runs. Overriding patch_clean_into_cf to False.")
+			patch_clean_into_cf = False
+
 		self.denoising = patch_clean_into_cf
 		self.noising = not patch_clean_into_cf
 
@@ -268,7 +272,7 @@ class ExperimentManager:
 		if return_paths:
 			return self.paths
 	
-	def save_paths(self, clean=True, filepath='./paths.pkl'):
+	def save_paths(self, filepath='./paths.pkl', clean=True):
 		"""Save the found paths to a file for later analysis or visualization. Optionally, clean the paths to remove redundant information before saving.
 		Args:
 			clean (bool, optional):
@@ -465,9 +469,3 @@ class ExperimentManager:
 		algorithm_params_complete = {**non_modified_defaults, **algorithm_params}
 
 		self.algorithm = partial(algorithm_function, **algorithm_params_complete)
-		
-
-	
-
-	
-

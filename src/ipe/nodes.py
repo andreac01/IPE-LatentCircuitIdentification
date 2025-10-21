@@ -759,7 +759,7 @@ class ATTN_Node(Node):
 				value = torch.einsum('bsd,ndh->bsnh', value_residual, W_V) + b_V[None, None, :, :]
 		else:
 			add_bias = True
-			if self.model.cfg.positional_embedding_type == 'rotary':
+			if self.model.cfg.n_key_value_heads is not None:
 				step = self.model.cfg.n_heads // self.model.cfg.n_key_value_heads
 			else:
 				step = 1

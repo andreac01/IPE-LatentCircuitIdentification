@@ -198,7 +198,6 @@ def PathMessagePatching(
 			# Cur depth frontier contains a list of all the path continuations found in the current depth
 			# So all these paths have 1 more node than the paths in the frontier
 			cur_depth_frontier = []
-
 			# For each incomplete path in the frontier, find all valuable continuations
 			for _, incomplete_path in tqdm(frontier):
 				
