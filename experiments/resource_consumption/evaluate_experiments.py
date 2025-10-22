@@ -137,11 +137,11 @@ def run_single_experiment(worker_args):
             if len(prompts) >= worker_args.batch_size:
                 break
     del temp_tokenizer
-    time.sleep(1)  # Ensure system stability
+    time.sleep(2)  # Ensure system stability
     gc.collect()
     torch.cuda.empty_cache()
 
-    wait_for_gpu_low_usage(util_threshold=2, mem_threshold=25)
+    wait_for_gpu_low_usage(util_threshold=2, mem_threshold=5)
     model = HookedTransformer.from_pretrained(
         worker_args.model,
         device=device,
@@ -259,17 +259,17 @@ if __name__ == "__main__":
         # Generate all experiment configurations
         all_configs = []
         for positional in positional_search_flags:
-            types = ['PathAttributionPatching', 'PathMessagePatching', 'PathMessagePatchingBatchedHeadsPos']
+            types = ['PathAttributionPatching']#, 'PathMessagePatching', 'PathMessagePatchingBatchedHeadsPos', 'PathMessagePatchingBatchedPos']
             for t in types:
+                if t == 'PathMessagePatchingBatchedPos' and not positional:
+                    continue
                 algorithms = []
-                # for top_n in TOP_NS:
-                #     params = {'top_n': top_n, 'max_time': 2*60*60}
-                #     if "Pos" in t: params['batch_positions'] = True
-                #     if "Head" in t: params['batch_heads'] = True
-                #     algorithms.append({"method": 'BestFirstSearch', "params": params})
+                for top_n in TOP_NS:
+                    params = {'top_n': top_n, 'max_time': 2*60*60}
+                    if "Pos" in t: params['batch_positions'] = True
+                    if "Head" in t: params['batch_heads'] = True
+                    algorithms.append({"method": 'BestFirstSearch', "params": params})
                 for threshold in THRESHOLDS:
-                    if t == 'PathMessagePatching':
-                        continue
                     params = {'min_contribution': threshold, 'return_all':True}
                     if "Pos" in t: params['batch_positions'] = True
                     if "Head" in t: params['batch_heads'] = True
