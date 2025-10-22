@@ -123,13 +123,14 @@ def run_model_background(data, job_id):
 				app.logger.debug(f"[{job_id}] Using precomputed paths")
 				task_name = data.get('task_name', 'Indirect Object Identification')
 				task_shortname = sample_prompts[task_name]['shortname']
-				search_mode = data.get('mode', 'Probability')
+				search_mode = data.get('task', 'target_probability_percentage').lower().replace(' ', '_')
+				patch_type = f"cf{data.get('patch', 'counterfactual') == 'counterfactual'}"
 				prompt = sample_prompts[task_name]["prompt"]
 				target = sample_prompts[task_name]["target"]
 				
-				base_dir = os.path.join(DATA_DIR, model_name, task_shortname)
-				path_file = os.path.join(base_dir, f'paths{search_mode}.pkl')
-				decoding_file = os.path.join(base_dir, f'top10{search_mode}.pkl')
+				base_dir = os.path.join(DATA_DIR, model_name, task_shortname, patch_type)
+				path_file = os.path.join(base_dir, f'paths_{search_mode}.pkl')
+				decoding_file = os.path.join(base_dir, f'top10_{search_mode}.pkl')
 
 				if not os.path.exists(path_file):
 					app.logger.error(f"Precomputed paths file not found at: {path_file}")

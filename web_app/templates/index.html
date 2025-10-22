@@ -77,11 +77,18 @@
 					</div>                    
                     <div class="col">
                         <div id="model-task-view" class="row g-3">
-                            <div class="col-md-3">
+                            <div class="col-md-1">
                                 <label for="model-select" class="form-label small">Model</label>
                                 <select id="model-select" class="form-select form-select-lg" data-bs-toggle="tooltip" title="Select a model to visualize.">
                                     <option selected>gpt2-small</option>
                                     <option>qwen2.5-0.5B</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="patch-select" class="patch-label small">Model</label>
+                                <select id="patch-select" class="form-select form-select-lg" data-bs-toggle="tooltip" title="Select the patching method to use.">
+                                    <option selected>counterfactual</option>
+                                    <option>zero ablation</option>
                                 </select>
                             </div>
                             <div class="col-md-3">
@@ -94,9 +101,11 @@
 							<div class="col-md-3">
                                 <label for="mode-select" class="form-label small">Metric</label>
                                 <select id="mode-select" class="form-select form-select-lg" data-bs-toggle="tooltip" title="Select the evaluation metric.">
-                                    <option selected>Probability</option>
-                                    <option>Logit</option>
+                                    <option selected>Target Logit Percentage</option>
+                                    <option>Target Probability Percentage</option>
 									<option>KL divergence</option>
+									<option>Indirect Effect</option>
+									<option>Logit Difference</option>
                                 </select>
                             </div>
 							<div class="col-md-1">

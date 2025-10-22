@@ -89,7 +89,8 @@ document.addEventListener('DOMContentLoaded', function() {
 					model_name: document.getElementById('model-select').value,
 					precomputed: true,
 					task_name: document.getElementById('task-select').value,
-					mode: document.getElementById('mode-select').value,
+					task: document.getElementById('mode-select').value,
+					patch: document.getElementById('patch-select').value,
 					divide_heads: divideHeadsSwitch.checked,
 					uuid: fullPlotData.uuid,
 				};
@@ -304,7 +305,8 @@ document.addEventListener('DOMContentLoaded', function() {
 					model_name: document.getElementById('model-select').value,
 					precomputed: true,
 					task_name: document.getElementById('task-select').value,
-					mode: document.getElementById('mode-select').value,
+					task: document.getElementById('mode-select').value,
+					patch: document.getElementById('patch-select').value,
 					divide_heads: divideHeadsSwitch.checked,
 				};
 				delta_time = 1000;

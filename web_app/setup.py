@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+import re
+import shutil
 
 def get_validated_path(prompt_message: str, default_path: str) -> str:
     """Prompts the user for a path, validates it, and offers to create it."""
