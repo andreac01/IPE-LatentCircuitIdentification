@@ -12,7 +12,7 @@ def run_experiment(MODEL, TASK, METRIC, ALGORITHM, SEARCH_STRATEGY, ALGORITHM_PA
     # This function needs to be self-contained in terms of device selection
     # as it will run in a separate process.
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    BATCH_SIZE = 4 # Or pass this as an argument if it varies
+    BATCH_SIZE = 1 # Or pass this as an argument if it varies
 
     model = HookedTransformer.from_pretrained(MODEL,
                                             device=DEVICE,
@@ -28,7 +28,7 @@ def run_experiment(MODEL, TASK, METRIC, ALGORITHM, SEARCH_STRATEGY, ALGORITHM_PA
     if TASK == "ioi":
         cf_key = 's2_io_flip_counterfactual'
         train_dataset = load_dataset(f'mib-bench/ioi', split='train')
-        TARGET_LENGTH = 15
+        TARGET_LENGTH = 14
     if TASK == "mcqa":
         train_dataset = load_dataset(f'mib-bench/copycolors_mcqa', '4_answer_choices', split='train')
         cf_key = 'symbol_counterfactual'
@@ -72,18 +72,18 @@ def run_experiment(MODEL, TASK, METRIC, ALGORITHM, SEARCH_STRATEGY, ALGORITHM_PA
     experiment.paths = sorted(paths, key=lambda x: abs(x[0].item()), reverse=True)[:TOPN]
     if not os.path.exists("./saved_paths"):
         os.makedirs("./saved_paths")
-    experiment.save_paths(f"./saved_paths/paths_{MODEL.lower().replace("/", "-")}_{TASK}_{ALGORITHM}_{SEARCH_STRATEGY}_{METRIC}_cf{CF}_pos{POSITIONAL}-{time.strftime('%Y%m%d_%H%M%S')}.pkl")
+    experiment.save_paths(f"./saved_paths/paths_{MODEL.lower().replace("/", "-")}_{TASK}_{ALGORITHM}_{SEARCH_STRATEGY}_{METRIC}_cf{CF}_pos{POSITIONAL}.pkl")
     print("Saved paths.")
 
 if __name__ == "__main__":
     # It's important to set the start method for multiprocessing with CUDA
     multiprocessing.set_start_method('spawn', force=True)
 
-    METRICS = ["target_probability_percentage", "logit_difference", "kl_divergence", "indirect_effect"]
+    METRICS = ["target_probability_percentage", "logit_difference", "kl_divergence", "indirect_effect", "target_logit_percentage"]
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    BATCH_SIZE = 4
+    BATCH_SIZE = 1
     MODELS = ["gpt2-small", "Qwen/Qwen2.5-0.5B"]
-    TASK = ["ioi", "mcqa"] #"ioi", 
+    TASK = ["mcqa", "ioi"]
     ALGORITHM = "PathAttributionPatching" #"PathAttributionPatching" # PathMessagePatching
     SEARCH_STRATEGY = "BestFirstSearch" #"BestFirstSearch"Threshold" #"BestFirstSearch"
     ALGORITHM_PARAMS = {"top_n": 300, "max_time": 1000}  #{"min_contribution": 1.}#, "batch_positions": True} #{"top_n": 300, "max_time": 3600} # {"top_n": 10, "max_time": 8*3600}, {"max_width": 10}

@@ -117,7 +117,7 @@ class ExperimentManager:
 		else:
 			self.patch_type = patch_type
 
-		if patch_clean_into_cf and metric in ['indirect_effect', 'logit_difference']:
+		if patch_clean_into_cf and (metric not in ['indirect_effect', 'logit_difference'] or self.patch_type != 'counterfactual'):
 			print("WARNING: patch_clean_into_cf is True but the chosen metric requires patching counterfactual into clean runs. Overriding patch_clean_into_cf to False.")
 			patch_clean_into_cf = False
 
