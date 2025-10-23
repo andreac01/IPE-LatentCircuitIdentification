@@ -59,7 +59,7 @@ def get_path_msg(path: list[Node], message: torch.Tensor = None) -> torch.Tensor
 	message = path[0].forward(message=message)
 	return get_path_msg(path[1:], message=message)
 
-def get_path_msgs(path: list[Node], messages: list[torch.Tensor] = [], msg_cache: dict = None, model: HookedTransformer = None) -> list[torch.Tensor]:
+def get_path_msgs(path: list[Node], messages: list[torch.Tensor] = [], msg_cache: dict = None, cf_cache: dict = None, model: HookedTransformer = None) -> list[torch.Tensor]:
 	"""
 	Recursively computes and collects messages by applying the forward method of each node in the path.
 	
@@ -84,6 +84,8 @@ def get_path_msgs(path: list[Node], messages: list[torch.Tensor] = [], msg_cache
 	# Compute the next message and append it
 	if msg_cache is not None:
 		path[0].msg_cache = msg_cache
+	if cf_cache is not None:
+		path[0].cf_cache = cf_cache
 	if model is not None:
 		path[0].model = model
 	next_message = path[0].forward(message=message)

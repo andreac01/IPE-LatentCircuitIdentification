@@ -16,6 +16,7 @@ from ipe.webutils.model import load_model, load_model_config, load_tokenizer
 from ipe.experiment import ExperimentManager
 import uuid
 import threading
+import time
 
 # load the evnironment
 load_dotenv()
@@ -127,8 +128,9 @@ def run_model_background(data, job_id):
 				patch_type = f"cf{data.get('patch', 'counterfactual') == 'counterfactual'}"
 				prompt = sample_prompts[task_name]["prompt"]
 				target = sample_prompts[task_name]["target"]
+				cf_prompt = sample_prompts[task_name].get("cf_prompt", prompt)
 				
-				base_dir = os.path.join(DATA_DIR, model_name, task_shortname, patch_type)
+				base_dir = os.path.join(DATA_DIR, model_name.lower().replace(' ','-'), task_shortname, patch_type)
 				path_file = os.path.join(base_dir, f'paths_{search_mode}.pkl')
 				decoding_file = os.path.join(base_dir, f'top10_{search_mode}.pkl')
 
@@ -136,15 +138,20 @@ def run_model_background(data, job_id):
 					app.logger.error(f"Precomputed paths file not found at: {path_file}")
 					raise FileNotFoundError("Precomputed paths not found")
 				paths = pickle.load(open(path_file, 'rb'))
-				
+
 				if os.path.exists(decoding_file):
 					with open(decoding_file, 'rb') as f:
 						path_details_store = pickle.load(f)
 				else:
-					_, cache = model.run_with_cache(prompt)
+					_, cache = model.run_with_cache(prompt, prepend_bos=True)
+					if data.get('patch', 'counterfactual') == 'counterfactual':
+						_, cf_cache = model.run_with_cache(cf_prompt, prepend_bos=True)
+						cf_cache = dict(cf_cache)
+					else:
+						cf_cache = None
 					img_node_paths = [get_image_path(p, divide_heads=data.get('divide_heads', True)) for p in paths]
 					for i, path_tuple in enumerate(paths):
-						messages = get_path_msgs(path=path_tuple[1], messages=[], msg_cache=dict(cache), model=model)
+						messages = get_path_msgs(path=path_tuple[1], messages=[], msg_cache=dict(cache), cf_cache=cf_cache, model=model)
 						image_path = img_node_paths[i][1]
 						decoding_info = [get_topk(model, messages[j][0][image_path[j].position].detach().clone(), topk=10) for j in range(len(image_path))]
 						path_data = [{'cmpt': n.cmpt, 'layer': n.layer, 'head': n.head_idx, 'position': n.position, 'in_type': n.in_type, 'shape': 'square' if n.cmpt in ['EMBED', 'FINAL', 'MLP'] else 'circle', 'probs': decoding_info[j]['topk_probs'], 'tokens': decoding_info[j]['topk_strtokens']} for j, n in enumerate(image_path)]
@@ -241,10 +248,15 @@ def get_result(job_id):
 	job_file = os.path.join(JOB_RESULTS_DIR, f'{job_id}.json')
 	if not os.path.exists(job_file):
 		return jsonify({'status': 'error', 'message': 'Job ID not found'}), 404
-	
-	with open(job_file, 'r') as f:
-		result = json.load(f)
-	
+
+	while True:
+		try:
+			with open(job_file, 'r') as f:
+				result = json.load(f)
+				break
+		except json.JSONDecodeError:
+			time.sleep(1)
+		
 	if result['status'] == 'complete':
 		# Optionally remove the file after retrieval
 		os.remove(job_file)
