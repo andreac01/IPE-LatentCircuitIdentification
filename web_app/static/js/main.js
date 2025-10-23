@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	const loader = document.getElementById('loader');
 	const showSecondaryPlotSwitch = document.getElementById('show-secondary-plot-switch');
 	const edgePrioritySwitch = document.getElementById('edge-priority-switch');
+	const allEdgesSwitch = document.getElementById('all-edges-switch');
 
 	// --- State ---
 	let fullPlotData = null; // Will store all data from the backend
@@ -152,7 +153,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	});
 
 	// Frontend-only controls
-	[numPathsSlider, colorSchemeSelect, edgePrioritySwitch].forEach(el => {
+	[numPathsSlider, colorSchemeSelect, edgePrioritySwitch, allEdgesSwitch].forEach(el => {
 		el.addEventListener('change', filterAndDraw);
 	});
 
@@ -192,7 +193,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 			// When hiding the secondary plot, reset the highlight on the primary plot
 			if (primaryPlotDiv.innerHTML.trim() && sortedEdgesCache.length > 0) {
-				const opacities = Array(sortedEdgesCache.length).fill(0.95);
+				const opacities = Array(sortedEdgesCache.length).fill(0.5);
 				const traceIndices = Array.from({ length: sortedEdgesCache.length }, (_, i) => i);
 				Plotly.restyle(primaryPlotDiv, { opacity: opacities }, traceIndices);
 			}
@@ -748,13 +749,23 @@ document.addEventListener('DOMContentLoaded', function() {
 			if (!sourceNode || !targetNode) return;
 
 			let color;
-			const normWeight = 0.5 + 0.5*(edge.weight / max_abs_weight);
+			const normWeight = 0.5 + 0.5 * (edge.weight / max_abs_weight);
 			switch (colorScheme) {
 				case 'path_weight':
-					const r = Math.round(100 + (255 - 100) * normWeight);
-					const g = Math.round(160 + (140 - 160) * normWeight);
-					const b = Math.round(230 + (0 - 230) * normWeight);
-					color = `rgb(${r}, ${g}, ${b})`;
+					let r, g, b;
+					if (edge.weight >= 0) {
+						// Positive weights: iceblue (rgba(205, 255, 180, 1)) to bright blue (rgba(205, 255, 0, 1))
+						r = Math.round(205 * (1 - normWeight) + 205 * normWeight);
+						g = Math.round(255 * (1 - normWeight) + 255 * normWeight);
+						b = Math.round(180 * (1 - normWeight) + 0 * normWeight);
+					} else {
+						// Negative weights: light orange (rgba(255, 100, 100, 1)) to dark red (rgba(180, 100, 0, 1))
+						r = Math.round(255 * (1 - normWeight) + 180 * normWeight);
+						g = Math.round(100 * (1 - normWeight) + 100 * normWeight);
+						b = Math.round(100 * (1 - normWeight) + 0 * normWeight);
+					}
+
+					color = `rgba(${r}, ${g}, ${b}, 1)`;
 					break;
 				case 'input_position':
 					color = inputPosColors[edge.start_pos % n_positions];
@@ -913,7 +924,7 @@ document.addEventListener('DOMContentLoaded', function() {
 					loadSecondaryPlot(pathIdx);
 				}
 			} else {
-				const opacities = Array(sortedEdgesCache.length).fill(0.95);
+				const opacities = Array(sortedEdgesCache.length).fill(0.5);
 				const traceIndices = Array.from({ length: sortedEdgesCache.length }, (_, i) => i);
 				Plotly.restyle(primaryPlotDiv, { opacity: opacities }, traceIndices);
 			}
@@ -945,6 +956,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	function highlightPrimaryPlotPath(pathIdx) {
 		if (!primaryPlotDiv.innerHTML.trim() || sortedEdgesCache.length === 0) return;
 		const themeLayout = getPlotlyThemeLayout();
+		const showAllEdges = allEdgesSwitch.checked;
 
 		const borderOpacities = [];
 		const mainOpacities = [];
@@ -955,8 +967,8 @@ document.addEventListener('DOMContentLoaded', function() {
 		sortedEdgesCache.forEach(edge => {
 			const isSelected = edge.path_idx === pathIdx;
 			
-			mainOpacities.push(isSelected ? 0.95 : 0.5);
-			borderOpacities.push(isSelected ? 0.7 : 0.3);
+			mainOpacities.push(isSelected ? 0.95 : (showAllEdges ? 0.05 : 0.5));
+			borderOpacities.push(isSelected ? 0.7 : (showAllEdges ? 0.025 : 0.3));
 			borderColors.push(isSelected ? '#8B0000' : themeLayout.edgeBorderColor);
 			borderWidths.push(isSelected ? 5 : 1);
 		});
@@ -1298,6 +1310,11 @@ document.addEventListener('DOMContentLoaded', function() {
 	const settingsToggle = document.getElementById('settings-toggle');
 	const resizeHandle = document.getElementById('resize-handle');
 	const toggleIcon = settingsToggle.querySelector('i');
+
+	// Collapse by default
+	settingsPanel.classList.add('collapsed');
+	toggleIcon.className = 'bi bi-gear-fill';
+	settingsToggle.setAttribute('data-bs-original-title', 'Show Settings');
 
 	const toggleSettings = () => {
 		const isCollapsed = settingsPanel.classList.toggle('collapsed');

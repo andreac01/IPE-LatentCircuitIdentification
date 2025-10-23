@@ -40,6 +40,7 @@ def copy_path_from_folder(folder_name: str):
             continue
 
         model = parts[0] if len(parts) >= 1 and parts[0] else "unknown_model"
+        model = model.replace("qwen-qwen", "qwen")
         task = parts[1] if len(parts) >= 2 and parts[1] else "unknown_task"
 
         cf_index = next((i for i, token in enumerate(parts) if token.startswith("cf")), None)

@@ -2,6 +2,8 @@
 	"Indirect Object Identification": {
 		"shortname": "ioi",
 		"prompt": "When John and Mary went to the shops, John gave the bag to",
-		"target": " Mary"
+		"cf_prompt": "When John and Mary went to the shops, Mary gave the bag to",
+		"target": " Mary",
+		"cf_target": " John"
 	}
 }
