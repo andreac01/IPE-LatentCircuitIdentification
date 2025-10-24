@@ -165,10 +165,13 @@ def run_model_background(data, job_id):
 				app.logger.debug(f"[{job_id}] Computing paths and details on the fly")
 				prompt = data['prompt']
 				target = data['target']
-				metric = 'target_logit_percentage' if target != "" else 'kl_divergence'
+				metric = 'target_probability_percentage' if target != "" else 'kl_divergence'
 				target_list = [target] if target != "" else []
-				
-				experiment = ExperimentManager(model=model, prompts=[prompt], targets=target_list, positional_search=True, metric=metric, patch_type='zero', search_strategy='BestFirstSearch', algorithm='PathAttributionPatching', algorithm_params={"top_n": 100, "include_negative": True, "max_time": 120})
+				if len(model.to_tokens(prompt, prepend_bos=False)) > 40:
+					return jsonify({'status': 'error', 'message': 'Prompt too long. Please provide a prompt shorter than 40 tokens.'}), 400
+				if len(model.to_tokens(target, prepend_bos=False)) > 1:
+					return jsonify({'status': 'error', 'message': 'Target is not a single token.'}), 400
+				experiment = ExperimentManager(model=model, prompts=[prompt], targets=target_list, positional_search=True, metric=metric, patch_type='zero', search_strategy='BestFirstSearch', algorithm='PathAttributionPatching', algorithm_params={"top_n": 200, "include_negative": True, "max_time": 180})
 				predictions = get_topk(model, experiment.cache[f'blocks.{model.cfg.n_layers- 1}.hook_resid_post'][0][-1], topk=10)
 				if target == "":
 					target = predictions['topk_strtokens'][0].replace('Ġ', '_').replace(' ', '_')

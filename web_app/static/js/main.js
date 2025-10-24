@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
 			modelTaskView.style.display = 'none';
 			promptTargetView.style.display = 'flex';
 			runButton.textContent = 'Compute and Visualize';
-			runButton.title = 'Find the top-100 paths using a Best First Search approach. If a target is provided the percentage of change in this logit will be used as metric. If target is empty use KL divergence.'
+			runButton.title = 'Find the top-200 paths using a Best First Search approach. If a target is provided the percentage of change in its probability will be used as metric. If target is empty use KL divergence. The search will cut off after 3 minutes.';
 		} else {
 			// Model & Task Mode (Default)
 			modelTaskView.style.display = 'flex';
@@ -812,19 +812,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
 			let perpX = -dy;
 			let perpY = dx*(maxY - minY)/(maxX - minX);
-			const offset = 0.01 * radMagnitude * Math.min(positionWidth, layerHeight);
+			const offset = 0.0025 * radMagnitude * Math.min(positionWidth, layerHeight);
 			const ctrlX = mx + perpX * offset;
 			const ctrlY = my + perpY * offset;
 
 			const isQueryEdge = targetNode.in_type === 'query' && (targetNode.cmpt === 'sa' || targetNode.cmpt === 'attn');
 			const lineShape = { shape: 'spline', smoothing: 1, dash: isQueryEdge ? 'dot' : 'solid' };
+			const borderLineShape = { shape: 'spline', smoothing: 1, dash: 'solid' };
 			const borderWidth = 2;
 
 			edgeTraces.push({
 				x: count > 1? [sourceNode.x, ctrlX, targetNode.x] : [sourceNode.x, (sourceNode.x + ctrlX)/2, ctrlX, (targetNode.x + ctrlX)/2, targetNode.x],
 				y: count > 1? [sourceNode.y, ctrlY, targetNode.y] : [sourceNode.y, (sourceNode.y + ctrlY)/2, ctrlY, (targetNode.y + ctrlY)/2, targetNode.y],
 				mode: 'lines',
-				line: { ...lineShape, color: themeLayout.edgeBorderColor, width: edgeWidth + borderWidth * 2 },
+				line: { ...borderLineShape, color: themeLayout.edgeBorderColor, width: edgeWidth + borderWidth * 2 },
 				type: 'scatter', hoverinfo: 'none',
 				opacity: 0.2,
 				meta: { type: 'border' }
