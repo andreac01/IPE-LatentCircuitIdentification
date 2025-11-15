@@ -32,7 +32,7 @@ def run_experiment(MODEL, TASK, METRIC, ALGORITHM, SEARCH_STRATEGY, ALGORITHM_PA
     if TASK == "mcqa":
         train_dataset = load_dataset(f'mib-bench/copycolors_mcqa', '4_answer_choices', split='train')
         cf_key = 'symbol_counterfactual'
-        TARGET_LENGTH = 31
+        TARGET_LENGTH = 30
     for sample in train_dataset:
         if model.to_tokens(sample['prompt'], prepend_bos=True).shape[1] == TARGET_LENGTH:
             prompts.append(sample['prompt'])
@@ -82,8 +82,8 @@ if __name__ == "__main__":
     METRICS = ["target_probability_percentage", "logit_difference", "kl_divergence", "indirect_effect", "target_logit_percentage"]
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     BATCH_SIZE = 1
-    MODELS = ["gpt2-small", "Qwen/Qwen2.5-0.5B"]
-    TASK = ["mcqa", "ioi"]
+    MODELS = ["Qwen/Qwen2.5-0.5B"] # "gpt2-small", 
+    TASK = ["mcqa"] # , "ioi"
     ALGORITHM = "PathAttributionPatching" #"PathAttributionPatching" # PathMessagePatching
     SEARCH_STRATEGY = "BestFirstSearch" #"BestFirstSearch"Threshold" #"BestFirstSearch"
     ALGORITHM_PARAMS = {"top_n": 300, "max_time": 1000}  #{"min_contribution": 1.}#, "batch_positions": True} #{"top_n": 300, "max_time": 3600} # {"top_n": 10, "max_time": 8*3600}, {"max_width": 10}
