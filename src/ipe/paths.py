@@ -92,7 +92,7 @@ def get_path_msgs(path: list[Node], messages: list[torch.Tensor] = [], msg_cache
 	messages.append(next_message)
 
 	# Recurse with the rest of the path
-	return get_path_msgs(path[1:], messages=messages, msg_cache=msg_cache, model=model)
+	return get_path_msgs(path[1:], messages=messages, msg_cache=msg_cache, cf_cache=cf_cache, model=model)
 
 def clean_paths(paths: list[tuple[float, list]], inplace: bool = False) -> list[tuple[float, list]]:
 	"""Cleans up the paths by removing references to models, parents, children, and caches to save memory. It is useful to call this function before saving the outputs of graph search to a file, avoiding saving cache, gradients, and model.

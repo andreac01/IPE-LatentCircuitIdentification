@@ -776,7 +776,7 @@ document.addEventListener('DOMContentLoaded', function() {
 					break;
 			}
 			const minWidth = 1;
-			const maxWidth = 30;
+			const maxWidth = 15;
 			const edgeWidth = minWidth + 2 * (Math.abs(normWeight-0.5) * (maxWidth - minWidth));
 			baseEdgeWidths.push(edgeWidth);
 

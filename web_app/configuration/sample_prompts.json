@@ -1,9 +1,16 @@
 {
 	"Indirect Object Identification": {
 		"shortname": "ioi",
-		"prompt": "When John and Mary went to the shops, John gave the bag to",
-		"cf_prompt": "When John and Mary went to the shops, Mary gave the bag to",
-		"target": " Mary",
-		"cf_target": " John"
+		"prompt": "As Carl and Maria left the consulate, Carl gave a fridge to",
+		"cf_prompt": "As Carl and Maria left the consulate, Maria gave a fridge to",
+		"target": " Maria",
+		"cf_target": " Carl"
+	},
+	"Multiple Choice Question Answer": {
+		"shortname": "mcqa",
+		"prompt": "Question: Wheels are black. What color are wheels?\nA. blue\nB. black\nC. yellow\nD. brown\nAnswer:",
+		"cf_prompt": "Question: Wheels are black. What color are wheels?\n1. blue\n2. black\n3. yellow\n4. brown\nAnswer:",
+		"target": " B",
+		"cf_target": "2"
 	}
 }
