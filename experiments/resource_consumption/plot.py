@@ -7,8 +7,10 @@ def plot_search_strategy_results(
     x_axis_col: str = 'execution_time_s',
     y_axis_col: str = 'relevant_paths_found',
     show_labels: bool = True,
+    show_legend: bool = True,
     save_plot: bool = False,
-    save_path: str = "search_strategy_plot.png"
+    save_path: str = "search_strategy_plot.png",
+    model: str = ""
 ):
     """
     Generates a scatter/line plot comparing relevant paths found vs. a chosen metric
@@ -19,13 +21,15 @@ def plot_search_strategy_results(
         x_axis_col: The column name to use for the x-axis.
         y_axis_col: The column name to use for the y-axis.
         show_labels: If True, adds text annotations (th=, n=, w=) to data points.
+        show_legend: If True, displays the legend panels.
         save_plot: If True, saves the plot to a file.
         save_path: The file path where the plot image will be saved.
+        model: If provided, prepends the model name to the plot title.
     """
 
     # Data Preprocessing
     # Remove from df the rows where relevant_paths_found is 0 or 1
-    df_plot = df[df[y_axis_col] > 1].copy()
+    df_plot = df[df[y_axis_col] > 0].copy()
     df_plot = df_plot.sort_values(by=["type", "search_strategy", y_axis_col])
 
     # Define a name map for the 'type' and 'search_strategy' columns
@@ -131,41 +135,46 @@ def plot_search_strategy_results(
             )
 
     # Legend Formatting
-    handles, labels = ax.get_legend_handles_labels()
+    if show_legend:
+        handles, labels = ax.get_legend_handles_labels()
 
-    search_strategy_handles = []
-    search_strategy_labels = []
-    type_handles = []
-    type_labels = []
+        search_strategy_handles = []
+        search_strategy_labels = []
+        type_handles = []
+        type_labels = []
 
-    if 'search_strategy_legend' in labels and 'type_legend' in labels:
-        style_title_index = labels.index('search_strategy_legend')
-        hue_title_index = labels.index('type_legend')
+        if 'search_strategy_legend' in labels and 'type_legend' in labels:
+            style_title_index = labels.index('search_strategy_legend')
+            hue_title_index = labels.index('type_legend')
 
-        for i in range(hue_title_index + 1, style_title_index):
-            type_handles.append(handles[i])
-            type_labels.append(labels[i])
+            for i in range(hue_title_index + 1, style_title_index):
+                type_handles.append(handles[i])
+                type_labels.append(labels[i])
 
-        for i in range(style_title_index + 1, len(labels)):
-            search_strategy_handles.append(handles[i])
-            search_strategy_labels.append(labels[i])
+            for i in range(style_title_index + 1, len(labels)):
+                search_strategy_handles.append(handles[i])
+                search_strategy_labels.append(labels[i])
 
-        ax.get_legend().remove()
+            ax.get_legend().remove()
 
-        legend1 = ax.legend(
-            search_strategy_handles, search_strategy_labels,
-            title="Search Strategy", title_fontsize=16, fontsize=13, loc='upper left',
-            bbox_to_anchor=(1.07, 0.55), borderaxespad=0., frameon=True
-        )
-        plt.setp(legend1.get_title(), fontweight='bold')
-        ax.add_artist(legend1)
+            legend1 = ax.legend(
+                search_strategy_handles, search_strategy_labels,
+                title="Search Strategy", title_fontsize=16, fontsize=13, loc='upper left',
+                bbox_to_anchor=(1.07, 0.55), borderaxespad=0., frameon=True
+            )
+            plt.setp(legend1.get_title(), fontweight='bold')
+            ax.add_artist(legend1)
 
-        legend2 = ax.legend(
-            type_handles, type_labels,
-            title="Type", title_fontsize=16, fontsize=13, loc='upper left',
-            bbox_to_anchor=(1.025, 0.9), borderaxespad=0., frameon=True
-        )
-        plt.setp(legend2.get_title(), fontweight='bold')
+            legend2 = ax.legend(
+                type_handles, type_labels,
+                title="Type", title_fontsize=16, fontsize=13, loc='upper left',
+                bbox_to_anchor=(1.025, 0.9), borderaxespad=0., frameon=True
+            )
+            plt.setp(legend2.get_title(), fontweight='bold')
+    else:
+        if ax.get_legend() is not None:
+            ax.get_legend().remove()
+
 
     # Axis and Title Formatting
     # Define map for x-axis labels
@@ -182,24 +191,29 @@ def plot_search_strategy_results(
     y_label = y_label_map.get(y_axis_col, f"{y_axis_col} [log scale]")
     title_x = x_label.split('[')[0].strip()
     title_y = y_label.split('[')[0].strip()
+    
+    plot_title = f'{title_y} vs {title_x} by Search Strategy'
+    if model:
+        plot_title = f'{model}: {plot_title}'
 
     # Set logarithmic scale for both axes
-    ax.set_xscale('log')
     ax.set_yscale('log')
-    
+    #if x_axis_col == 'execution_time_s':
+    ax.set_xscale('log')
+        
     # Set dynamic axis limits
     if not df_plot.empty:
         ax.set_ylim(df_plot[y_axis_col].min() * 0.8, df_plot[y_axis_col].max() * 1.5)
         ax.set_xlim(df_plot[x_axis_col].min() * 0.8, df_plot[x_axis_col].max() * 1.5)
     else:
-        ax.set_ylim(1, 1000)
-        ax.set_xlim(1, 1000)
+        ax.set_ylim(1, 10000)
+        ax.set_xlim(1, 10000)
 
 
     # Add informative and well-styled labels and title
     ax.set_xlabel(x_label, fontsize=14, fontweight='bold')
     ax.set_ylabel(y_label, fontsize=14, fontweight='bold')
-    ax.set_title(f'{title_y} vs {title_x} by Search Strategy', fontsize=18, fontweight='bold')
+    ax.set_title(plot_title, fontsize=18, fontweight='bold')
 
     # Add a grid for easier reading of values
     ax.grid(True, which='both', linestyle='--', alpha=0.6)
@@ -212,3 +226,4 @@ def plot_search_strategy_results(
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Plot saved to {save_path}")
     plt.show()
+

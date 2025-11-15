@@ -217,9 +217,9 @@ if __name__ == "__main__":
     parser.add_argument("--target-length", type=int, default=15)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--model", type=str, default="gpt2")
-    parser.add_argument("--thresholds", type=str, default="1,0.5,0.25")
-    parser.add_argument("--top-ns", type=str, default="10,100,1000")
-    parser.add_argument("--max-widths", type=str, default="10,100,1000")
+    parser.add_argument("--thresholds", type=str, default="1.5")
+    parser.add_argument("--top-ns", type=str, default="10,1000")
+    parser.add_argument("--max-widths", type=str, default="100,1000")
     parser.add_argument("--positional", type=str, default="True-False")
 
     # Internal Arguments for the WORKER
@@ -259,7 +259,7 @@ if __name__ == "__main__":
         # Generate all experiment configurations
         all_configs = []
         for positional in positional_search_flags:
-            types = ['PathAttributionPatching']#, 'PathMessagePatching', 'PathMessagePatchingBatchedHeadsPos', 'PathMessagePatchingBatchedPos']
+            types = ['PathAttributionPatching', 'PathMessagePatching', 'PathMessagePatchingBatchedHeadsPos', 'PathMessagePatchingBatchedPos']
             for t in types:
                 if t == 'PathMessagePatchingBatchedPos' and not positional:
                     continue
