@@ -263,12 +263,7 @@ class ExperimentManager:
 		"""
 		if self.denoising and self.patch_type == 'counterfactual':
 			print("Patching clean residuals into counterfactual runs.")
-		# 	self.cache, self.cf_cache = self.cf_cache, self.cache
-		# else:
-		# 	print("Patching counterfactual residuals into clean runs.")
 		self.paths = self.algorithm()
-		# if self.denoising and self.patch_type == 'counterfactual':
-		# 	self.cache, self.cf_cache = self.cf_cache, self.cache
 		if return_paths:
 			return self.paths
 	

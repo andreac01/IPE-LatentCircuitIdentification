@@ -904,7 +904,7 @@ class ATTN_Node(Node):
 					value = torch.einsum('bsd,ndh->bsnh', value_residual, W_V) + b_V[None, None, :, :]
 			else:
 				add_bias = True
-				if self.model.cfg.positional_embedding_type == 'rotary':
+				if self.model.cfg.n_key_value_heads is not None:
 					step = self.model.cfg.n_heads // self.model.cfg.n_key_value_heads
 				else:
 					step = 1
@@ -1406,7 +1406,7 @@ class FINAL_Node(Node):
 		Args:
 			grad_outputs : torch.Tensor, optional (default=None)
 				Usually the gradient to propagate backwards in this particular case it is never used.
-			
+			-
 			save : bool, optional (default=True)
 				Whether to save the computed gradient in self.gradient. The gradient can be reused
 				later by setting use_precomputed to True.
