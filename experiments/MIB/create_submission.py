@@ -7,13 +7,14 @@ from transformer_lens import HookedTransformer
 import argparse
 
 
-def path_to_edges(score: float, path: list[Node], edges: dict) -> dict:
+def path_to_edges(score: float, path: list[Node], edges: dict, neg_edges: str = 'all') -> dict:
     """Convert a path of nodes into a set of edges with associated scores.
 
     Args:
         score (float): score associated with the path
         path (list[Node]): list of nodes in the path
         edges (set[Node]): set of edges to update
+        neg_edges (str): 'all' or 'last'. If 'last', only edges to logits can have negative scores.
 
     Raises:
         ValueError: if an unknown node type is encountered
@@ -23,6 +24,8 @@ def path_to_edges(score: float, path: list[Node], edges: dict) -> dict:
     """
     n0s = ['input']
     for i in range(1, len(path)):
+        is_last_node_in_path = (i == len(path) - 1)
+
         if isinstance(path[i], EMBED_Node):
             n1s = ['input']
         elif isinstance(path[i], ATTN_Node):
@@ -41,12 +44,18 @@ def path_to_edges(score: float, path: list[Node], edges: dict) -> dict:
             raise ValueError(f"Unknown node type: {type(path[i])}")
 
         n0 = n0s[0].split('<')[0]
-        for n1 in n1s:        
-            if f'{n0}->{n1}' not in edges:
-                edges[f'{n0}->{n1}'] = score
+        for n1 in n1s:
+            # Determine the score to add based on the neg_edges policy
+            score_to_add = score
+            is_final_edge = is_last_node_in_path and n1 == 'logits'
+            if neg_edges == 'last' and not is_final_edge and score < 0:
+                score_to_add = abs(score)
+
+            edge_key = f'{n0}->{n1}'
+            if edge_key not in edges:
+                edges[edge_key] = score_to_add
             else:
-                cur_score = edges[f'{n0}->{n1}']
-                edges[f'{n0}->{n1}'] = cur_score + score
+                edges[edge_key] += score_to_add
         n0s = n1s
     return edges
 
@@ -76,11 +85,13 @@ def path_to_nodes(path: list[Node]) -> set[str]:
 
 def create_submission(model: str = "gpt2-small",
                       path_source_dir: str = "./detected_paths",
-                      edges_output_dir: str = "./submissions"):
+                      edges_output_dir: str = "./submissions",
+                      neg_edges: str = "all"):
     """Process all detected paths and convert them to submission format.
     Args:
         path_source_dir (str): Directory containing detected paths
         edges_output_dir (str): Directory to save submission files
+        neg_edges (str): 'all' or 'last'. Controls how negative scores are applied.
     """
 
     if not os.path.exists(edges_output_dir):
@@ -90,15 +101,15 @@ def create_submission(model: str = "gpt2-small",
 
     files = os.listdir(path_source_dir)
     target = [f for f in files if f.endswith('.pkl') and model in f]
-    assert len(target) == 1, f"Unexpected number of files found for model '{model}' in '{path_source_dir}' (found {len(target)})"
-    target = target[0]
-    print(f"Processing file: {target}")
-    
-    paths = pkl.load(open(os.path.join(path_source_dir, target), 'rb'))
+    if len(target) != 1:
+        print(f"[Warning] Expected one .pkl file for model {model}, found {len(target)} files.")
+    paths = []
+    for t in target:
+        paths.extend(pkl.load(open(os.path.join(path_source_dir, t), 'rb')))
     edges = {}
     nodes = set()
     for score, path in paths:
-        edges = path_to_edges(score, path, edges)
+        edges = path_to_edges(score, path, edges, neg_edges=neg_edges)
         nodes = nodes.union(path_to_nodes(path))
     print(f"Extracted {len(nodes)} nodes and {len(edges)} edges from {len(paths)} paths")
     count = 0
@@ -136,8 +147,10 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, default="gpt2-small", help="Model name to filter .pkl files and to load")
     parser.add_argument("--source_dir", type=str, default="./detected_paths", help="Directory containing detected paths (.pkl files)")
     parser.add_argument("--output_dir", type=str, default="./submissions", help="Directory to save submission JSON")
+    parser.add_argument("--neg_edges", type=str, default="all", choices=['all', 'last'], help="Where to allow negative scores ('all' or 'last' edge only)")
     args = parser.parse_args()
 
     create_submission(model=args.model,
                         path_source_dir=args.source_dir,
-                        edges_output_dir=args.output_dir)
+                        edges_output_dir=args.output_dir,
+                        neg_edges=args.neg_edges)

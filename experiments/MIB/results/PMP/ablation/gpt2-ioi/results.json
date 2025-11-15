@@ -1,0 +1,34 @@
+{
+    "metric": "target_logit_percentage",
+    "target_length": 15,
+    "batch_size": 8,
+    "model": "gpt2-small",
+    "task": "ioi",
+    "algorithm": "PathMessagePatching",
+    "search_strategy": "Threshold",
+    "cf": false,
+    "denoising": false,
+    "positional": false,
+    "algorithm_params": {
+        "min_contribution": 0.1,
+        "batch_heads": true
+    },
+    "paths_found": 44682,
+    "edges": 4971,
+    "nodes": 153,
+    "time_seconds": 90000,
+    "CPR": {
+        "weighted_edge_counts": [13.0, 50.0, 138.0, 286.0, 600.0, 1584.0, 3160.0, 5803.0, 15897.0, 32491.0], 
+        "area_under": 0.7861703684679263, 
+        "area_from_1": 0.21282963153207363, 
+        "average": 0.3563659375424606, 
+        "faithfulnesses": [0.0, 0.009078664187467889, 0.06870969658078352, 0.06107043629834783, 0.18693602343913202, 0.2395487447120687, 0.5336789021745932, 0.5189100352612711, 0.9457268727709415, 1.0]
+    },
+    "CMD": {
+        "weighted_edge_counts": [12.0, 45.0, 133.0, 283.0, 612.0, 1581.0, 3241.0, 6170.0, 16146.0, 32491.0], 
+        "area_under": 0.6788559067303053, 
+        "area_from_1": 0.3201440932696948, 
+        "average": 0.33503479345470155, 
+        "faithfulnesses": [0.0, 0.005677085272003422, 0.04526897558872266, 0.14559090765714802, 0.1744904503076533, 0.3960327215900545, 0.3863958598746249, 0.4974801810654895, 0.6994117531913193, 1.0]
+    }
+}
