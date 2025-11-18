@@ -396,7 +396,7 @@ class MLP_Node(Node):
 				The list of all predecessor nodes influencing the input of this node.
 		
 		Notes:
-			- If self.position is None, only non-position-specific previous nodes are considered.
+			If self.position is None, only non-position-specific previous nodes are considered.
 		"""
 		prev_nodes = []
 		common_args = {"model": self.model, "msg_cache": self.msg_cache, "cf_cache": self.cf_cache, "parent": self, "patch_type": self.patch_type}
@@ -946,8 +946,8 @@ class ATTN_Node(Node):
 		Returns the list of predecessors nodes in the computational graph whose outputs influence the
 		output of this node. 
 		Previous nodes are:
-		- MLP, EMBED and ATTN nodes in self.position from previous layers if patch_query=True.
-		- MLP, EMBED and ATTN nodes in all previous positions from previous layers if patch_key=True or patch_value=True.
+			- MLP, EMBED and ATTN nodes in self.position from previous layers if patch_query=True.
+			- MLP, EMBED and ATTN nodes in all previous positions from previous layers if patch_key=True or patch_value=True.
 
 		Args:
 			model_cfg (HookedTransformerConfig):
@@ -962,7 +962,7 @@ class ATTN_Node(Node):
 				The list of all predecessor nodes influencing the input of this node.
 
 		Notes:
-			- If self.position is None, only non-position-specific previous nodes are considered.
+			If self.position is None, only non-position-specific previous nodes are considered.
 		"""	
 		prev_nodes = []
 		common_args = {"model": self.model, "msg_cache": self.msg_cache, "parent": self, "patch_type": self.patch_type, "cf_cache": self.cf_cache}

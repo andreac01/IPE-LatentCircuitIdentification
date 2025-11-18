@@ -37,23 +37,24 @@ class ExperimentManager:
 		patch_type: str = 'auto',
 		patch_clean_into_cf: bool = True
 		):
-		"""Manages the setup and execution of path-finding experiments using an easier interface which employs default parameters and sensible checks.
+		"""
+		Manages the setup and execution of path-finding experiments using an easier interface which employs default parameters and sensible checks.
 
 		It helps define the metric and algorithm, run the experiment, plot the results, and decode the residuals along the paths.
 		In the setup, it allows you to:
-		1. Choose the metric from:
-		- :func:`ipe.metrics.target_logit_percentage` (metric = 'target_logit_percentage')
-		- :func:`ipe.metrics.target_probability_percentage` (metric = 'target_probability_percentage')
-		- :func:`ipe.metrics.logit_difference` (metric = 'logit_difference')
-		- :func:`ipe.metrics.kl_divergence` (metric = 'kl_divergence')
-		- :func:`ipe.metrics.indirect_effect` (metric = 'indirect_effect')
-		2. Choose the search algorithm from:
-		- :func:`ipe.graph_search.PathAttributionPatching` (algorithm = 'PathAttributionPatching', method = 'Threshold')
-		- :func:`ipe.graph_search.PathMessagePatching` (algorithm = 'PathMessagePatching', method = 'Threshold')
-		- :func:`ipe.graph_search.PathAttributionPatching_BestFirstSearch` (algorithm = 'PathAttributionPatching', method = 'BestFirstSearch') (default)
-		- :func:`ipe.graph_search.PathMessagePatching_BestFirstSearch` (algorithm = 'PathMessagePatching', method = 'BestFirstSearch')
-		- :func:`ipe.graph_search.PathAttributionPatching_LimitedLevelWidth` (algorithm = 'PathAttributionPatching', method = 'LimitedLevelWidth')
-		- :func:`ipe.graph_search.PathMessagePatching_LimitedLevelWidth` (algorithm = 'PathMessagePatching', method = 'LimitedLevelWidth')
+			1. Choose the metric from:
+				- :func:`ipe.metrics.target_logit_percentage` (metric = 'target_logit_percentage')
+				- :func:`ipe.metrics.target_probability_percentage` (metric = 'target_probability_percentage')
+				- :func:`ipe.metrics.logit_difference` (metric = 'logit_difference')
+				- :func:`ipe.metrics.kl_divergence` (metric = 'kl_divergence')
+				- :func:`ipe.metrics.indirect_effect` (metric = 'indirect_effect')
+			2. Choose the search algorithm from:
+				- :func:`ipe.graph_search.PathAttributionPatching` (algorithm = 'PathAttributionPatching', method = 'Threshold')
+				- :func:`ipe.graph_search.PathMessagePatching` (algorithm = 'PathMessagePatching', method = 'Threshold')
+				- :func:`ipe.graph_search.PathAttributionPatching_BestFirstSearch` (algorithm = 'PathAttributionPatching', method = 'BestFirstSearch') (default)
+				- :func:`ipe.graph_search.PathMessagePatching_BestFirstSearch` (algorithm = 'PathMessagePatching', method = 'BestFirstSearch')
+				- :func:`ipe.graph_search.PathAttributionPatching_LimitedLevelWidth` (algorithm = 'PathAttributionPatching', method = 'LimitedLevelWidth')
+				- :func:`ipe.graph_search.PathMessagePatching_LimitedLevelWidth` (algorithm = 'PathMessagePatching', method = 'LimitedLevelWidth')
 		
 		You can also provide custom parameters to the metric and the algorithm as dictionaries.
 		

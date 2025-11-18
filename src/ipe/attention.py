@@ -19,23 +19,23 @@ def custom_attention_forward(
 	"""
 	Performs a custom forward pass through an attention module for specific attention heads and positions.
 	This function implements a customizable attention mechanism that allows for:
-	- Computing attention for specific heads
-	- Computing attention for specific query/key positions
-	- Using precomputed attention scores
-	- Visualizing attention patterns
-	- Supporting different precision levels
-
+		- Computing attention for specific heads
+		- Computing attention for specific query/key positions
+		- Using precomputed attention scores
+		- Visualizing attention patterns
+		- Supporting different precision levels
+AbstractAttention
 	Args:
 		attention_module (AbstractAttention): 
 			The attention module to use for calculations.
 		head (int): 
 			Specific attention head to compute. If None, computes for all heads.
 		q (torch.Tensor): 
-			Query tensor.
+			Query tensor, possibly patched.
 		k (torch.Tensor): 
-			Key tensor.
+			Key tensor, possibly patched.
 		v (torch.Tensor): 
-			Value tensor.
+			Value tensor, possibly patched.
 		precomputed_attention_scores (torch.Tensor, optional): 
 			Pre-calculated attention scores to use. Defaults to None.
 		query_position (int, optional): 
