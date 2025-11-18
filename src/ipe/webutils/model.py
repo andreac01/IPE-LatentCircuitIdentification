@@ -36,8 +36,8 @@ def download_model(model_name: str, cache_dir: str = "/app/models") -> None:
 	Args:
 		model_name (str):
 			The name of the model to download (e.g., 'gpt2').
-		cache_dir (str, default="/app/models"):
-			The directory where the model should be cached.
+		cache_dir (str, optional):
+			The directory where the model should be cached. Defaults to "/app/models".
 	Returns:
 		None
 	"""
@@ -56,15 +56,17 @@ def download_model(model_name: str, cache_dir: str = "/app/models") -> None:
 
 def load_model(model_name: str, required_bytes: int = 0, device: str = 'cpu', cache_dir: str = "/app/models") -> HookedTransformer:
 	"""Load (and cache) a HookedTransformer, but first check memory.
+	
 	Args:
 		model_name (str):
 			The name of the model to load (e.g., 'gpt2').
-		required_bytes (int, default=0):
-			The number of bytes required to load the model.
-		device (str or torch.device, default='cpu'):
-			The device to load the model onto (e.g., 'cpu' or 'cuda').
-		cache_dir (str, default="/app/models"):
-			The directory where the model should be cached.
+		required_bytes (int, optional):
+			The number of bytes required to load the model. Defaults to 0.
+		device (str or torch.device, optional):
+			The device to load the model onto (e.g., 'cpu' or 'cuda'). Defaults to 'cpu'.
+		cache_dir (str, optional):
+			The directory where the model should be cached. Defaults to "/app/models".
+	
 	Returns:
 		HookedTransformer:
 			The loaded transformer model.
@@ -102,10 +104,9 @@ def load_tokenizer(config: dict) -> AutoTokenizer:
 	"""Load the tokenizer for a given model. The tokenizer is fetched from Hugging Face using the model's configuration, to avoiding loading the entire model as required by HookedTransformer.
 	
 	Args:
-		model_name (str):
-			The name of the model whose tokenizer to load (e.g., 'gpt2').
 		config (dict):
 			The configuration dictionary containing 'huggingface_name'.
+	
 	Returns:
 		AutoTokenizer:
 			The loaded tokenizer.
@@ -114,11 +115,11 @@ def load_tokenizer(config: dict) -> AutoTokenizer:
 
 def load_model_config(config: dict) -> AutoConfig:
 	"""Load the configuration of a model from Hugging Face.
+	
 	Args:
-		model_name (str):
-			The name of the model whose configuration to load (e.g., 'gpt2').
 		config (dict):
 			The configuration dictionary containing 'huggingface_name'.
+	
 	Returns:
 		AutoConfig:
 			The loaded model configuration.

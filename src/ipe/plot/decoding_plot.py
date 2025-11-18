@@ -8,11 +8,38 @@ import numpy as np
 from plotly.subplots import make_subplots
 from ipe.paths import get_path_msgs
 from ipe.miscellanea import get_topk
+import plotly
+from ipe.nodes import Node
 
 
 # Helper function from the user's request
-def plot_probability_distribution_plotly(logits, title, model, top_n=10):
-    """Plots the probability distribution for the top N tokens using Plotly."""
+def plot_probability_distribution_plotly(logits: torch.Tensor, title: str, model, top_n: int = 10) -> plotly.graph_objects.Figure:
+    """
+    Plots the probability distribution of the top N tokens using Plotly.
+    This function visualizes the probability distribution of the top N tokens 
+    based on the provided logits. It uses horizontal bar plots to display the 
+    probabilities of each token, sorted in descending order.
+    
+    Args:
+        logits (torch.Tensor): 
+            The raw logits output from the model. This should be a 1D tensor representing the unnormalized log probabilities of tokens.
+        title (str): 
+            The title of the plot.
+        model (HookedTransformer): 
+            The model object that provides a `to_string` method to convert token indices to their corresponding string representations.
+        top_n (int, optional): 
+            The number of top tokens to display in the plot. Defaults to 10.
+    
+    Returns:
+        plotly.graph_objects.Figure: 
+            A Plotly figure object containing the probability distribution plot.
+
+    Notes:
+        - The `model` object must have a `to_string` method that takes a list of token 
+          indices and returns their string representations.
+        - The logits are converted to probabilities using the softmax function.
+        - The plot is styled using the "plotly_white" template.
+    """
     probs = F.softmax(logits.to(torch.float32), dim=-1).detach().cpu().numpy()
     idxs = np.argsort(probs)[-top_n:][::-1]
     probs_top = probs[idxs]
@@ -47,7 +74,7 @@ def plot_probability_distribution_plotly(logits, title, model, top_n=10):
     return fig
 
 
-def create_interactive_decoding_plot(logits, model):
+def create_interactive_decoding_plot(logits: torch.Tensor, model) -> None:
     """
     Creates an interactive plot to visualize the top N token predictions.
     
@@ -113,20 +140,31 @@ def create_interactive_decoding_plot(logits, model):
     display(VBox(widgets_list + [plot_output], layout=widgets.Layout(margin="20px")))
 
 # Helper function to generate a readable label for a node
-def get_node_label(node):
-    """Creates a descriptive string label for a path node."""
+def get_node_label(node: Node) -> str:
+    """
+    Creates a descriptive string label for a path node.
+    
+    Args:
+        node: A node object with attributes 'layer', 'head' (optional), and 'position'.
+    
+    Returns:
+        str: A formatted label string for the node.
+    """
     h = f" H{node.head}" if hasattr(node, 'head') and node.head is not None else ""
     return f"{node.__class__.__name__.replace('_Node', '')} L{node.layer}{h}  P{node.position}"
 
-def create_interactive_path_visualization(paths, model, cache):
+def create_interactive_path_visualization(paths: list[list], model, cache: dict) -> None:
     """
     Creates an interactive Plotly and IPyWidgets visualization for model paths,
     optimized for Google Colab using interactive_output.
 
     Args:
-        paths (list): A list where each element is a path (a list of node objects).
-        model: A HookedTransformer model instance.
-        cache: The activation cache from a model run.
+        paths (list): 
+            A list where each element is a path (a list of node objects).
+        model: 
+            A HookedTransformer model instance.
+        cache: 
+            The activation cache from a model run.
     """
     batch_size = cache['hook_embed'].shape[0]
     fixed_path_plot_height = 400  # Fixed height for the path plot
@@ -157,10 +195,20 @@ def create_interactive_path_visualization(paths, model, cache):
     token_output = Output()
 
     # --- 3. UPDATE LOGIC ---
-    def update_visualization(path_idx, batch_idx, node_idx):
+    def update_visualization(path_idx: int, batch_idx: int, node_idx: int) -> None:
         """
         Draws both the path plot and the top-k token plot.
         This function is executed when any linked widget changes.
+
+        Args:
+            path_idx (int): 
+                Index of the selected path.
+            batch_idx (int): 
+                Index of the selected batch/sample.
+            node_idx (int): 
+                Index of the selected node within the path.
+        Returns:
+            None
         """
         path_data = paths[path_idx]
         path_len = len(path_data)

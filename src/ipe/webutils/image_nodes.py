@@ -3,40 +3,27 @@ from typing import Union
 from math import ceil
 import torch
 
-
 class ImgNode:
 	"""
-	A support class that represent a node in the image graph for visualization purposes.
+	Represents a node in the visualization graph.
 
 	Attributes:
-		cmpt (str): 
-			The component type (e.g., 'emb', 'sa', 'mlp', 'lmh').
-		layer (int): 
-			The layer index of the component.
-		head_idx (Union[int, None]): 
-			The head index for attention components, None for non-attention components.
-		position (Union[int, None]): 
-			The token position in the sequence, None for components without a position.
-		in_type (str): 
-			The input type for attention components ('query' or 'key-value'), None for non-attention components.
+		cmpt (str): Component type (e.g., 'emb', 'sa', 'mlp', 'lmh').
+		layer (int): Layer index of the component.
+		head_idx (int | None): Head index for attention components, or None.
+		position (int | None): Token position in the sequence, or None.
+		in_type (str | None): Input type for attention components ('query' or 'key-value'), or None.
 	"""
 	def __init__(self, cmpt: str, layer: int, head_idx: Union[int, None], position: Union[int, None], in_type: str = None) -> None:
-		"""Initializes an ImgNode instance.
-		
+		"""
+		Initialize an ImgNode.
+
 		Args:
-			cmpt (str):
-				The component type (e.g., 'emb', 'sa', 'mlp', 'lmh').
-			layer (int):
-				The layer index of the component.
-			head_idx (Union[int, None]):
-				The head index for attention components, None for non-attention components.
-			position (Union[int, None]):
-				The token position in the sequence, None for components without a position.
-			in_type (str, optional):
-				The input type for attention components ('query' or 'key-value'), None for non-attention components.
-		Returns:
-			ImgNode:
-				An instance of ImgNode.
+			cmpt: Component type (e.g., 'emb', 'sa', 'mlp', 'lmh').
+			layer: Layer index of the component.
+			head_idx: Head index for attention components, or None.
+			position: Token position in the sequence, or None.
+			in_type: Input type for attention components ('query' or 'key-value'), or None.
 		"""
 		self.cmpt = cmpt
 		self.layer = layer
@@ -46,23 +33,32 @@ class ImgNode:
 	
 	def __repr__(self) -> str:
 		""" A detailed string representation of the node for debugging purposes.
+		
 		Returns:
 			str: A detailed string representation of the ImgNode instance.
 		"""
 		return f"ImgNode(cmpt={self.cmpt}, layer={self.layer}, head_idx={self.head_idx}, position={self.position}, in_type={self.in_type})"
 	
 	def __str__(self) -> str:
-		""" A coincise string representation of the node."""
+		"""Return a concise human-readable identifier for the node.
+		
+		Returns:
+			str: A concise string identifier for the ImgNode instance.
+		"""
 		head_str = f"h{self.head_idx}" if self.head_idx is not None else ""
 		pos_str = f"p{self.position}" if self.position is not None else ""
 		type_str = f"_{self.in_type}" if self.in_type else ""
 		return f"{self.cmpt}_l{self.layer}{head_str}{pos_str}{type_str}"
 
 	def __lt__(self, other) -> bool:
-		"""Defines a less-than comparison for ImgNode instances based on layer, component type, position, and head index. So that node A < node B if A is a predecessor of B in the architecture or inference.
+		"""
+		Define ordering for ImgNode instances.
+
+		Nodes are compared by (layer, cmpt, position, head_idx). Useful for sorting.
 
 		Args:
-			other (ImgNode): The other ImgNode instance to compare against.
+			other (ImgNode): Another ImgNode instance to compare against.
+		
 		Returns:
 			bool: True if self is less than other, False otherwise.
 		"""
@@ -71,21 +67,22 @@ class ImgNode:
 		return (self.layer, self.cmpt, self.position, self.head_idx) < (other.layer, other.cmpt, other.position, other.head_idx)
 
 	def __eq__(self, other) -> bool:
-		"""Defines equality comparison for ImgNode instances based on their string representation.
+		"""Equality based on the string identifier produced by __str__.
 		
 		Args:
-			other (ImgNode): The other ImgNode instance to compare against.
+			other (ImgNode): Another ImgNode instance to compare against.
+		
 		Returns:
-			bool: True if both instances are equal, False otherwise.
-		"""
+			bool: True if both ImgNode instances are equal, False otherwise."""
 		if not isinstance(other, ImgNode):
 			return False
 		return str(self) == str(other)
 
 	def __hash__(self) -> int:
-		"""Defines a hash function for ImgNode instances based on the simplified string representation.
+		"""Hash based on the string identifier, matching __eq__ semantics.
+		
 		Returns:
-			int: The hash value of the ImgNode instance.
+			int: Hash value of the ImgNode instance.
 		"""
 		return hash(str(self))
 
@@ -94,77 +91,33 @@ def make_graph_from_paths(paths: list[tuple[float, list[ImgNode]]],
 						  n_heads: int,
 						  n_positions: int,
 						  divide_heads: bool = True) -> nx.MultiDiGraph:
-	"""Creates a directed graph from a list of paths for visualization purposes, in networkx format.
-	
+	"""Create a directed multigraph from a list of weighted paths for visualization.
+
 	Args:
-		paths (list[tuple[float, list[ImgNode]]]): 
-			A list of tuples where each tuple contains a path weight and a list of ImgNode instances representing the path.
-		n_layers (int): 
-			The total number of layers in the model.
-		n_heads (int): 
-			The total number of attention heads in each attention module.
-		n_positions (int): 
-			The total number of token positions in the input prompt.
+		paths (list[tuple[float, list[ImgNode]]]):
+			Each element is a tuple (weight, path_nodes), where weight is a float
+			or a single-element torch.Tensor, and path_nodes is a list of ImgNode
+			instances ordered along the path.
+		n_layers (int):
+			Total number of transformer layers.
+		n_heads (int):
+			Number of attention heads per layer (used when divide_heads is True).
+		n_positions (int):
+			Number of token positions in the sequence (used to populate context nodes).
 		divide_heads (bool, optional):
-			Whether to represent attention heads separately (True) or as a single attention block (False). Defaults to True.
+			If True, represent individual attention heads as separate nodes ('sa').
+			If False, represent attention as a single block ('attn'). Defaults to True.
+
 	Returns:
-		nx.MultiDiGraph: 
-			A directed graph where nodes are ImgNode instances and edges represent connections between them with weights.
+		nx.MultiDiGraph:
+			A directed multigraph whose nodes are ImgNode instances and whose edges
+			have attributes:
+				- weight: path contribution (float)
+				- path_idx: index of the source path in the input list
+				- in_type: input type carried by the destination node ('query'/'key-value' or None)
+			The graph object also contains summary attributes in G.graph:
+				- max_weight, min_weight, max_abs_weight, num_paths
 	"""
-
-		
-	G = nx.MultiDiGraph()
-	all_nodes: set[ImgNode] = set()
-	all_edge_weights = []
-
-	for path_idx, (path_weight, path_nodes) in enumerate(paths):
-		if not path_nodes:
-			continue
-		for node in path_nodes:
-			all_nodes.add(node)
-		for i in range(len(path_nodes) - 1):
-			src_node = path_nodes[i]
-			dst_node = path_nodes[i+1]
-			path_weight = path_weight.item() if isinstance(path_weight, torch.Tensor) else path_weight
-			G.add_edge(src_node, dst_node, weight=path_weight, path_idx=path_idx, in_type=dst_node.in_type)
-			all_edge_weights.append(path_weight)
-
-	possible_nodes_context = {
-		ImgNode('emb', 0, None, pos) for pos in range(n_positions)
-	}
-	possible_nodes_context |= {
-		ImgNode('lmh', n_layers, None, pos) for pos in range(n_positions)
-	}
-	possible_nodes_context |= {
-		ImgNode('mlp', layer, None, pos)
-		for layer in range(n_layers)
-		for pos in range(n_positions)
-	}
-
-	if divide_heads:
-		possible_nodes_context |= {
-			ImgNode('sa', layer, head, pos, in_type=t) 
-			for layer in range(n_layers)
-			for head in range(n_heads)
-			for pos in range(n_positions)
-			for t in ['query', 'key-value']
-		}
-	else:
-		possible_nodes_context |= {
-			ImgNode('attn', layer, head, pos, in_type=t)
-			for layer in range(n_layers)
-			for head in range(n_heads)
-			for pos in range(n_positions)
-			for t in ['query', 'key-value']
-		}
-		
-	G.add_nodes_from(all_nodes)
-	G.add_nodes_from(possible_nodes_context)
-	G.graph['max_weight'] = max(all_edge_weights) if all_edge_weights else 1.0
-	G.graph['min_weight'] = min(all_edge_weights) if all_edge_weights else 0.0
-	G.graph['max_abs_weight'] = max(abs(w) for w in all_edge_weights) if all_edge_weights else 1.0
-	G.graph['num_paths'] = len(paths)
-	return G
 
 def place_node(node: ImgNode, 
 			   n_layers: int, 
@@ -190,6 +143,7 @@ def place_node(node: ImgNode,
 			The total number of attention heads in each attention module. Required if divide_heads is True. Defaults to 0.
 		heads_per_row (int, optional):
 			The number of attention heads to display per row when dividing heads. Defaults to 4. The attention block will be divided into ceil(n_heads / heads_per_row) rows.
+	
 	Returns:
 		tuple[float, float]:"""
 	
@@ -231,6 +185,7 @@ def get_image_path(contrib_and_path: tuple[float, list], divide_heads=True) -> t
 			A tuple containing the path contribution (weight) and a list of nodes representing the path. It also accepts contribution as single-element torch.Tensor.
 		divide_heads (bool, optional):
 			Whether to represent attention heads separately (True) or as a single attention block (False). Defaults to True.
+	
 	Returns:
 		tuple[float, list[ImgNode]]: 
 			A tuple containing the path contribution and a list of ImgNode instances representing the path.
@@ -270,39 +225,41 @@ def create_graph_data(
 		output_str_tokens: list[str]
 	) -> dict:
 	"""
-	Creates graph data visualization for a neural network's attention pathways.
+	Generates graph data for visualizing a neural network's attention pathways.
+
 	This function processes a list of node paths from a neural network and constructs
-	a graph representation with proper node positioning and edge connections.
-	This function is required for visualization in the web app.
+	a graph representation with properly positioned nodes and connected edges.
+	The resulting data is used for visualization in the web application.
 
 	Args:
-		img_node_paths : list
-			list of paths through the network nodes to visualize
-		n_layers : int
-			Number of transformer layers in the model
-		n_heads : int
-			Number of attention heads per layer
-		n_positions : int
-			Number of token positions in the sequence
-		divide_heads : bool
-			Whether to visually separate heads in the layout
-		prompt_str_tokens : list
-			list of input tokens for labeling embedding nodes
-		output_str_tokens : list
-			list of output tokens for labeling LMH (language model head) nodes
-	
-	Returns;
-		dict
-			Dictionary containing:
-			- 'nodes': list of node data with positions and attributes
-			- 'edges': list of edge connections with weights and path indices
-			- 'max_abs_weight': Maximum absolute weight in the graph
-			- 'num_paths': Number of paths in the graph
-			- 'n_positions': Number of token positions
-			- 'n_layers': Number of layers in the model
-			- 'n_heads': Number of attention heads
-			- 'tokenized_prompt': list of input tokens
-			- 'tokenized_target': list containing the last output token
+		img_node_paths (list[tuple[float, list[ImgNode]]]):
+			A list of paths through the network nodes to visualize. Each path is a tuple
+			containing a weight and a list of ImgNode instances.
+		n_layers (int):
+			The number of transformer layers in the model.
+		n_heads (int):
+			The number of attention heads per layer.
+		n_positions (int):
+			The number of token positions in the sequence.
+		divide_heads (bool):
+			Whether to visually separate attention heads in the layout.
+		prompt_str_tokens (list[str]):
+			A list of input tokens for labeling embedding nodes.
+		output_str_tokens (list[str]):
+			A list of output tokens for labeling LMH (language model head) nodes.
+
+	Returns:
+		dict:
+			A dictionary containing the following keys:
+			- 'nodes': A list of node data with positions and attributes.
+			- 'edges': A list of edge connections with weights and path indices.
+			- 'max_abs_weight': The maximum absolute weight in the graph.
+			- 'num_paths': The number of paths in the graph.
+			- 'n_positions': The number of token positions.
+			- 'n_layers': The number of layers in the model.
+			- 'n_heads': The number of attention heads.
+			- 'tokenized_prompt': A list of input tokens.
+			- 'tokenized_target': A list containing the last output token.
 	"""
 	G = make_graph_from_paths(img_node_paths, n_layers, n_heads, n_positions, divide_heads=divide_heads)
 	

@@ -1,0 +1,16 @@
+nbsphinx
+pydata-sphinx-theme
+sphinx-autobuild
+sphinx-autodoc-typehints
+sphinx-basic-ng
+sphinx-copybutton
+sphinx_design
+sphinx-rtd-theme
+sphinxcontrib-applehelp
+sphinxcontrib-devhelp
+sphinxcontrib-htmlhelp
+sphinxcontrib-jquery
+sphinxcontrib-jsmath
+sphinxcontrib-qthelp
+sphinxcontrib-serializinghtml
+pandoc
