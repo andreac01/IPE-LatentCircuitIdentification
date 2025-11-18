@@ -16,7 +16,8 @@ def custom_attention_forward(
 	plot_patterns: bool = False,
 	add_bias: bool = False,
 ) -> torch.Tensor:
-	"""	Performs a custom forward pass through an attention module for specific attention heads and positions.
+	"""
+	Performs a custom forward pass through an attention module for specific attention heads and positions.
 	This function implements a customizable attention mechanism that allows for:
 	- Computing attention for specific heads
 	- Computing attention for specific query/key positions
@@ -26,29 +27,39 @@ def custom_attention_forward(
 
 	Args:
 		attention_module (AbstractAttention): 
-			The attention module to use for calculations
-			head (int, optional): Specific attention head to compute. If None, computes for all heads
-			q (torch.Tensor): Query tensor
-			k (torch.Tensor): Key tensor  
-			v (torch.Tensor): Value tensor
-			precomputed_attention_scores (torch.Tensor, optional): Pre-calculated attention scores to use
+			The attention module to use for calculations.
+		head (int): 
+			Specific attention head to compute. If None, computes for all heads.
+		q (torch.Tensor): 
+			Query tensor.
+		k (torch.Tensor): 
+			Key tensor.
+		v (torch.Tensor): 
+			Value tensor.
+		precomputed_attention_scores (torch.Tensor, optional): 
+			Pre-calculated attention scores to use. Defaults to None.
 		query_position (int, optional): 
-			Specific query position to compute attention for
+			Specific query position to compute attention for. Defaults to None.
 		keyvalue_position (int, optional): 
-			Specific key/value position to compute attention for
-		plot_patterns (bool, default=False): 
-			Whether to plot attention patterns
-		add_bias (bool, default=False): 
-			Whether to add bias term in final linear projection
+			Specific key/value position to compute attention for. Defaults to None.
+		plot_patterns (bool, optional): 
+			Whether to plot attention patterns. Defaults to False.
+		add_bias (bool, optional): 
+			Whether to add a bias term in the final linear projection. Defaults to False.
+
 	Returns:
-		torch.Tensor: Output tensor after attention computation
+		torch.Tensor: 
+			Output tensor after attention computation.
+
 	Notes:
-		- Does not support rotary positional embeddings, ALiBi, or relative positional bias
-		- Automatically handles precision conversion for numerical stability
-		- Applies causal masking when input sequence lengths match
-		- Can visualize attention patterns at different stages if plot_patterns=True
+		- Does not support rotary positional embeddings, ALiBi, or relative positional bias.
+		- Automatically handles precision conversion for numerical stability.
+		- Applies causal masking when input sequence lengths match.
+		- Can visualize attention patterns at different stages if `plot_patterns=True`.
+
 	Raises:
-		NotImplementedError: If using unsupported positional embedding types
+		NotImplementedError: 
+			If using unsupported positional embedding types such as ALiBi or relative positional bias.
 	"""
 	if attention_module.cfg.positional_embedding_type == "rotary":
 		past_kv_pos_offset = 0 if query_position is None else query_position

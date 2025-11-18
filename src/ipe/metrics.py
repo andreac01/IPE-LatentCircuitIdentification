@@ -8,9 +8,9 @@ def target_probability_percentage(clean_final_resid: Tensor,
 								model: HookedTransformer,
 								target_tokens: list[int]) -> Tensor:
 	"""
-	Compute the difference in the probability of associated with the target token
-	when decoding the clean and corrupted residuals. 
-	This probability is returned as a percentage of the clean model's probability.
+	Compute the percentage difference in the probability of the target tokens.
+
+	This is calculated as `mean(100 * (clean_prob - corrupted_prob) / clean_prob)`.
 
 	Args:
 		clean_final_resid (torch.Tensor): 
@@ -25,8 +25,8 @@ def target_probability_percentage(clean_final_resid: Tensor,
 			The indexes of the target tokens.
 
 	Returns:
-		float: 
-			The difference in probability of predicting the target token.
+		torch.Tensor: 
+			The mean percentage difference in probability for the target tokens.
 	"""
 	# Get logits for the last token
 	clean_final_resid = model.ln_final(clean_final_resid[:, -1, :])
@@ -45,9 +45,10 @@ def target_logit_percentage(clean_final_resid: Tensor,
 						model: HookedTransformer,
 						target_tokens: list[int]) -> Tensor:
 	"""
-	Compute the difference in logits for the target token as a percentage
-	between the logit obtained from the decoding of the clean and corrupted residual.
-	This implementation is optimized for transformerlens HookedTransformer.
+	Compute the percentage difference in logits for the target tokens.
+
+	This is calculated as `mean(100 * (clean_logit - corrupted_logit) / abs(clean_logit))`.
+	This implementation is optimized for transformer_lens HookedTransformer.
 
 	Args:
 		clean_final_resid (torch.Tensor): 
@@ -63,7 +64,7 @@ def target_logit_percentage(clean_final_resid: Tensor,
 
 	Returns:
 		torch.Tensor: 
-			The percentage difference in logits for the target token.
+			The mean percentage difference in logits for the target token.
 	"""
 	
 	# Get the unembedding weights and bias
@@ -90,9 +91,10 @@ def kl_divergence(clean_final_resid: Tensor,
 				corrupted_resid: Tensor,
 				model: HookedTransformer) -> Tensor:
 	"""
-	Compute the KL divergence between the output distributions of the clean and corrupted residuals.
-	The implementation is particularly useful when the target token is not known in advance.
-	This implementation is optimized for transformerlens HookedTransformer.
+	Compute the KL divergence between the clean and corrupted output distributions.
+
+	This is useful when the target token is not known in advance.
+	This implementation is optimized for transformer_lens HookedTransformer.
 
 	Args:
 		clean_final_resid (torch.Tensor): 
@@ -105,7 +107,7 @@ def kl_divergence(clean_final_resid: Tensor,
 			The hooked transformer model.
 	Returns:
 		torch.Tensor: 
-			The KL divergence between the output distributions.
+			The KL divergence between the output distributions, averaged over the batch.
 	"""
 	clean_final_resid = clean_final_resid[:, -1, :]
 	corrupted_final_resid = corrupted_resid[:, -1, :]
@@ -119,7 +121,7 @@ def kl_divergence(clean_final_resid: Tensor,
 	clean_log_probs = F.softmax(clean_logits, dim=-1)
 	corrupted_probs = F.softmax(corrupted_logits, dim=-1)
 
-	kl_divs = F.kl_div(clean_log_probs.log(), corrupted_probs, reduction='batchmean')
+	kl_divs = F.kl_div(clean_log_probs, corrupted_probs, reduction='batchmean')
 	return kl_divs
 
 def indirect_effect(clean_final_resid: Tensor,
@@ -129,31 +131,35 @@ def indirect_effect(clean_final_resid: Tensor,
 					cf_target_tokens: list[int],
 					verbose = False,
 					denoising: bool = False,
-     				baseline_value: float = 0.) -> Tensor:
+					baseline_value: float = 0.) -> Tensor:
 	"""
 	Compute the Indirect Effect (IE) score.
-	IE(z) = 0.5 * [ (P*z(r) - P(r)) / P(r) + (P(r') - P*z(r')) / P*z(r') ]
-	This measures how much a component's activation (z) from a corrupted run
+
+	This measures how much a component's activation from a corrupted run
 	influences the output probabilities on a clean run.
+	The formula is:
+	IE = 0.5 * [ (P_patch(r) - P_clean(r)) / P_clean(r) + (P_clean(r') - P_patch(r')) / P_patch(r') ]
+	where r is the corrupted target and r' is the clean target.
 
 	Args:
 		clean_final_resid (torch.Tensor): 
 			The final residual stream of the clean model run.
 			Shape: (batch, seq_len, d_model).
 		corrupted_resid (torch.Tensor): 
-			The final residual stream of the corrupted model run.
+			The final residual stream of the patched model run.
 			Shape: (batch, seq_len, d_model).
 		model (HookedTransformer): The hooked transformer model.
 		target_tokens (list[int]): 
-			The indexes of the target tokens for the clean prompt (r').
-		cf_target_tokens (list[int]): 
 			The indexes of the target tokens from the corrupted prompt (r).
+		cf_target_tokens (list[int]): 
+			The indexes of the target tokens for the clean prompt (r').
 		verbose (bool, optional): 
-  			If True, prints intermediate values for debugging. Default is False.
+			If True, prints intermediate values for debugging. Defaults to False.
 		denoising (bool, optional): 
-  			If True, we are patching the clean residuals into the counterfactual run. So we do not need to invert the sign of the IE.
+			If True, we are patching clean activations into a corrupted run. 
+			The sign of the result is not inverted. Defaults to False.
 		baseline_value (float, optional): 
-			A baseline value to subtract from the final IE score. Default is 0.
+			A baseline value to subtract from the final IE score. Defaults to 0.
 
 	Returns:
 		torch.Tensor: The Indirect Effect score.
@@ -216,33 +222,35 @@ def logit_difference(corrupted_resid: Tensor,
 					cf_target_tokens: list[int],
 					baseline_value: float = 0.,
 					denoising: bool = False
-     ) -> Tensor:
+		) -> Tensor:
 	"""
-	Compute the logit difference between the target token of the clean prompt (y)
-	and the target token of the counterfactual prompt (y') for the last position in the sequence.
-	When noising the effect of a path is positive if it's removal decreases the logit of the target token so we compute y' - y.
-	When denoising the effect is positive if patching the path increases the logit of the target token so we compute y - y'.
+	Compute the logit difference between two target tokens.
+
+	This is calculated on the output of a patched/ablated model run.
+	When noising (ablating), the effect of a path is positive if its removal 
+	decreases the logit of the target token, so we compute `logit(y') - logit(y)`.
+	When denoising (patching), the effect is positive if patching the path 
+	increases the logit of the target token, so we compute `logit(y) - logit(y')`.
 
 	Args:
 		corrupted_resid (torch.Tensor): 
-			The final residual stream of the counterfactual model (or ablated model).
+			The final residual stream of the patched/ablated model.
 			Shape: (batch, seq_len, d_model).
 		model (HookedTransformer): 
 			The hooked transformer model.
 		target_tokens (list[int]): 
-			The indexes of the target tokens for the clean model.
-		cf_target_tokens (Optional[list[int]]): 
-			The indexes of the target tokens for the counterfactual model.
-			Required when use_ablation_mode is False.
+			The indexes of the target tokens for the clean prompt (y).
+		cf_target_tokens (list[int]): 
+			The indexes of the target tokens for the counterfactual prompt (y').
 		baseline_value (float, optional): 
-			A baseline value to subtract from the final logit difference. Default is 0.
+			A baseline value to subtract from the final logit difference. Defaults to 0.
 		denoising (bool, optional): 
-  			If True, we are patching the clean residuals into the counterfactual run. 
-    		So we do not need to invert the sign of the logit difference.
+			If True, we are patching clean activations into a corrupted run. 
+			The sign of the logit difference is not inverted. Defaults to False.
 
 	Returns:
-		float: 
-			The logit difference: y' - y.
+		torch.Tensor: 
+			The mean logit difference over the batch.
 	"""
 	# Get the unembedding weights and bias
 	W_U = model.W_U

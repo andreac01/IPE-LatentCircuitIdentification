@@ -116,7 +116,7 @@ def find_relevant_heads(
 		include_negative (bool):
 			If True, include paths with negative contributions.
 		batch_positions (bool):
-			If True, when expanding nodes, first evaluates attentions without considering position-wise contributions, only later, if the attention has been deemed meaningful, it will be evaluated at all possible key-value positions.
+			If True, when expanding nodes, first evaluates attention without considering position-wise contributions, and only if the attention has been deemed meaningful, it will be evaluated at all possible key-value positions.
 	
 	Returns:
 		list of tuples: A list of tuples containing the contribution score and the corresponding extended path.
@@ -174,14 +174,14 @@ def PathMessagePatching(
 			The initial node to begin the backward search from (e.g., FINAL_Node(layer=model.cfg.n_layers - 1, position=target_pos)).
 		min_contribution (float, default=0.5):
 			The minimum absolute contribution score required for a path to be considered valid.
-		include_negative (bool, default=False): 
+		include_negative (bool, default=True): 
 			If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.
 		return_all (bool, default=False): 
 			If True, return all evaluated complete paths regardless of their contribution score. The search will still be guided by min_contribution.
 		batch_positions (bool, default=False): 
-			If True, when expanding nodes, first evaluates attentions without considering position-wise contributions, only later, if the attention has been deemed meaningful, it will be evaluated at all possible key-value positions.
+			If True, when expanding nodes, first evaluates attention without considering position-wise contributions, and only if the attention has been deemed meaningful, it will be evaluated at all possible key-value positions.
 		batch_heads (bool, default=False): 
-			If True, when expanding nodes, first evaluates attentions without considering all heads at once, only later, if the attention as a whole has been deemed meaningful, it will evaluate all single heads.
+			If True, when expanding nodes, first evaluates attention without considering all heads at once, and only if the attention as a whole has been deemed meaningful, it will evaluate all single heads.
 	Returns:
 		A list of tuples containing the contribution score and the corresponding path, 
 		sorted by contribution in descending order.
@@ -265,7 +265,7 @@ def PathMessagePatching_BestFirstSearch(
 	batch_heads: bool = False
 ) -> list[tuple[torch.Tensor, list[Node]]]:
 	"""
-	Performs a Breadth-First Search (BFS) starting from a node backwards to identify
+	Performs a Best-First Search (BFS) starting from a node backwards to identify
 	the most significant paths reaching it from an EMBED_Node.
 
 	Args:
@@ -280,14 +280,12 @@ def PathMessagePatching_BestFirstSearch(
 			The number of paths to return.
 		max_time (int, default=300):
 			The maximum time (in seconds) to run the search.
-		include_negative (bool, default=False): 
-			If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.
-		return_all (bool, default=False): 
-			If True, return all evaluated complete paths regardless of their contribution score. The search will still be guided by min_contribution.
+		include_negative (bool, default=True): 
+			If True, include paths with negative contributions.
 		batch_positions (bool, default=False): 
-			If True, when expanding nodes, first evaluates attentions without considering position-wise contributions, only later, if the attention has been deemed meaningful, it will be evaluated at all possible key-value positions.
+			If True, when expanding nodes, first evaluates attention without considering position-wise contributions, and only if the attention has been deemed meaningful, it will be evaluated at all possible key-value positions.
 		batch_heads (bool, default=False): 
-			If True, when expanding nodes, first evaluates attentions without considering all heads at once, only later, if the attention as a whole has been deemed meaningful, it will evaluate all single heads.
+			If True, when expanding nodes, first evaluates attention without considering all heads at once, and only if the attention as a whole has been deemed meaningful, it will evaluate all single heads.
 	Returns:
 		A list of tuples containing the contribution score and the corresponding path, 
 		sorted by contribution in descending order.
@@ -364,7 +362,7 @@ def PathMessagePatching_LimitedLevelWidth(
 	model: HookedTransformer,
 	metric: Callable,
 	root: Node,
-	max_width: int = 20000,
+	max_width: int = 2000,
 	include_negative: bool = True,
 	batch_positions: bool = False,
 	batch_heads: bool = False
@@ -380,9 +378,9 @@ def PathMessagePatching_LimitedLevelWidth(
 			A function to evaluate the contribution or importance of the path.
 		root (Node): 
 			The initial node to begin the backward search from.
-		max_width (int, default=20000):
+		max_width (int, default=2000):
 			The maximum number of nodes to retain at each level of the search tree.
-		include_negative (bool, default=False): 
+		include_negative (bool, default=True): 
 			If True, include paths with negative contributions.
 		batch_positions (bool, default=False): 
 			If True, nodes are expanded without position-wise contributions, and only
@@ -497,23 +495,19 @@ def PathAttributionPatching(
 	Args:
 		model (HookedTransformer): 
 			The transformer model used for evaluation.
-		msg_cache (ActivationCache): 
-			The activation cache containing intermediate activations.
 		metric (Callable):
 			A function to evaluate the contribution or importance of the path.
 				It must accept a single parameter corresponding to the corrupted residual stream just before the final layer norm.
 		root (Node): 
 			The initial node to begin the backward search from (e.g., FINAL_Node(layer=model.cfg.n_layers - 1, position=target_pos)).
-		ground_truth_tokens (list of int): 
-			The reference tokens used for evaluating path contributions.
 		min_contribution (float, default=0.5): 
 			The minimum absolute contribution score required for a path to be considered valid.
-		include_negative (bool, default=False): 
+		include_negative (bool, default=True): 
 			If True, include paths with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.
 		return_all (bool, default=False): 
 			If True, return all evaluated paths regardless of their contribution score. The search will still be guided by min_contribution threshold.
 		confirm_relevance (bool, default=False):
-			If True, after identifying a potentially relevant component based on the linear approximation, it will also evaluate the contribution of the full path including to confirm its relevance.
+			If True, after identifying a potentially relevant component based on the linear approximation, it will also evaluate the contribution of the full path to confirm its relevance.
 	Returns:
 		A list of tuples containing the contribution score and the corresponding path, sorted by contribution in descending order.
 	"""
@@ -613,14 +607,12 @@ def PathAttributionPatching_BestFirstSearch(
 	Args:
 		model (HookedTransformer): 
 			The transformer model used for evaluation.
-		msg_cache (ActivationCache): 
-			The activation cache containing intermediate activations.
 		metric (Callable):
 			A function to evaluate the contribution or importance of the path.
-				It must accept a single parameter corresponding to the corrupted residual stream just before the final layer norm.
+			It must accept a single parameter corresponding to the corrupted residual stream just before the final layer norm.
 		root (Node): 
 			The initial node to begin the backward search from (e.g., FINAL_Node(layer=model.cfg.n_layers - 1, position=target_pos)).
-		include_negative (bool, default=False): 
+		include_negative (bool, default=True): 
 			If True, include paths with negative contributions, otherwise only return positively contributing paths. 
 			Note that to save computation the negatively contributing paths are discarded even if incomplete.
 		top_n (int, default=100):
@@ -694,19 +686,19 @@ def PathAttributionPatching_LimitedLevelWidth(
 	Args:
 		model (HookedTransformer): 
 			The transformer model used for evaluation.
-		msg_cache (ActivationCache): 
-			The activation cache containing intermediate activations.
 		metric (Callable):
 			A function to evaluate the contribution or importance of the path.
 				It must accept a single parameter corresponding to the corrupted residual stream 
 				just before the final layer norm.
 		root (Node): 
 			The initial node to begin the backward search from (e.g., FINAL_Node(layer=model.cfg.n_layers - 1, position=target_pos)).
-		include_negative (bool, default=False): 
+		root (Node): 
+			The initial node to begin the backward search from (e.g., FINAL_Node(layer=model.cfg.n_layers - 1, position=target_pos)).
+		max_width (int, default=2000):
+			The maximum number of nodes to retain at each level of the search tree.
+		include_negative (bool, default=True): 
 			If True, include paths with negative contributions, otherwise only return positively contributing paths. 
 			Note that to save computation the negatively contributing paths are discarded even if incomplete.
-		max_width (int, default=20000):
-			The maximum number of nodes to retain at each level of the search tree.
 	Returns:
 		A list of tuples containing the contribution score and the corresponding path, sorted by contribution in descending order.
 	"""

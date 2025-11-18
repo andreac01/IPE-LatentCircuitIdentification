@@ -37,25 +37,25 @@ class ExperimentManager:
 		patch_type: str = 'auto',
 		patch_clean_into_cf: bool = True
 		):
-		"""Manages the setup and execution of path-finding experiments using a easier interface, that employs default parameters and sensible checks.
+		"""Manages the setup and execution of path-finding experiments using an easier interface which employs default parameters and sensible checks.
 
-		It helps in the definition of the metric, the algorithm, running the experiment, plotting the results and decoding the residuals along the paths.
-		In the setup it allows you to:
-		1. Choose the metric in between:
+		It helps define the metric and algorithm, run the experiment, plot the results, and decode the residuals along the paths.
+		In the setup, it allows you to:
+		1. Choose the metric from:
 		- :func:`ipe.metrics.target_logit_percentage` (metric = 'target_logit_percentage')
-		- :func:`ipe.metrics.target_probability_percentage` (metric = 'target_probability_percentage') (default)
+		- :func:`ipe.metrics.target_probability_percentage` (metric = 'target_probability_percentage')
 		- :func:`ipe.metrics.logit_difference` (metric = 'logit_difference')
 		- :func:`ipe.metrics.kl_divergence` (metric = 'kl_divergence')
 		- :func:`ipe.metrics.indirect_effect` (metric = 'indirect_effect')
-		2. Choose the seach algorithm in between:
-		- :func:`ipe.graph_search.PathAttributionPatching` (alorithm = 'PathAttributionPatching', method = 'Threshold')
-		- :func:`ipe.graph_search.PathMessagePatching` (alorithm = 'PathMessagePatching', method = 'Threshold')
-		- :func:`ipe.graph_search.PathAttributionPatching_BestFirstSearch` (alorithm = 'PathAttributionPatching', method = 'BestFirstSearch') (default)
-		- :func:`ipe.graph_search.PathMessagePatching_BestFirstSearch` (alorithm = 'PathMessagePatching', method = 'BestFirstSearch')
-		- :func:`ipe.graph_search.PathAttributionPatching_LimitedLevelWidth` (alorithm = 'PathAttributionPatching', method = 'LimitedLevelWidth')
-		- :func:`ipe.graph_search.PathMessagePatching_LimitedLevelWidth` (alorithm = 'PathMessagePatching', method = 'LimitedLevelWidth')
+		2. Choose the search algorithm from:
+		- :func:`ipe.graph_search.PathAttributionPatching` (algorithm = 'PathAttributionPatching', method = 'Threshold')
+		- :func:`ipe.graph_search.PathMessagePatching` (algorithm = 'PathMessagePatching', method = 'Threshold')
+		- :func:`ipe.graph_search.PathAttributionPatching_BestFirstSearch` (algorithm = 'PathAttributionPatching', method = 'BestFirstSearch') (default)
+		- :func:`ipe.graph_search.PathMessagePatching_BestFirstSearch` (algorithm = 'PathMessagePatching', method = 'BestFirstSearch')
+		- :func:`ipe.graph_search.PathAttributionPatching_LimitedLevelWidth` (algorithm = 'PathAttributionPatching', method = 'LimitedLevelWidth')
+		- :func:`ipe.graph_search.PathMessagePatching_LimitedLevelWidth` (algorithm = 'PathMessagePatching', method = 'LimitedLevelWidth')
 		
-		You can also provide custom parameters to the metric and the algorithm as a dictionary.
+		You can also provide custom parameters to the metric and the algorithm as dictionaries.
 		
 		Args:
 			model (HookedTransformer): 
@@ -65,20 +65,20 @@ class ExperimentManager:
 			targets (list[str]):
 				List of target tokens corresponding to each prompt. Each target must be a single token.
 			cf_prompts (list[str], optional):
-				List of counterfactual prompts for the model. If provided, must have the same length as prompts and positional_search rules apply. Defaults to None.
+				List of counterfactual prompts for the model. If provided, they must have the same length as prompts and positional_search rules apply. Defaults to None.
 			cf_targets (list[str], optional):
-				List of counterfactual target tokens corresponding to each counterfactual prompt. Each target must be a single token. If provided, must have the same length as targets. Defaults to None
+				List of counterfactual target tokens corresponding to each counterfactual prompt. Each target must be a single token. If provided, it must have the same length as targets. Defaults to None.
 			algorithm (str, optional):
 				The path-finding algorithm to use. Options are 'PathAttributionPatching' or 'PathMessagePatching'. Defaults to 'PathAttributionPatching'.
 			search_strategy (str, optional):
 				The search strategy to use within the chosen algorithm. Options are 'Threshold', 'BestFirstSearch', or 'LimitedLevelWidth'. Defaults to 'BestFirstSearch'.
 			algorithm_params (dict, optional):
-				Custom parameters for the chosen algorithm. If provided, must be a dictionary containing parameters appropriate for the algorithm/search strategy combination. Defaults to {}.
+				Custom parameters for the chosen algorithm. If provided, must be a dictionary containing parameters appropriate for the algorithm/search strategy combination (algorithms: https://github.com/andreac01/IPE-LatentCircuitIdentification/blob/main/src/ipe/graph_search.py). Defaults to {}.
 			metric (str, optional):
 				The name of the metric to use. Options are 'target_logit_percentage', 'target_probability_percentage', 'logit_difference', 'kl_divergence', or 'indirect_effect'. Defaults to 'target_logit_percentage'.
-				Note that 'kl_divergence is the only metric that does not require a target token.
+				Note that 'kl_divergence' is the only metric that does not require a target token.
 			metric_params (dict, optional):
-				Custom parameters for the chosen metric. If provided, must be a dictionary containing parameters appropriate for the metric. Defaults to {}.
+				Custom parameters for the chosen metric. If provided, must be a dictionary containing parameters appropriate for the metric (metrics: https://github.com/andreac01/IPE-LatentCircuitIdentification/blob/main/src/ipe/metrics.py). Defaults to {}.
 			positional_search (bool, optional):
 				Whether to perform positional search. If True, all prompts (and cf_prompts if provided) must have the same length. Defaults to True.
 			patch_type (str, optional):
@@ -118,7 +118,7 @@ class ExperimentManager:
 			self.patch_type = patch_type
 
 		if patch_clean_into_cf and (metric not in ['indirect_effect', 'logit_difference'] or self.patch_type != 'counterfactual'):
-			print("WARNING: patch_clean_into_cf is True but the chosen metric requires patching counterfactual into clean runs. Overriding patch_clean_into_cf to False.")
+			print("WARNING: patch_clean_into_cf is True but the chosen metric requires patching counterfactuals into clean runs. Overriding patch_clean_into_cf to False.")
 			patch_clean_into_cf = False
 
 		self.denoising = patch_clean_into_cf
@@ -160,7 +160,7 @@ class ExperimentManager:
 		self,
 		residual: Tensor
 	):
-		"""Decode a given residual stream using the model's unembedding layer and display an interactive decoding plot. This decoding may be used to analyze hidden layer messages (see www.lesswrong.com/posts/AcKRB8wDpdaN6v6ru/interpreting-gpt-the-logit-lens)
+		"""Decode a given residual stream using the model's unembedding layer and display an interactive decoding plot. This decoding may be used to analyze hidden layer messages (see www.lesswrong.com/posts/AcKRB8wDpdaN6v6ru/interpreting-gpt-the-logit-lens).
 		The output will be an interactive plot showing the top token predictions based on the provided residual stream.
 		Args:
 			residual (Tensor):
@@ -304,7 +304,7 @@ class ExperimentManager:
 	def load_root(
 		self,
 	):
-		"""Initialize the root node for the path-finding algorithm. The root node represents the starting point of the search process and is configured based on the model, metric, position and other relevant parameters."""
+		"""Initialize the root node for the path-finding algorithm. The root node represents the starting point of the search process and is configured based on the model, metric, position, and other relevant parameters."""
 		root_cache = self.cf_cache if (self.denoising and self.patch_type == 'counterfactual') else self.cache
 		root_cf_cache = self.cache if (self.denoising and self.patch_type == 'counterfactual') else self.cf_cache
 		self.root = FINAL_Node(
@@ -378,7 +378,7 @@ class ExperimentManager:
 			if param in self_parameters:
 				print(f"WARNING: [load_metric] Using ExperimentManager attribute for optional parameter '{param}': {self.__dict__[param]}")
 				metric_params[param] = self.__dict__[param]
-    
+	
 		non_modified_defaults = {k: v for k, v in optional_params.items() if k not in metric_params}
 
 		metric_params_complete = {**non_modified_defaults, **metric_params}

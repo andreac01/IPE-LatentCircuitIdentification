@@ -7,14 +7,20 @@ from typing import Iterable
 
 def get_function_params(func: callable, which: str='all') -> dict[str, inspect.Parameter]:
 	"""
-	Returns a dictionary of all parameters for a given function.
-	Keys are parameter names, values are inspect.Parameter objects.
+	Get parameters for a given function.
 
 	Args:
-		func: The function to inspect.
-		which: 'all' to get all parameters, 'required' to get only required parameters, 'default' to get only parameters with default values.
+		func (callable): The function to inspect.
+		which (str): One of 'all', 'required', or 'default'.
+			- 'all': Get all parameters.
+			- 'required': Get only required parameters (those without a default value).
+			- 'default': Get only parameters with default values.
+
 	Returns:
-		dict: A dictionary of parameter names and their default values.
+		dict: A dictionary of parameters.
+	
+	Raises:
+		ValueError: If 'which' is not one of 'all', 'required', or 'default'.
 	"""
 	sig = inspect.signature(func)
 	if which == 'required':
@@ -28,14 +34,24 @@ def get_function_params(func: callable, which: str='all') -> dict[str, inspect.P
 
 def batch_iterable(iterable: Iterable, batch_size: int):
 	"""Batch an iterable into chunks of a specified size.
+
 	Args:
-		iterable (iterable): 
+		iterable (Iterable): 
 			The input iterable to be batched.
 		batch_size (int): 
 			The size of each batch.
+
 	Yields:
-		list: A batch of elements from the iterable.
+		list: 
+			A batch of elements from the iterable. Each batch is a list of up to `batch_size` elements.
+
+	Raises:
+		ValueError: 
+			If `batch_size` is not a positive integer.
 	"""
+	if batch_size <= 0:
+		raise ValueError("batch_size must be a positive integer.")
+	
 	it = iter(iterable)
 	while True:
 		chunk = list(islice(it, batch_size))
@@ -58,6 +74,9 @@ def get_topk(model: HookedTransformer, residual: Tensor, topk=5) -> dict[list]:
 			- 'topk_logits': The top-k logits.
 			- 'topk_probs': The top-k probabilities.
 			- 'topk_strtokens': The top-k string representations of the tokens.
+   	Raises:
+		AssertionError: 
+			If the residual tensor is not 1-dimensional.
 	"""
 	assert residual.dim() == 1, "Residual must be a 1D tensor of shape (d_model,)"
 	resid_norm = model.ln_final(residual)

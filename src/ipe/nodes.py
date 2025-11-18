@@ -25,7 +25,7 @@ class Node(abc.ABC):
 		position (int, default=None): 
 			Token position if position-specific, else None. None is equivalent to all positions.
 		parent (Node, default=None): 
-			Parent node in the next node in the path. The parent is a successor in the computational graph.
+			Parent node is the next node in the path. The parent is a successor in the computational graph.
 		children (set, default=set()): 
 			Set of child nodes. A child is a predecessor in the computational graph.
 		msg_cache (dict): 
@@ -45,35 +45,32 @@ class Node(abc.ABC):
 		This is an abstract base class that should not be instantiated directly. Concrete implementations should inherit from this class and implement the required abstract methods.
 	"""
 	def __init__(self, model: HookedTransformer, layer: int, msg_cache: dict, input_name: str, output_name: str, position: int = None, cf_cache: dict = {}, parent = None, children: set = set(), gradient: torch.Tensor = None, patch_type: str = 'zero'):
-		"""	 Initializes an Node instance.
+		"""Initializes a Node instance.
 
 		Args:
 			model (HookedTransformer): 
 				The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
 			layer (int): 
 				Layer index in the transformer. Embedding layer is assumed to be layer 0.
-			position (int, default=None): 
-				Token position if position-specific, else None. None is equivalent to all positions.
-			parent (Node, default=None): 
-				Parent node in the next node in the path. The parent is a successor in the computational graph.
-			children (set, default=set()): 
-				Set of child nodes. A child is a predecessor in the computational graph.
 			msg_cache (dict): 
 				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
-			cf_cache (dict, default={}): 
-				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-			gradient (torch.Tensor, default=None): 
-				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
 			input_name (str): 
 				Input activation name. This is the name associated to the cache entry corresponding to the input of this node.
 			output_name (str): 
 				Output activation name. This is the name associated to the cache entry corresponding to the output of this node.
+			position (int, default=None): 
+				Token position if position-specific, else None. None is equivalent to all positions.
+			cf_cache (dict, default={}): 
+				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
+			parent (Node, default=None): 
+				Parent node is the next node in the path. The parent is a successor in the computational graph.
+			children (set, default=set()): 
+				Set of child nodes. A child is a predecessor in the computational graph.
+			gradient (torch.Tensor, default=None): 
+				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing through the path from final node to the current one.
 			patch_type (str, default='zero'): 
 				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
-		Returns:
-			Node:
-				An instance of Node.
-	"""
+		"""
 		self.model = model
 		self.layer = layer
 		self.position = position
@@ -92,7 +89,7 @@ class Node(abc.ABC):
 		"""Adds a node as a child of self and sets self as its parent. A child can be interpreted as a predecessor in the computational graph.
 		
 		Args:
-			child (Node)
+			child (Node):
 				The Node to be added as a child of self.
 		
 		Returns:
@@ -100,7 +97,7 @@ class Node(abc.ABC):
 
 		"""
 		self.children.add(child)
-		child.parent.add(self)
+		child.parent = self
 
 	def add_parent(self, parent: 'Node') -> None:
 		"""Adds a node as a parent of self and update the list of children of the parent node. A parent can be interpreted as a successor in the computational graph.
@@ -113,7 +110,7 @@ class Node(abc.ABC):
 			None
 		
 		"""
-		self.parent.add(parent)
+		self.parent = parent
 		parent.children.add(self)
 
 	@abc.abstractmethod
@@ -129,13 +126,13 @@ class Node(abc.ABC):
 		- 'counterfactual': returns the difference between the normal output and the counterfactual output of the component
 
 		Args:
-
-			message (torch.Tensor of shape (batch_size, seq_len, d_model), default=None):
-				The message whose effect on the node need to be evaluated. If None, returns the normal 
+			message (torch.Tensor, optional):
+				The message whose effect on the node need to be evaluated. Defaults to None.
+				Shape: (batch_size, seq_len, d_model). If None, returns the normal 
 				output or the difference between normal and counterfactual output depending on patch_type.
 			
 		Returns:
-			Tensor:
+			torch.Tensor:
 				A tensor representing the effect of the message on the output of the node.
 				In simpler terms, it represents the message caused by passing the input message through this node.
 
@@ -153,19 +150,16 @@ class Node(abc.ABC):
 		output of this node. 
 
 		Args:
-
 			model_cfg (HookedTransformerConfig):
 				The configuration of the transformer model. It is used to determine the number of heads and other model parameters.
-
-			include_head (bool, default=False):
-				Whether to consider specific head nodes for ATTN.
-
-			separate_kv (bool, default=False):
-				Whether to consider key and value positions separately for ATTN nodes 
+			include_head (bool, optional):
+				Whether to consider specific head nodes for ATTN. Defaults to False.
+			separate_kv (bool, optional):
+				Whether to consider key and value positions separately for ATTN nodes. Defaults to False.
 		
 		Returns:
-			list of Node:
-				The list of all predecessor nodes infuencing the input of this node.
+			list[Node]:
+				The list of all predecessor nodes influencing the input of this node.
 		"""
 		pass
 
@@ -178,21 +172,19 @@ class Node(abc.ABC):
 		or assuming a gradient of ones if self has no parent. When 'grad_outputs' is specified, it is used instead of the parent's gradient.
 
 		Args:
-			grad_outputs : torch.Tensor, optional (default=None)
-				Gradient to propagate backwards. If None, uses the gradient from the parent node or ones.
-			
-			save : bool, optional (default=True)
+			grad_outputs (torch.Tensor, optional):
+				Gradient to propagate backwards. If None, uses the gradient from the parent node or ones. Defaults to None.
+			save (bool, optional):
 				Whether to save the computed gradient in self.gradient. The gradient can be reused
-				later by setting use_precomputed to True.
-			
-			use_precomputed : bool, optional (default=False)
-				Whether to use the precomputed gradient if available. The precoputed gradient is stored whenever
-				save is True.
+				later by setting use_precomputed to True. Defaults to True.
+			use_precomputed (bool, optional):
+				Whether to use the precomputed gradient if available. The precomputed gradient is stored whenever
+				save is True. Defaults to False.
 		
 		Returns:
-			gradient : torch.Tensor
+			torch.Tensor:
 				A tensor representing the gradient of the output with respect to the input
-				of this node, passing trough the path from final node to the current one.
+				of this node, passing through the path from final node to the current one.
 		"""
 
 
@@ -270,7 +262,7 @@ class Node(abc.ABC):
 		Returns:
 			int: The hash value of the Node instance.
 		Notes:
-			This methos is overridden in child classes to include additional attributes.
+			This method is overridden in child classes to include additional attributes.
 		"""
 		return hash((type(self).__name__, self.layer, self.position))
 
@@ -287,7 +279,7 @@ class MLP_Node(Node):
 		position (int, default=None): 
 			Token position if position-specific, else None. None is equivalent to all positions.
 		parent (Node, default=None): 
-			Parent node in the next node in the path. The parent is a successor in the computational graph.
+			Parent node is the next node in the path. The parent is a successor in the computational graph.
 		children (set, default=set()): 
 			Set of child nodes. A child is a predecessor in the computational graph.
 		msg_cache (dict): 
@@ -310,23 +302,20 @@ class MLP_Node(Node):
 				The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
 			layer (int): 
 				Layer index in the transformer. Embedding layer is assumed to be layer 0.
-			position (int, default=None): 
-				Token position if position-specific, else None. None is equivalent to all positions.
-			parent (Node, default=None): 
-				Parent node in the next node in the path. The parent is a successor in the computational graph.
-			children (set, default=set()): 
-				Set of child nodes. A child is a predecessor in the computational graph.
-			msg_cache (dict): 
-				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
-			cf_cache (dict, default={}): 
-				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-			gradient (torch.Tensor, default=None): 
-				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
-			patch_type (str, default='zero'): 
-				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
-		Returns:
-			self (MLP_Node):
-				The initialized MLP_Node instance.
+			position (int, optional): 
+				Token position if position-specific, else None. Defaults to None.
+			parent (Node, optional): 
+				Parent node is the next node in the path. The parent is a successor in the computational graph. Defaults to None.
+			children (set, optional): 
+				Set of child nodes. A child is a predecessor in the computational graph. Defaults to set().
+			msg_cache (dict, optional): 
+				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). Defaults to {}.
+			cf_cache (dict, optional): 
+				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). Defaults to {}.
+			gradient (torch.Tensor, optional): 
+				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing through the path from final node to the current one. Defaults to None.
+			patch_type (str, optional): 
+				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path. Defaults to 'zero'.
 		"""
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name=f"blocks.{layer}.hook_resid_mid", output_name=f"blocks.{layer}.hook_mlp_out", patch_type=patch_type)
 	
@@ -343,9 +332,9 @@ class MLP_Node(Node):
 		- 'counterfactual': returns the difference between the normal output and the counterfactual output
 
 		Args:
-
-			message (torch.Tensor of shape (batch_size, seq_len, d_model), default=None):
-				The message whose effect on the node need to be evaluated. If None, returns the normal 
+			message (torch.Tensor, optional):
+				The message whose effect on the node need to be evaluated. Defaults to None.
+				Shape: (batch_size, seq_len, d_model). If None, returns the normal 
 				output or the difference between normal and counterfactual output depending on patch_type.
 			
 		Returns:
@@ -393,20 +382,18 @@ class MLP_Node(Node):
 		- MLP, EMBED and ATTN nodes in self.position from previous layers.
 		- ATTN nodes in self.position from current layers.
 		ATTN nodes are always patched both in query and key-value positions separately.
-		Args:
 
+		Args:
 			model_cfg (HookedTransformerConfig):
 				The configuration of the transformer model. It is used to determine the number of heads and other model parameters.
-
-			include_head (bool, default=False):
-				Whether to consider specific head nodes for ATTN.
-
-			separate_kv (bool, default=False):
-				Whether to consider key and value positions separately for ATTN nodes 
+			include_head (bool, optional):
+				Whether to consider specific head nodes for ATTN. Defaults to False.
+			separate_kv (bool, optional):
+				Whether to consider key and value positions separately for ATTN nodes. Defaults to False.
 		
 		Returns:
-			list of Node:
-				The list of all predecessor nodes infuencing the input of this node.
+			list[Node]:
+				The list of all predecessor nodes influencing the input of this node.
 		
 		Notes:
 			- If self.position is None, only non-position-specific previous nodes are considered.
@@ -487,21 +474,19 @@ class MLP_Node(Node):
 		or assuming a gradient of ones if self has no parent. When 'grad_outputs' is specified, it is used instead of the parent's gradient.
 
 		Args:
-			grad_outputs : torch.Tensor, optional (default=None)
-				Gradient to propagate backwards. If None, uses the gradient from the parent node or ones.
-			
-			save : bool, optional (default=True)
+			grad_outputs (torch.Tensor, optional):
+				Gradient to propagate backwards. If None, uses the gradient from the parent node or ones. Defaults to None.
+			save (bool, optional):
 				Whether to save the computed gradient in self.gradient. The gradient can be reused
-				later by setting use_precomputed to True.
-			
-			use_precomputed : bool, optional (default=False)
-				Whether to use the precomputed gradient if available. The precoputed gradient is stored whenever
-				save is True.
+				later by setting use_precomputed to True. Defaults to True.
+			use_precomputed (bool, optional):
+				Whether to use the precomputed gradient if available. The precomputed gradient is stored whenever
+				save is True. Defaults to False.
 		
 		Returns:
-			gradient : torch.Tensor
+			torch.Tensor:
 				A tensor representing the gradient of the output with respect to the input
-				of this node, passing trough the path from final node to the current one.
+				of this node, passing through the path from final node to the current one.
 		"""
 		if self.gradient is not None and use_precomputed:
 			if self.position is None:
@@ -561,7 +546,7 @@ class ATTN_Node(Node):
 		patch_query (bool, default=True):
 			Whether to patch the query projection of the attention head. If False, the query projection is not patched and the message is only removed from the key and/or value projections.
 		parent (Node, default=None): 
-			Parent node in the next node in the path. The parent is a successor in the computational graph.
+			Parent node is the next node in the path. The parent is a successor in the computational graph.
 		children (set, default=set()): 
 			Set of child nodes. A child is a predecessor in the computational graph.
 		msg_cache (dict): 
@@ -589,37 +574,33 @@ class ATTN_Node(Node):
 				The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
 			layer (int): 
 				Layer index in the transformer. Embedding layer is assumed to be layer 0.
-			head (int, default=None):
-				Attention head index if head-specific, else None. None is equivalent to all heads. When an head is specified the contribution of the is considered, particularly the bias term which is not head-specific is not included. Therefore the output of an ATTN node is equal to the output of all the heads plus the bias term. If head is None the whole attention output is considered.
-			position (int, default=None): 
-				Token position if position-specific, else None. None is equivalent to all positions.
-			keyvalue_position (int, default=None):
+			head (int, optional):
+				Attention head index if head-specific, else None. None is equivalent to all heads. When a head is specified the contribution of the is considered, particularly the bias term which is not head-specific is not included. Therefore the output of an ATTN node is equal to the output of all the heads plus the bias term. If head is None the whole attention output is considered. Defaults to None.
+			position (int, optional): 
+				Token position if position-specific, else None. None is equivalent to all positions. Defaults to None.
+			keyvalue_position (int, optional):
 				Key/Value token position if position-specific, else None. None is equivalent to all positions.
-				If keyvalue_position is specified, the node represents the contribution of the attention head when the value residual strams of all other positions are zeroed out. This is equivalent to attending only to a single position, but scaling the output by the attention score of that position.
-			patch_key (bool, default=True):
-				Whether to patch the key projection of the attention head. If False, the key projection is not patched and the message is only removed from the query and/or value projections.
-			patch_value (bool, default=True):
-				Whether to patch the value projection of the attention head. If False, the value projection is not patched and the message is only removed from the query and/or key projections.
-			patch_query (bool, default=True):
-				Whether to patch the query projection of the attention head. If False, the query projection is not patched and the message is only removed from the key and/or value projections.
-			parent (Node, default=None): 
-				Parent node in the next node in the path. The parent is a successor in the computational graph.
-			children (set, default=set()): 
-				Set of child nodes. A child is a predecessor in the computational graph.
-			msg_cache (dict): 
-				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
-			cf_cache (dict, default={}): 
-				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-			gradient (torch.Tensor, default=None): 
-				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
-			patch_type (str, default='zero'): 
-				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
-			plot_patterns (bool, default=False):
-				Whether to plot the attention patterns when calculating the forward pass. This is useful for debugging purposes but also to visualize the changes in the attention patterns when patching specific positions.
-		
-		Returns:
-			self (ATTN_Node):
-				The initialized ATTN_Node instance.
+				If keyvalue_position is specified, the node represents the contribution of the attention head when the value residual streams of all other positions are zeroed out. This is equivalent to attending only to a single position, but scaling the output by the attention score of that position. Defaults to None.
+			parent (Node, optional): 
+				Parent node is the next node in the path. The parent is a successor in the computational graph. Defaults to None.
+			children (set, optional): 
+				Set of child nodes. A child is a predecessor in the computational graph. Defaults to set().
+			msg_cache (dict, optional): 
+				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). Defaults to {}.
+			cf_cache (dict, optional): 
+				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). Defaults to {}.
+			gradient (torch.Tensor, optional): 
+				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing through the path from final node to the current one. Defaults to None.
+			patch_query (bool, optional):
+				Whether to patch the query projection of the attention head. If False, the query projection is not patched and the message is only removed from the key and/or value projections. Defaults to True.
+			patch_key (bool, optional):
+				Whether to patch the key projection of the attention head. If False, the key projection is not patched and the message is only removed from the query and/or value projections. Defaults to True.
+			patch_value (bool, optional):
+				Whether to patch the value projection of the attention head. If False, the value projection is not patched and the message is only removed from the query and/or key projections. Defaults to True.
+			plot_patterns (bool, optional):
+				Whether to plot the attention patterns when calculating the forward pass. This is useful for debugging purposes but also to visualize the changes in the attention patterns when patching specific positions. Defaults to False.
+			patch_type (str, optional): 
+				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path. Defaults to 'zero'.
 		"""
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, patch_type=patch_type, input_name=f"blocks.{layer}.hook_resid_pre", output_name="")
 		self.head = head
@@ -650,9 +631,9 @@ class ATTN_Node(Node):
 		- 'counterfactual': returns the difference between the normal output and the counterfactual output of the component
 
 		Args:
-
-			message (torch.Tensor of shape (batch_size, seq_len, d_model), default=None):
-				The message whose effect on the node need to be evaluated. If None, returns the normal 
+			message (torch.Tensor, optional):
+				The message whose effect on the node need to be evaluated. Defaults to None.
+				Shape: (batch_size, seq_len, d_model). If None, returns the normal 
 				output or the difference between normal and counterfactual output depending on patch_type.
 			
 		Returns:
@@ -664,7 +645,7 @@ class ATTN_Node(Node):
 		- If a position is specified the output will be zero for all other positions.
 		- The method assumes that the msg_cache and cf_cache contain the necessary activations.
 		- When message is None, the method will cache the output in msg_cache or cf_cache if not already present.
-		- The method automatically adds entries to the msg_cache and cf_cache, correspoding to the output of single attention heads, if they are not already present.
+		- The method automatically adds entries to the msg_cache and cf_cache, corresponding to the output of single attention heads, if they are not already present.
 		- This method uses precomputed attention scores if possible, this may introduce small numerical differences compared to a full recomputation.
 		"""
 		length = self.position+1 if self.position is not None else self.msg_cache[self.input_name].shape[1]
@@ -821,21 +802,19 @@ class ATTN_Node(Node):
 		or assuming a gradient of ones if self has no parent. When 'grad_outputs' is specified, it is used instead of the parent's gradient.
 
 		Args:
-			grad_outputs : torch.Tensor, optional (default=None)
-				Gradient to propagate backwards. If None, uses the gradient from the parent node or ones.
-			
-			save : bool, optional (default=True)
+			grad_outputs (torch.Tensor, optional):
+				Gradient to propagate backwards. If None, uses the gradient from the parent node or ones. Defaults to None.
+			save (bool, optional):
 				Whether to save the computed gradient in self.gradient. The gradient can be reused
-				later by setting use_precomputed to True.
-			
-			use_precomputed : bool, optional (default=False)
-				Whether to use the precomputed gradient if available. The precoputed gradient is stored whenever
-				save is True.
+				later by setting use_precomputed to True. Defaults to True.
+			use_precomputed (bool, optional):
+				Whether to use the precomputed gradient if available. The precomputed gradient is stored whenever
+				save is True. Defaults to False.
 		
 		Returns:
-			gradient : torch.Tensor
+			torch.Tensor:
 				A tensor representing the gradient of the output with respect to the input
-				of this node, passing trough the path from final node to the current one.
+				of this node, passing through the path from final node to the current one.
 		"""
 		if self.gradient is not None and use_precomputed:
 			if self.gradient.shape[1] == 1:
@@ -969,20 +948,18 @@ class ATTN_Node(Node):
 		Previous nodes are:
 		- MLP, EMBED and ATTN nodes in self.position from previous layers if patch_query=True.
 		- MLP, EMBED and ATTN nodes in all previous positions from previous layers if patch_key=True or patch_value=True.
-		Args:
 
+		Args:
 			model_cfg (HookedTransformerConfig):
 				The configuration of the transformer model. It is used to determine the number of heads and other model parameters.
-
-			include_head (bool, default=False):
-				Whether to consider specific head nodes for ATTN.
-
-			separate_kv (bool, default=False):
-				Whether to consider key and value positions separately for ATTN nodes 
+			include_head (bool, optional):
+				Whether to consider specific head nodes for ATTN. Defaults to False.
+			separate_kv (bool, optional):
+				Whether to consider key and value positions separately for ATTN nodes. Defaults to False.
 		
 		Returns:
-			list of Node:
-				The list of all predecessor nodes infuencing the input of this node.
+			list[Node]:
+				The list of all predecessor nodes influencing the input of this node.
 
 		Notes:
 			- If self.position is None, only non-position-specific previous nodes are considered.
@@ -1121,7 +1098,7 @@ class EMBED_Node(Node):
 		position (int, default=None): 
 			Token position if position-specific, else None. None is equivalent to all positions.
 		parent (Node, default=None): 
-			Parent node in the next node in the path. The parent is a successor in the computational graph.
+			Parent node is the next node in the path. The parent is a successor in the computational graph.
 		children (set, default=set()): 
 			Set of child nodes. A child is a predecessor in the computational graph.
 		msg_cache (dict): 
@@ -1142,25 +1119,22 @@ class EMBED_Node(Node):
 		Args:
 			model (HookedTransformer): 
 				The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
-			layer (int): 
-				Layer index in the transformer. Embedding layer is assumed to be layer 0.
-			position (int, default=None): 
-				Token position if position-specific, else None. None is equivalent to all positions.
-			parent (Node, default=None): 
-				Parent node in the next node in the path. The parent is a successor in the computational graph.
-			children (set, default=set()): 
-				Set of child nodes. A child is a predecessor in the computational graph.
-			msg_cache (dict): 
-				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
-			cf_cache (dict, default={}): 
-				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-			gradient (torch.Tensor, default=None): 
-				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
-			patch_type (str, default='zero'): 
-				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
-		Returns:
-			self (EMBED_Node):
-				An instance of the EMBED_Node class.
+			layer (int, optional): 
+				Layer index in the transformer. Embedding layer is assumed to be layer 0. Defaults to 0.
+			position (int, optional): 
+				Token position if position-specific, else None. None is equivalent to all positions. Defaults to None.
+			parent (Node, optional): 
+				Parent node is the next node in the path. The parent is a successor in the computational graph. Defaults to None.
+			children (set, optional): 
+				Set of child nodes. A child is a predecessor in the computational graph. Defaults to set().
+			msg_cache (dict, optional): 
+				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). Defaults to {}.
+			cf_cache (dict, optional): 
+				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). Defaults to {}.
+			gradient (torch.Tensor, optional): 
+				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing through the path from final node to the current one. Defaults to None.
+			patch_type (str, optional): 
+				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path. Defaults to 'zero'.
 		"""		
 		super().__init__(model=model, layer=layer, position=position, parent=parent, children=children, msg_cache=msg_cache, cf_cache=cf_cache, gradient=gradient, input_name="hook_embed", output_name="hook_embed", patch_type=patch_type)
 
@@ -1176,9 +1150,9 @@ class EMBED_Node(Node):
 		- 'counterfactual': returns the difference between the normal output and the counterfactual output of the component
 
 		Args:
-
-			message (torch.Tensor of shape (batch_size, seq_len, d_model), default=None):
-				The message whose effect on the node need to be evaluated. If None, returns the normal 
+			message (torch.Tensor, optional):
+				The message whose effect on the node need to be evaluated. Defaults to None.
+				Shape: (batch_size, seq_len, d_model). If None, returns the normal 
 				output or the difference between normal and counterfactual output depending on patch_type.
 			
 		Returns:
@@ -1213,21 +1187,19 @@ class EMBED_Node(Node):
 		or assuming a gradient of ones if self has no parent. When 'grad_outputs' is specified this is used.
 
 		Args:
-			grad_outputs : torch.Tensor, optional (default=None)
-				Usually the gradient to propagate backwards in this particular case it is never used.
-			
-			save : bool, optional (default=True)
+			grad_outputs (torch.Tensor, optional):
+				Gradient to propagate backwards. If None, uses the gradient from the parent node or ones. Defaults to None.
+			save (bool, optional):
 				Whether to save the computed gradient in self.gradient. The gradient can be reused
-				later by setting use_precomputed to True.
-			
-			use_precomputed : bool, optional (default=False)
-				Whether to use the precomputed gradient if available. The precoputed gradient is stored whenever
-				save is True.
+				later by setting use_precomputed to True. Defaults to True.
+			use_precomputed (bool, optional):
+				Whether to use the precomputed gradient if available. The precomputed gradient is stored whenever
+				save is True. Defaults to False.
 		
 		Returns:
-			gradient : torch.Tensor
+			torch.Tensor:
 				A tensor representing the gradient of the output with respect to the input
-				of this node, passing trough the path from final node to the current one.
+				of this node, passing through the path from final node to the current one.
 		
 		Notes:
 			- Given that the EMBED node is a dummy node, the gradient is simply the one provided or the one from the parent node. The only modification is to zero out the gradient for positions not equal to self.position if specified.
@@ -1259,19 +1231,17 @@ class EMBED_Node(Node):
 		Returns the list of predecessors nodes in the computational graph whose outputs influence the
 		output of this node. 
 		Given that this is an EMBED node, there are no predecessors, so the method returns an empty list.
-		Args:
 
+		Args:
 			model_cfg (HookedTransformerConfig):
 				The configuration of the transformer model. It is used to determine the number of heads and other model parameters.
-
-			include_head (bool, default=False):
-				Whether to consider specific head nodes for ATTN.
-
-			separate_kv (bool, default=False):
-				Whether to consider key and value positions separately for ATTN nodes 
+			include_head (bool, optional):
+				Whether to consider specific head nodes for ATTN. Defaults to False.
+			separate_kv (bool, optional):
+				Whether to consider key and value positions separately for ATTN nodes. Defaults to False.
 		
 		Returns:
-			list of Node:
+			list[Node]:
 				The list of all predecessor, which is always empty for EMBED nodes.
 		"""	
 		return []
@@ -1306,7 +1276,7 @@ class FINAL_Node(Node):
 		position (int, default=None): 
 			Token position if position-specific, else None. None is equivalent to all positions.
 		parent (Node, default=None): 
-			Parent node in the next node in the path. The parent is a successor in the computational graph.
+			Parent node is the next node in the path. The parent is a successor in the computational graph.
 		children (set, default=set()): 
 			Set of child nodes. A child is a predecessor in the computational graph.
 		msg_cache (dict): 
@@ -1330,27 +1300,23 @@ class FINAL_Node(Node):
 				The transformer model instance. It is assumed to be a HookedTransformer from transformer_lens library. Any other implementation which provide the same interface should work as well.
 			layer (int): 
 				Layer index in the transformer. Embedding layer is assumed to be layer 0.
-			metric (callable):
+			metric (callable, optional):
 				A callable that takes as input a tensor of shape (batch_size, seq_len, d_model) and returns a scalar tensor.
-				It is used to compute the gradient of the output with respect to the input of this node.
-			position (int, default=None): 
-				Token position if position-specific, else None. None is equivalent to all positions.
-			parent (Node, default=None): 
-				Parent node in the next node in the path. The parent is a successor in the computational graph.
-			children (set, default=set()): 
-				Set of child nodes. A child is a predecessor in the computational graph.
-			msg_cache (dict): 
-				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). 
-			cf_cache (dict, default={}): 
-				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads).
-			gradient (torch.Tensor, default=None): 
-				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing trough the path from final node to the current one.
-			patch_type (str, default='zero'): 
-				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
-		
-		Returns:
-			self (FINAL_Node):
-				An instance of the FINAL_Node class.
+				It is used to compute the gradient of the output with respect to the input of this node. Defaults to None.
+			position (int, optional): 
+				Token position if position-specific, else None. None is equivalent to all positions. Defaults to None.
+			parent (Node, optional): 
+				Parent node is the next node in the path. The parent is a successor in the computational graph. Defaults to None.
+			children (set, optional): 
+				Set of child nodes. A child is a predecessor in the computational graph. Defaults to set().
+			msg_cache (dict, optional): 
+				Clean activation cache. Can be obtained by running the model with hooks using the clean prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). Defaults to {}.
+			cf_cache (dict, optional): 
+				Counterfactual activation cache. Can be obtained by running the model with hooks using the corrupted prompt and converting the result to a dictionary. It must be a dictionary because it might be modified by adding new cached entries, corresponding to the outputs of subcomponents (e.g. single attention heads). Defaults to {}.
+			gradient (torch.Tensor, optional): 
+				Node cached gradient. Usually is used to represent the gradient of the final output with respect to the input of this node, passing through the path from final node to the current one. Defaults to None.
+			patch_type (str, optional): 
+				Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path. Defaults to 'zero'.
 		"""
 		if layer != model.cfg.n_layers - 1:
 			print(f"WARNING: FINAL_Node should be initialized with the last layer index ({model.cfg.n_layers - 1}), got {layer}")
@@ -1368,9 +1334,9 @@ class FINAL_Node(Node):
 		- 'counterfactual': returns the difference between the normal output and the counterfactual output of the component
 
 		Args:
-
-			message (torch.Tensor of shape (batch_size, seq_len, d_model), default=None):
-				The message whose effect on the node need to be evaluated. If None, returns the normal 
+			message (torch.Tensor, optional):
+				The message whose effect on the node need to be evaluated. Defaults to None.
+				Shape: (batch_size, seq_len, d_model). If None, returns the normal 
 				output or the difference between normal and counterfactual output depending on patch_type.
 			
 		Returns:
@@ -1404,26 +1370,23 @@ class FINAL_Node(Node):
 		or assuming a gradient of ones if self has no parent. When 'grad_outputs' is specified, it is used instead of the parent's gradient.
 
 		Args:
-			grad_outputs : torch.Tensor, optional (default=None)
-				Usually the gradient to propagate backwards in this particular case it is never used.
-			-
-			save : bool, optional (default=True)
+			grad_outputs (torch.Tensor, optional):
+				Gradient to propagate backwards. Not used in this method. Defaults to None.
+			save (bool, optional):
 				Whether to save the computed gradient in self.gradient. The gradient can be reused
-				later by setting use_precomputed to True.
-			
-			use_precomputed : bool, optional (default=False)
-				Whether to use the precomputed gradient if available. The precoputed gradient is stored whenever
-				save is True.
-			
-			metric : callable, optional (default=None)
+				later by setting use_precomputed to True. Defaults to True.
+			use_precomputed (bool, optional):
+				Whether to use the precomputed gradient if available. The precomputed gradient is stored whenever
+				save is True. Defaults to False.
+			metric (callable, optional):
 				A callable that takes as input a tensor of shape (batch_size, seq_len, d_model) and returns a scalar tensor.
 				It is used to compute the gradient of the output with respect to the input of this node.
-				If None, uses the metric provided at initialization. If neither is provided, raises an error.
+				If None, uses the metric provided at initialization. If neither is provided, raises an error. Defaults to None.
 		
 		Returns:
-			gradient : torch.Tensor
+			torch.Tensor:
 				A tensor representing the gradient of the output with respect to the input
-				of this node, passing trough the path from final node to the current one.
+				of this node, passing through the path from final node to the current one.
 		"""
 		if self.gradient is not None and use_precomputed:
 			if self.position is None:
@@ -1460,18 +1423,15 @@ class FINAL_Node(Node):
 		For the FINAL node, these are all MLP, EMBED and ATTN nodes from all layers.
 
 		Args:
-
 			model_cfg (HookedTransformerConfig):
 				The configuration of the transformer model. It is used to determine the number of heads and other model parameters.
-
-			include_head (bool, default=False):
-				Whether to consider specific head nodes for ATTN.
-
-			separate_kv (bool, default=False):
-				Whether to consider key and value positions separately for ATTN nodes 
+			include_head (bool, optional):
+				Whether to consider specific head nodes for ATTN. Defaults to True.
+			separate_kv (bool, optional):
+				Whether to consider key and value positions separately for ATTN nodes. Defaults to False.
 		
 		Returns:
-			list of Node:
+			list[Node]:
 				The list of all nodes.
 		
 		Notes:

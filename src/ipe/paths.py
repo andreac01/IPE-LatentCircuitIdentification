@@ -8,8 +8,11 @@ def evaluate_path(path: list[Node], metric: Callable[[torch.Tensor], float]) -> 
 	Evaluates the contribution of a given path by executing the forward methods of each node in the path and then applying the provided metric function to the final output.
 	
 	Args:
-		path (list of Node): The sequence of nodes representing the path to be evaluated.
-		metric (Callable): A function to evaluate the contribution or importance of the path. It must accept a single parameter, the output of the last node when the path is removed.
+		path (list[Node]): 
+			The sequence of nodes representing the path to be evaluated.
+		metric (Callable[[torch.Tensor], float]): 
+			A function to evaluate the contribution or importance of the path. It must accept a single parameter, the output of the last node when the path is removed.
+	
 	Returns:
 		float: 
 			The contribution score of the path as determined by the metric function.
@@ -28,11 +31,12 @@ def get_path(node: Node) -> list[Node]:
 	Constructs the path from the given node back to the root by following parent links.
 
 	Args:
-		node (Node): The node from which to start constructing the path.
+		node (Node): 
+			The node from which to start constructing the path.
 	
 	Returns:
-		list of Node:
-			The sequence of nodes representing the path from the root to the given node.
+		list[Node]: 
+			The sequence of nodes representing the path from the given node to the root, with the given node as the first element and the root as the last element.
 	"""
 	path = [node]
 	while path[-1].parent is not None:
@@ -45,14 +49,14 @@ def get_path_msg(path: list[Node], message: torch.Tensor = None) -> torch.Tensor
 	Recursively computes the message by applying the forward method of each node in the path.
 
 	Args:
-		path (list of Node): 
+		path (list[Node]): 
 			The sequence of nodes representing the path.
-		message (torch.Tensor, default=None):
-			Initial message to be passed to the first node in the path.
+		message (torch.Tensor, optional):
+			Initial message to be passed to the first node in the path. Defaults to None.
 
 	Returns:
 		torch.Tensor:
-			The final message after applying all nodes in the path.
+			The final message after propagating through all nodes in the path, or None if the path is empty.
 	"""
 	if len(path) == 0:
 		return message
@@ -64,17 +68,21 @@ def get_path_msgs(path: list[Node], messages: list[torch.Tensor] = [], msg_cache
 	Recursively computes and collects messages by applying the forward method of each node in the path.
 	
 	Args:
-		path (list of Node): 
+		path (list[Node]): 
 			The sequence of nodes representing the path.
-		messages (list of torch.Tensor, default=[]):
-			list to collect messages at each step.
+		messages (list[torch.Tensor], optional):
+			List to collect messages at each step. Defaults to an empty list.
 		msg_cache (dict, optional):
-			Cache for messages to optimize computation.
+			Cache for messages to optimize computation. Defaults to None.
+		cf_cache (dict, optional):
+			Cache for counterfactual messages. Defaults to None.
 		model (HookedTransformer, optional):
-			The transformer model to be used in the nodes.
+			The transformer model to be used in the nodes. Defaults to None.
+	
 	Returns:
-		list of torch.Tensor:
-			The list of all messages flowing through the path including intermediate ones."""
+		list[torch.Tensor]:
+			The list of all messages flowing through the path, including intermediate ones.
+	"""
 	if not path:
 		return messages
 	
@@ -94,15 +102,19 @@ def get_path_msgs(path: list[Node], messages: list[torch.Tensor] = [], msg_cache
 	# Recurse with the rest of the path
 	return get_path_msgs(path[1:], messages=messages, msg_cache=msg_cache, cf_cache=cf_cache, model=model)
 
-def clean_paths(paths: list[tuple[float, list]], inplace: bool = False) -> list[tuple[float, list]]:
-	"""Cleans up the paths by removing references to models, parents, children, and caches to save memory. It is useful to call this function before saving the outputs of graph search to a file, avoiding saving cache, gradients, and model.
+def clean_paths(paths: list[tuple[float, list[Node]]], inplace: bool = False) -> list[tuple[float, list[Node]]]:
+	"""
+	Cleans up the paths by removing references to models, parents, children, and caches to save memory. This function is useful to call before saving the outputs of graph search to a file, as it avoids saving unnecessary data such as cache, gradients, and model references.
 	
 	Args:
-		paths (list[tuple[float, list]]): 
-			A list of tuples where each tuple contains a path weight and a list of Node instances representing the path.
+		paths (list[tuple[float, list[Node]]]): 
+			A list of tuples where each tuple contains a path weight (float or torch.Tensor) and a list of Node instances representing the path.
+		inplace (bool, optional): 
+			If True, modifies the paths in place. If False, creates and returns a cleaned copy of the paths. Defaults to False.
+	
 	Returns:
-		list[tuple[float, list]]: 
-			The cleaned list of paths with unnecessary references removed.
+		list[tuple[float, list[Node]]]: 
+			The cleaned list of paths with unnecessary references removed. If `inplace` is True, the original list is modified and returned.
 	"""
 	cleaned = []
 	if inplace:
