@@ -44,7 +44,7 @@ class Node(abc.ABC):
 	Notes:
 		This is an abstract base class that should not be instantiated directly. Concrete implementations should inherit from this class and implement the required abstract methods.
 	"""
-	def __init__(self, model: HookedTransformer, layer: int, msg_cache: dict, input_name: str, output_name: str, position: int = None, cf_cache: dict = {}, parent = None, children: set = set(), gradient: torch.Tensor = None, patch_type: str = 'zero'):
+	def __init__(self, model: HookedTransformer, layer: int, msg_cache: dict, input_name: str, output_name: str, position: int = None, cf_cache: dict = {}, parent = None, children: set = None, gradient: torch.Tensor = None, patch_type: str = 'zero'):
 		"""	 Initializes an Node instance.
 
 		Args:
@@ -78,7 +78,7 @@ class Node(abc.ABC):
 		self.layer = layer
 		self.position = position
 		self.parent= parent
-		self.children = children
+		self.children = children if children is not None else set()
 		self.msg_cache = msg_cache
 		self.cf_cache = cf_cache
 		self.gradient = gradient
@@ -257,7 +257,7 @@ class Node(abc.ABC):
 			bool: True if self is equal to other, False otherwise.
 		"""
 		if not isinstance(other, Node):
-			return NotImplemented
+						return NotImplemented
 		if (self.layer != other.layer or self.position != other.position or type(self) is not type(other)):
 			return False
 		if isinstance(self, ATTN_Node) and isinstance(other, ATTN_Node):
@@ -303,7 +303,7 @@ class MLP_Node(Node):
 		patch_type (str, default='zero'): 
 			Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
 	"""
-	def __init__(self, model: HookedTransformer, layer: int, position: int = None, parent: Node = None, children = set(), msg_cache = {}, cf_cache = {}, gradient = None, patch_type = 'zero'):
+	def __init__(self, model: HookedTransformer, layer: int, position: int = None, parent: Node = None, children = None, msg_cache = {}, cf_cache = {}, gradient = None, patch_type = 'zero'):
 		"""Initializes an MLP_Node instance.
 		Args:
 			model (HookedTransformer): 
@@ -581,7 +581,7 @@ class ATTN_Node(Node):
 		plot_patterns (bool, default=False):
 			Whether to plot the attention patterns when calculating the forward pass. This is useful for debugging purposes but also to visualize the changes in the attention patterns when patching specific positions.
 	"""
-	def __init__(self, model: HookedTransformer, layer: int, head: int = None, position: int = None, keyvalue_position: int = None, parent: Node = None, children = set(), msg_cache = {}, cf_cache = {}, gradient = None, patch_query: bool = True, patch_key: bool = True, patch_value: bool = True, plot_patterns: bool = False, patch_type = 'zero'):
+	def __init__(self, model: HookedTransformer, layer: int, head: int = None, position: int = None, keyvalue_position: int = None, parent: Node = None, children = None, msg_cache = {}, cf_cache = {}, gradient = None, patch_query: bool = True, patch_key: bool = True, patch_value: bool = True, plot_patterns: bool = False, patch_type = 'zero'):
 		"""Initializes an ATTN_Node instance.
 
 		Args:
@@ -1137,7 +1137,7 @@ class EMBED_Node(Node):
 		patch_type (str, default='zero'): 
 			Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
 	"""
-	def __init__(self, model: HookedTransformer, layer: int = 0, position: int = None, parent: Node = None, children = set(), msg_cache = {}, cf_cache = {}, gradient = None, patch_type = 'zero'):
+	def __init__(self, model: HookedTransformer, layer: int = 0, position: int = None, parent: Node = None, children = None, msg_cache = {}, cf_cache = {}, gradient = None, patch_type = 'zero'):
 		"""Initializes the EMBED_Node instance.
 		Args:
 			model (HookedTransformer): 
@@ -1322,7 +1322,7 @@ class FINAL_Node(Node):
 		patch_type (str, default='zero'): 
 			Type of intervention ('zero' or 'counterfactual'). Zero patching corresponds to removing the message from the first node in the path to the input of the next node, while counterfactual patching corresponds to replacing the message with the counterfactual activation. In both cases the effect of the path is then calculated by propagating the message through the whole path.
 	"""
-	def __init__(self, model: HookedTransformer, layer: int, metric: callable = None, position: Optional[int] = None, parent: Node = None, children = set(), msg_cache = {}, cf_cache = {}, gradient = None, patch_type = 'zero'):
+	def __init__(self, model: HookedTransformer, layer: int, metric: callable = None, position: Optional[int] = None, parent: Node = None, children = None, msg_cache = {}, cf_cache = {}, gradient = None, patch_type = 'zero'):
 		"""Initializes the FINAL_Node instance.
 		
 		Args:

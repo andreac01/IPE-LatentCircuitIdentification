@@ -1,7 +1,7 @@
 from transformer_lens import HookedTransformer
 import torch
 from ipe.nodes import Node, ATTN_Node
-from ipe.paths import evaluate_path, get_path
+from ipe.paths import evaluate_path, evaluate_tree, get_path
 from ipe.miscellanea import batch_iterable
 from tqdm import tqdm
 from typing import Callable
@@ -149,6 +149,65 @@ def find_relevant_heads(
 	return relevant_extensions
 
 
+
+def TreeMessagePatching(
+	model: HookedTransformer,
+	metric: Callable,
+	root: Node,
+	min_contribution: float = 0.5,
+	include_negative: bool = True,
+) -> Node:
+	"""
+	Performs a Breadth-First Search (BFS) backwards from a node, growing a single
+	tree rooted at it. Unlike PathMessagePatching, which scores each path in
+	isolation, each candidate is scored by its marginal effect on the joint
+	ablation of the tree discovered so far: score(C) = evaluate_tree(T + C) - evaluate_tree(T).
+	The marginal is required because the metric grows monotonically with the
+	ablated mass, so the total tree score would be dominated by the already
+	discovered branches and could no longer discriminate single candidates.
+
+	Args:
+		model (HookedTransformer):
+			The transformer model used for evaluation.
+		metric (Callable):
+			A function to evaluate the contribution or importance of the tree. It must accept a single parameter: `corrupted_resid`.
+		root (Node):
+			The initial node to begin the backward search from (e.g. FINAL_Node(layer=model.cfg.n_layers - 1, position=target_pos)). Its children are populated in place.
+		min_contribution (float, default=0.5):
+			The minimum absolute marginal contribution required for a candidate to be attached to the tree.
+		include_negative (bool, default=True):
+			If True, include candidates with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.
+
+	Returns:
+		Node:
+			The root of the discovered tree, with its children populated.
+	"""
+	with torch.no_grad():
+		frontier = [root]
+		baseline = evaluate_tree(root, metric)
+		while frontier:
+			# Score every leaf's candidates against the frozen level baseline,
+			# then attach survivors so scoring stays order-independent.
+			level_additions = []
+			for leaf in tqdm(frontier):
+				survivors = []
+				for candidate in leaf.get_expansion_candidates(model.cfg, include_head=True):
+					leaf.children.add(candidate)
+					score = evaluate_tree(root, metric) - baseline
+					leaf.children.discard(candidate)
+					if (score >= min_contribution) or (include_negative and abs(score) >= min_contribution):
+						survivors.append(candidate)
+				level_additions.append((leaf, survivors))
+
+			next_frontier = []
+			for leaf, survivors in level_additions:
+				for candidate in survivors:
+					leaf.children.add(candidate)
+					if candidate.__class__.__name__ != 'EMBED_Node':
+						next_frontier.append(candidate)
+			baseline = evaluate_tree(root, metric)
+			frontier = next_frontier
+	return root
 
 def PathMessagePatching(
 	model: HookedTransformer,

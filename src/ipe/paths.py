@@ -23,6 +23,42 @@ def evaluate_path(path: list[Node], metric: Callable[[torch.Tensor], float]) -> 
 
 	return metric(corrupted_resid=path[-1].forward() - message)
 
+def get_tree_msg(node: Node) -> torch.Tensor:
+	"""
+	Recursively computes the message a node sends to its parent in a tree.
+
+	The message arriving at a node is the sum of the messages of all its children, removed jointly from the node's clean input before its component is re-evaluated. A leaf (no children) emits forward(None), matching path semantics where the deepest node sends its full output.
+
+	Args:
+		node (Node):
+			The node whose outgoing message is computed.
+
+	Returns:
+		torch.Tensor:
+			The message produced by the node given the joint ablation of its children's subtrees.
+	"""
+	if not node.children:
+		return node.forward(message=None)
+	incoming = sum(get_tree_msg(child) for child in node.children)
+	return node.forward(message=incoming)
+
+def evaluate_tree(root: Node, metric: Callable[[torch.Tensor], float]) -> float:
+	"""
+	Evaluates the contribution of a whole tree by jointly ablating every branch and applying the metric. evaluate_path is the degenerate single-child case.
+
+	Args:
+		root (Node):
+			The root of the tree (e.g. a FINAL_Node) whose children point backwards towards the EMBED_Nodes.
+		metric (Callable):
+			A function to evaluate the contribution of the tree. It must accept a single parameter, the output of the root when the tree is removed.
+
+	Returns:
+		float:
+			The contribution score of the tree as determined by the metric function.
+	"""
+	message = get_tree_msg(root)
+	return metric(corrupted_resid=root.forward() - message)
+
 def get_path(node: Node) -> list[Node]:
 	"""
 	Constructs the path from the given node back to the root by following parent links.
