@@ -1,7 +1,7 @@
 from transformer_lens import HookedTransformer
 import torch
 from ipe.nodes import Node, ATTN_Node
-from ipe.paths import evaluate_path, evaluate_tree, get_path
+from ipe.paths import evaluate_path, get_path
 from ipe.miscellanea import batch_iterable
 from tqdm import tqdm
 from typing import Callable
@@ -150,6 +150,57 @@ def find_relevant_heads(
 
 
 
+def refresh_tree_messages(node: Node) -> torch.Tensor:
+	"""Bottom-up pass caching, on each node, its outgoing message `_tree_msg`
+	(what it sends to its parent) and `_tree_incoming` (the summed messages of
+	its children). This is get_tree_msg with the intermediate results cached so
+	that candidate scoring can recompute only the chain it affects.
+
+	Args:
+		node (Node):
+			The root of the (sub)tree to refresh.
+
+	Returns:
+		torch.Tensor:
+			The outgoing message of `node`.
+	"""
+	if not node.children:
+		node._tree_msg, node._tree_incoming = node.forward(message=None), None
+	else:
+		incoming = sum(refresh_tree_messages(child) for child in node.children)
+		node._tree_incoming, node._tree_msg = incoming, node.forward(message=incoming)
+	return node._tree_msg
+
+
+def candidate_message(root: Node, leaf: Node, candidate: Node) -> torch.Tensor:
+	"""Message reaching `root` if `candidate` is attached to the cut-leaf `leaf`,
+	recomputed along the `leaf -> root` chain only, reusing the cached messages
+	of every sibling subtree. Equivalent to get_tree_msg(root) on the tree with
+	`candidate` added, but O(depth) instead of O(tree). Requires the cache to be
+	up to date (see refresh_tree_messages).
+
+	Args:
+		root (Node):
+			The root of the tree.
+		leaf (Node):
+			The cut-leaf the candidate would be attached to.
+		candidate (Node):
+			The candidate predecessor, scored without mutating the tree.
+
+	Returns:
+		torch.Tensor:
+			The message reaching the root with the candidate hypothetically attached.
+	"""
+	old, new = leaf._tree_msg, leaf.forward(message=candidate.forward(message=None))
+	node = leaf
+	while node is not root:
+		parent = node.parent
+		incoming = parent._tree_incoming - old + new
+		old, new = parent._tree_msg, parent.forward(message=incoming)
+		node = parent
+	return new
+
+
 def TreeMessagePatching(
 	model: HookedTransformer,
 	metric: Callable,
@@ -183,8 +234,10 @@ def TreeMessagePatching(
 			The root of the discovered tree, with its children populated.
 	"""
 	with torch.no_grad():
+		clean = root.forward()
+		root_msg = refresh_tree_messages(root)
+		baseline = metric(corrupted_resid=clean - root_msg) if root.children else metric(corrupted_resid=clean)
 		frontier = [root]
-		baseline = evaluate_tree(root, metric)
 		while frontier:
 			# Score every leaf's candidates against the frozen level baseline,
 			# then attach survivors so scoring stays order-independent.
@@ -192,9 +245,7 @@ def TreeMessagePatching(
 			for leaf in tqdm(frontier):
 				survivors = []
 				for candidate in leaf.get_expansion_candidates(model.cfg, include_head=True):
-					leaf.children.add(candidate)
-					score = evaluate_tree(root, metric) - baseline
-					leaf.children.discard(candidate)
+					score = metric(corrupted_resid=clean - candidate_message(root, leaf, candidate)) - baseline
 					if (score >= min_contribution) or (include_negative and abs(score) >= min_contribution):
 						survivors.append(candidate)
 				level_additions.append((leaf, survivors))
@@ -205,7 +256,9 @@ def TreeMessagePatching(
 					leaf.children.add(candidate)
 					if candidate.__class__.__name__ != 'EMBED_Node':
 						next_frontier.append(candidate)
-			baseline = evaluate_tree(root, metric)
+			# Refresh the cache for the newly grown tree and update the baseline.
+			root_msg = refresh_tree_messages(root)
+			baseline = metric(corrupted_resid=clean - root_msg) if root.children else metric(corrupted_resid=clean)
 			frontier = next_frontier
 	return root
 
