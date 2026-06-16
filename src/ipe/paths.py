@@ -56,7 +56,7 @@ def evaluate_tree(root: Node, metric: Callable[[torch.Tensor], float]) -> float:
 		float:
 			The contribution score of the tree as determined by the metric function.
 	"""
-	message = get_tree_msg(root)
+	message = get_tree_msg(root) if root.children else 0
 	return metric(corrupted_resid=root.forward() - message)
 
 def get_path(node: Node) -> list[Node]:
