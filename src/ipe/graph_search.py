@@ -8,6 +8,51 @@ from typing import Callable
 import gc
 import heapq
 import time
+from loguru import logger
+
+# --- Debug logging ----------------------------------------------------------
+# TreeMessagePatching emits verbose debug records (per-candidate contribution,
+# frontier, node being inspected, candidate, admit/reject) to a common log file
+# so a run can be inspected offline. Call setup_tree_debug_log(path) before the
+# search to (re)configure the sink; logging is a no-op until then.
+TREE_DEBUG_LOG = "tree_search_debug.log"
+_tree_debug_sink_id = None
+
+
+def setup_tree_debug_log(path: str = TREE_DEBUG_LOG, level: str = "DEBUG") -> None:
+	"""Route the tree-search debug records to `path`.
+
+	Adds a dedicated loguru sink writing only the records tagged with
+	`tree_debug=True` (see TreeMessagePatching). Safe to call repeatedly: the
+	previous sink installed by this helper is removed first so the file is opened
+	fresh (mode="w") for each new run.
+
+	Args:
+		path (str, default=TREE_DEBUG_LOG):
+			Destination log file.
+		level (str, default="DEBUG"):
+			Minimum record level to write.
+	"""
+	global _tree_debug_sink_id
+	if _tree_debug_sink_id is not None:
+		try:
+			logger.remove(_tree_debug_sink_id)
+		except ValueError:
+			pass
+	_tree_debug_sink_id = logger.add(
+		path,
+		level=level,
+		mode="w",
+		enqueue=True,
+		filter=lambda record: record["extra"].get("tree_debug", False),
+		format="{time:HH:mm:ss.SSS} | {level: <7} | {message}",
+	)
+	logger.bind(tree_debug=True).info(f"Tree debug log initialised at {path}")
+
+
+# Bound logger used by the tree search; records carry the tree_debug flag so the
+# sink filter above picks them up without polluting the rest of the app's logs.
+_tlog = logger.bind(tree_debug=True)
 
 def find_relevant_positions(
 		candidate: ATTN_Node,
@@ -150,57 +195,6 @@ def find_relevant_heads(
 
 
 
-def refresh_tree_messages(node: Node) -> torch.Tensor:
-	"""Bottom-up pass caching, on each node, its outgoing message `_tree_msg`
-	(what it sends to its parent) and `_tree_incoming` (the summed messages of
-	its children). This is get_tree_msg with the intermediate results cached so
-	that candidate scoring can recompute only the chain it affects.
-
-	Args:
-		node (Node):
-			The root of the (sub)tree to refresh.
-
-	Returns:
-		torch.Tensor:
-			The outgoing message of `node`.
-	"""
-	if not node.children:
-		node._tree_msg, node._tree_incoming = node.forward(message=None), None
-	else:
-		incoming = sum(refresh_tree_messages(child) for child in node.children)
-		node._tree_incoming, node._tree_msg = incoming, node.forward(message=incoming)
-	return node._tree_msg
-
-
-def candidate_message(root: Node, leaf: Node, candidate: Node) -> torch.Tensor:
-	"""Message reaching `root` if `candidate` is attached to the cut-leaf `leaf`,
-	recomputed along the `leaf -> root` chain only, reusing the cached messages
-	of every sibling subtree. Equivalent to get_tree_msg(root) on the tree with
-	`candidate` added, but O(depth) instead of O(tree). Requires the cache to be
-	up to date (see refresh_tree_messages).
-
-	Args:
-		root (Node):
-			The root of the tree.
-		leaf (Node):
-			The cut-leaf the candidate would be attached to.
-		candidate (Node):
-			The candidate predecessor, scored without mutating the tree.
-
-	Returns:
-		torch.Tensor:
-			The message reaching the root with the candidate hypothetically attached.
-	"""
-	old, new = leaf._tree_msg, leaf.forward(message=candidate.forward(message=None))
-	node = leaf
-	while node is not root:
-		parent = node.parent
-		incoming = parent._tree_incoming - old + new
-		old, new = parent._tree_msg, parent.forward(message=incoming)
-		node = parent
-	return new
-
-
 def TreeMessagePatching(
 	model: HookedTransformer,
 	metric: Callable,
@@ -210,22 +204,24 @@ def TreeMessagePatching(
 ) -> Node:
 	"""
 	Performs a Breadth-First Search (BFS) backwards from a node, growing a single
-	tree rooted at it. Unlike PathMessagePatching, which scores each path in
-	isolation, each candidate is scored by its marginal effect on the joint
-	ablation of the tree discovered so far: score(C) = evaluate_tree(T + C) - evaluate_tree(T).
-	The marginal is required because the metric grows monotonically with the
-	ablated mass, so the total tree score would be dominated by the already
-	discovered branches and could no longer discriminate single candidates.
+	tree rooted at it. Each candidate is scored by its own isolated contribution
+	along the branch it would create: score(C) = evaluate_path([C, leaf, ..., root]),
+	i.e. the message C sends up the leaf->root chain, removed from the clean
+	residual and passed to the metric. This is exactly the per-path contribution
+	PathMessagePatching uses; the tree is the same set of paths materialised as a
+	trie sharing common suffixes toward the root. No joint-ablation baseline is
+	involved, so a candidate's score depends only on C and the chain above it, not
+	on any sibling subtree.
 
 	Args:
 		model (HookedTransformer):
 			The transformer model used for evaluation.
 		metric (Callable):
-			A function to evaluate the contribution or importance of the tree. It must accept a single parameter: `corrupted_resid`.
+			A function to evaluate the contribution or importance of the path. It must accept a single parameter: `corrupted_resid`.
 		root (Node):
 			The initial node to begin the backward search from (e.g. FINAL_Node(layer=model.cfg.n_layers - 1, position=target_pos)). Its children are populated in place.
 		min_contribution (float, default=0.5):
-			The minimum absolute marginal contribution required for a candidate to be attached to the tree.
+			The minimum absolute contribution required for a candidate to be attached to the tree.
 		include_negative (bool, default=True):
 			If True, include candidates with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.
 
@@ -234,32 +230,125 @@ def TreeMessagePatching(
 			The root of the discovered tree, with its children populated.
 	"""
 	with torch.no_grad():
-		clean = root.forward()
-		root_msg = refresh_tree_messages(root)
-		baseline = metric(corrupted_resid=clean - root_msg) if root.children else metric(corrupted_resid=clean)
+		_tlog.info(
+			f"=== TreeMessagePatching start === root={root!r} "
+			f"min_contribution={min_contribution} include_negative={include_negative}"
+		)
 		frontier = [root]
+		depth = 0
 		while frontier:
-			# Score every leaf's candidates against the frozen level baseline,
-			# then attach survivors so scoring stays order-independent.
-			level_additions = []
-			for leaf in tqdm(frontier):
-				survivors = []
-				for candidate in leaf.get_expansion_candidates(model.cfg, include_head=True):
-					score = metric(corrupted_resid=clean - candidate_message(root, leaf, candidate)) - baseline
-					if (score >= min_contribution) or (include_negative and abs(score) >= min_contribution):
-						survivors.append(candidate)
-				level_additions.append((leaf, survivors))
-
+			# Each candidate is scored in isolation (its own branch contribution),
+			# so survivors can be attached immediately without affecting any other
+			# leaf's scores.
+			_tlog.debug(f"--- depth {depth} --- frontier_size={len(frontier)}")
+			_tlog.debug(f"depth {depth} frontier: {[repr(n) for n in frontier]}")
 			next_frontier = []
-			for leaf, survivors in level_additions:
-				for candidate in survivors:
-					leaf.children.add(candidate)
-					if candidate.__class__.__name__ != 'EMBED_Node':
-						next_frontier.append(candidate)
-			# Refresh the cache for the newly grown tree and update the baseline.
-			root_msg = refresh_tree_messages(root)
-			baseline = metric(corrupted_resid=clean - root_msg) if root.children else metric(corrupted_resid=clean)
+			level_scored = level_admitted = 0
+			for leaf_idx, leaf in enumerate(tqdm(frontier)):
+				# [leaf, parent, ..., root] reused as the suffix for every candidate.
+				suffix = get_path(leaf)
+				survivors = []
+				candidates = leaf.get_expansion_candidates(model.cfg, include_head=True)
+				_tlog.debug(
+					f"[d{depth} leaf {leaf_idx + 1}/{len(frontier)}] inspecting {leaf!r} "
+					f"-> {len(candidates)} candidates"
+				)
+				for candidate in candidates:
+					# Isolated contribution of the branch C -> leaf -> ... -> root.
+					score = evaluate_path([candidate] + suffix, metric)
+					admitted = (score >= min_contribution) or (include_negative and abs(score) >= min_contribution)
+					level_scored += 1
+					_tlog.debug(
+						f"[d{depth} leaf {leaf_idx + 1}/{len(frontier)}] candidate={candidate!r} "
+						f"contribution={float(score):+.6f} |contribution|={abs(float(score)):.6f} "
+						f"thr={min_contribution} -> {'ADMIT' if admitted else 'reject'}"
+					)
+					if admitted:
+						survivors.append(candidate)
+						leaf.children.add(candidate)
+						if candidate.__class__.__name__ != 'EMBED_Node':
+							next_frontier.append(candidate)
+						level_admitted += 1
+				_tlog.debug(
+					f"[d{depth} leaf {leaf_idx + 1}/{len(frontier)}] {leaf!r} survivors="
+					f"{len(survivors)}: {[repr(c) for c in survivors]}"
+				)
+
+			_tlog.info(
+				f"=== depth {depth} done === scored={level_scored} admitted={level_admitted} "
+				f"next_frontier_size={len(next_frontier)}"
+			)
 			frontier = next_frontier
+			depth += 1
+		_tlog.info(f"=== TreeMessagePatching end === depth_reached={depth}")
+	return root
+
+def TreeMessagePatching_LimitedLevelWidth(
+	model: HookedTransformer,
+	metric: Callable,
+	root: Node,
+	max_width: int = 20000,
+	include_negative: bool = True,
+) -> Node:
+	"""Beam variant of TreeMessagePatching: instead of admitting every candidate
+	above a threshold, score all candidate extensions of all leaves at a depth and
+	keep only the top `max_width` by |contribution|. This is the tree analog of
+	PathMessagePatching_LimitedLevelWidth. Candidates are still scored by their own
+	isolated branch contribution (evaluate_path([C, leaf, ..., root])), so pruning
+	across leaves is well-defined and the tree remains a trie of the same paths.
+
+	Args:
+		model (HookedTransformer):
+			The transformer model used for evaluation.
+		metric (Callable):
+			A function to evaluate the contribution or importance of the path.
+		root (Node):
+			The initial node to begin the backward search from. Its children are populated in place.
+		max_width (int, default=20000):
+			The maximum number of candidates to retain at each depth of the tree.
+		include_negative (bool, default=True):
+			If True, rank candidates by the magnitude of their contribution and keep
+			negatively-contributing ones; otherwise only positive contributions are kept.
+
+	Returns:
+		Node:
+			The root of the discovered tree, with its children populated.
+	"""
+	with torch.no_grad():
+		_tlog.info(
+			f"=== TreeMessagePatching_LimitedLevelWidth start === root={root!r} "
+			f"max_width={max_width} include_negative={include_negative}"
+		)
+		frontier = [root]
+		depth = 0
+		while frontier:
+			_tlog.debug(f"--- depth {depth} --- frontier_size={len(frontier)}")
+			# Score every candidate extension of every leaf at this depth, then keep
+			# only the global top-`max_width` by |contribution|.
+			scored = []  # (rank_value, leaf, candidate)
+			for leaf in tqdm(frontier):
+				suffix = get_path(leaf)
+				for candidate in leaf.get_expansion_candidates(model.cfg, include_head=True):
+					score = evaluate_path([candidate] + suffix, metric)
+					if include_negative or score >= 0:
+						rank_value = abs(score.item()) if include_negative else score.item()
+						scored.append((rank_value, leaf, candidate))
+			if not scored:
+				break
+
+			survivors = heapq.nlargest(max_width, scored, key=lambda x: x[0])
+			next_frontier = []
+			for _, leaf, candidate in survivors:
+				leaf.children.add(candidate)
+				if candidate.__class__.__name__ != 'EMBED_Node':
+					next_frontier.append(candidate)
+			_tlog.info(
+				f"=== depth {depth} done === scored={len(scored)} admitted={len(survivors)} "
+				f"next_frontier_size={len(next_frontier)}"
+			)
+			frontier = next_frontier
+			depth += 1
+		_tlog.info(f"=== TreeMessagePatching_LimitedLevelWidth end === depth_reached={depth}")
 	return root
 
 def PathMessagePatching(
