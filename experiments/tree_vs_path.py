@@ -767,7 +767,7 @@ def main():
     parser.add_argument("--metric", default="logit_difference",
                         choices=["logit_difference", "indirect_effect", "target_logit_percentage",
                                  "target_probability_percentage", "kl_divergence"])
-    parser.add_argument("--batch-size", type=int, default=4)
+    parser.add_argument("--batch-size", type=int, default=20)
     parser.add_argument("--target-length", type=int, default=None,
                         help="Force a tokenised prompt length; default picks the modal length automatically.")
     parser.add_argument("--max-scan", type=int, default=2000,
