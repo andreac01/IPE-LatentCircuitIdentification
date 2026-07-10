@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IPE Circuit Discovery</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="app">
+	<header id="topbar">
+		<h1>IPE Circuit Discovery</h1>
+		<span class="spacer"></span>
+		<span id="device-chip" class="chip">device: …</span>
+	</header>
+
+	<aside id="sidebar">
+		<section>
+			<label for="model">Model</label>
+			<select id="model"></select>
+		</section>
+
+		<section>
+			<label for="prompts">Clean prompts <span class="hint">one per line</span></label>
+			<textarea id="prompts" rows="3" spellcheck="false"
+				placeholder="When Mary and John went to the store, John gave a drink to"></textarea>
+			<label for="targets">Targets <span class="hint">one per line, single token — mind the leading space</span></label>
+			<textarea id="targets" rows="1" spellcheck="false" placeholder=" Mary"></textarea>
+		</section>
+
+		<section>
+			<label for="cf-prompts">Counterfactual prompts <span class="hint">optional; empty &rarr; zero patching</span></label>
+			<textarea id="cf-prompts" rows="3" spellcheck="false"
+				placeholder="When Mary and John went to the store, Mary gave a drink to"></textarea>
+			<label for="cf-targets">Counterfactual targets</label>
+			<textarea id="cf-targets" rows="1" spellcheck="false" placeholder=" John"></textarea>
+		</section>
+
+		<section class="row2">
+			<div>
+				<label>Search</label>
+				<div class="seg" id="method-seg">
+					<button type="button" data-value="tree" class="on">Tree</button>
+					<button type="button" data-value="path">Path</button>
+				</div>
+			</div>
+			<div>
+				<label>Strategy</label>
+				<div class="seg" id="strategy-seg">
+					<button type="button" data-value="threshold" class="on">Threshold</button>
+					<button type="button" data-value="topk">Top-k</button>
+				</div>
+			</div>
+		</section>
+
+		<section class="row2">
+			<div id="min-contribution-field">
+				<label for="min-contribution">Min contribution</label>
+				<input type="number" id="min-contribution" value="0.05" step="0.01">
+			</div>
+			<div id="max-width-field" hidden>
+				<label for="max-width">Beam width</label>
+				<input type="number" id="max-width" value="20" step="1" min="1">
+			</div>
+			<div>
+				<label for="metric">Metric</label>
+				<select id="metric"></select>
+			</div>
+		</section>
+
+		<section class="checks">
+			<label class="check"><input type="checkbox" id="positional" checked> positional search</label>
+			<label class="check"><input type="checkbox" id="include-negative" checked> include negative</label>
+		</section>
+
+		<section class="actions">
+			<button id="run" class="primary">Run discovery</button>
+			<button id="cancel" hidden>Cancel</button>
+		</section>
+
+		<section id="status" hidden>
+			<div id="status-msg"></div>
+			<div id="progress-bar"><div id="progress-fill"></div></div>
+			<div id="progress-txt" class="hint"></div>
+		</section>
+
+		<section id="result-box" hidden>
+			<label>Result</label>
+			<div id="summary"></div>
+			<label for="threshold-slider">Filter |contribution| &ge; <span id="threshold-val">0</span></label>
+			<input type="range" id="threshold-slider" min="0" max="1" step="0.001" value="0">
+			<button id="download">Download graph JSON</button>
+		</section>
+
+		<section id="legend">
+			<label>Legend</label>
+			<div class="legend-row"><span class="ramp"></span></div>
+			<div class="legend-row legend-labels">
+				<span id="legend-min">&minus;</span><span>node contribution</span><span id="legend-max">+</span>
+			</div>
+			<div class="legend-row"><span class="swatch complete"></span> complete branch (reaches EMB)</div>
+			<div class="legend-row"><span class="swatch dashed"></span> pruned branch (never reached EMB)</div>
+			<div class="legend-row"><span class="swatch jog"></span> horizontal jog = K/V read at an earlier position</div>
+		</section>
+	</aside>
+
+	<main id="canvas-wrap">
+		<div id="empty-state">Type a clean prompt to preview the model grid.</div>
+		<div id="zoom-controls">
+			<button id="zoom-in" title="Zoom in">+</button>
+			<button id="zoom-out" title="Zoom out">&minus;</button>
+			<button id="zoom-reset" title="Reset view">&#8634;</button>
+		</div>
+		<svg id="grid" role="img" aria-label="Model computational grid: layers on the y axis, token positions on the x axis"></svg>
+		<div id="tooltip" hidden></div>
+	</main>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -26,6 +26,9 @@ dependencies = [
 	"pytest",
 	"plotly",
 	"ipywidgets",
+	"fastapi",
+	"uvicorn",
+	"loguru",
 ]
 
 [project.urls]

@@ -268,7 +268,7 @@ GREATER_THAN_EDGES = [
     # direct contributions to logits
     ("m8", "logits"), ("m9", "logits"), ("m10", "logits"), ("m11", "logits"),
     ("a5.h1", "logits"), ("a5.h5", "logits"), ("a6.h9", "logits"),
-    ("a7.h10", "logits"), ("a8.h8", "logits"), ("a8.h11", "logits"), ("a9.h1", "logits"),
+    ("a7.h10", "logits"), ("a8.h11", "logits"), ("a9.h1", "logits"),
 ]
 
 
@@ -767,7 +767,7 @@ def main():
     parser.add_argument("--metric", default="logit_difference",
                         choices=["logit_difference", "indirect_effect", "target_logit_percentage",
                                  "target_probability_percentage", "kl_divergence"])
-    parser.add_argument("--batch-size", type=int, default=20)
+    parser.add_argument("--batch-size", type=int, default=5)
     parser.add_argument("--target-length", type=int, default=None,
                         help="Force a tokenised prompt length; default picks the modal length automatically.")
     parser.add_argument("--max-scan", type=int, default=2000,
@@ -789,7 +789,7 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = HookedTransformer.from_pretrained(
-        args.model, device=device, torch_dtype=torch.float32, center_unembed=True,
+        args.model, device=device, torch_dtype=torch.float16, center_unembed=True,
     )
     model.eval()
 

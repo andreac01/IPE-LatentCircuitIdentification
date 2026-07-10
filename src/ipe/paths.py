@@ -3,6 +3,7 @@ import torch
 from transformer_lens import HookedTransformer
 from typing import Callable
 
+@torch.no_grad()
 def evaluate_path(path: list[Node], metric: Callable[[torch.Tensor], float]) -> float:
 	"""
 	Evaluates the contribution of a given path by executing the forward methods of each node in the path and then applying the provided metric function to the final output.
@@ -23,6 +24,7 @@ def evaluate_path(path: list[Node], metric: Callable[[torch.Tensor], float]) -> 
 
 	return metric(corrupted_resid=path[-1].forward() - message)
 
+@torch.no_grad()
 def get_tree_msg(node: Node) -> torch.Tensor:
 	"""
 	Recursively computes the message a node sends to its parent in a tree.
@@ -42,6 +44,7 @@ def get_tree_msg(node: Node) -> torch.Tensor:
 	incoming = sum(get_tree_msg(child) for child in node.children)
 	return node.forward(message=incoming)
 
+@torch.no_grad()
 def evaluate_tree(root: Node, metric: Callable[[torch.Tensor], float]) -> float:
 	"""
 	Evaluates the contribution of a whole tree by jointly ablating every branch and applying the metric. evaluate_path is the degenerate single-child case.

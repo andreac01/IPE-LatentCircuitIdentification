@@ -54,6 +54,21 @@ def setup_tree_debug_log(path: str = TREE_DEBUG_LOG, level: str = "DEBUG") -> No
 # sink filter above picks them up without polluting the rest of the app's logs.
 _tlog = logger.bind(tree_debug=True)
 
+
+def _emit(on_event: Callable | None, event: dict) -> None:
+	"""Deliver a progress event to an observer, if one is registered.
+
+	Events are plain dicts with an 'event' key; 'node'/'parent'/'path' values are
+	live Node objects (the observer serializes them as it needs). Observer errors
+	are swallowed so a broken consumer can never abort a long search.
+	"""
+	if on_event is None:
+		return
+	try:
+		on_event(event)
+	except Exception:
+		pass
+
 def find_relevant_positions(
 		candidate: ATTN_Node,
 		incomplete_path: list[Node],
@@ -201,6 +216,7 @@ def TreeMessagePatching(
 	root: Node,
 	min_contribution: float = 0.5,
 	include_negative: bool = True,
+	on_event: Callable = None,
 ) -> Node:
 	"""
 	Performs a Breadth-First Search (BFS) backwards from a node, growing a single
@@ -224,6 +240,10 @@ def TreeMessagePatching(
 			The minimum absolute contribution required for a candidate to be attached to the tree.
 		include_negative (bool, default=True):
 			If True, include candidates with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.
+		on_event (Callable, optional):
+			Observer called with progress events (dicts): depth_start, leaf_done,
+			admit (carrying the admitted Node, its parent and contribution) and
+			depth_end. Used e.g. to stream a live view of the growing tree.
 
 	Returns:
 		Node:
@@ -242,6 +262,7 @@ def TreeMessagePatching(
 			# leaf's scores.
 			_tlog.debug(f"--- depth {depth} --- frontier_size={len(frontier)}")
 			_tlog.debug(f"depth {depth} frontier: {[repr(n) for n in frontier]}")
+			_emit(on_event, {"event": "depth_start", "depth": depth, "frontier_size": len(frontier)})
 			next_frontier = []
 			level_scored = level_admitted = 0
 			for leaf_idx, leaf in enumerate(tqdm(frontier)):
@@ -264,20 +285,27 @@ def TreeMessagePatching(
 						f"thr={min_contribution} -> {'ADMIT' if admitted else 'reject'}"
 					)
 					if admitted:
+						candidate.contribution = float(score)
 						survivors.append(candidate)
 						leaf.children.add(candidate)
 						if candidate.__class__.__name__ != 'EMBED_Node':
 							next_frontier.append(candidate)
 						level_admitted += 1
+						_emit(on_event, {"event": "admit", "depth": depth, "node": candidate,
+										 "parent": leaf, "contribution": float(score)})
 				_tlog.debug(
 					f"[d{depth} leaf {leaf_idx + 1}/{len(frontier)}] {leaf!r} survivors="
 					f"{len(survivors)}: {[repr(c) for c in survivors]}"
 				)
+				_emit(on_event, {"event": "leaf_done", "depth": depth,
+								 "leaf": leaf_idx + 1, "n_leaves": len(frontier)})
 
 			_tlog.info(
 				f"=== depth {depth} done === scored={level_scored} admitted={level_admitted} "
 				f"next_frontier_size={len(next_frontier)}"
 			)
+			_emit(on_event, {"event": "depth_end", "depth": depth, "scored": level_scored,
+							 "admitted": level_admitted, "next_frontier_size": len(next_frontier)})
 			frontier = next_frontier
 			depth += 1
 		_tlog.info(f"=== TreeMessagePatching end === depth_reached={depth}")
@@ -289,6 +317,7 @@ def TreeMessagePatching_LimitedLevelWidth(
 	root: Node,
 	max_width: int = 20000,
 	include_negative: bool = True,
+	on_event: Callable = None,
 ) -> Node:
 	"""Beam variant of TreeMessagePatching: instead of admitting every candidate
 	above a threshold, score all candidate extensions of all leaves at a depth and
@@ -309,6 +338,10 @@ def TreeMessagePatching_LimitedLevelWidth(
 		include_negative (bool, default=True):
 			If True, rank candidates by the magnitude of their contribution and keep
 			negatively-contributing ones; otherwise only positive contributions are kept.
+		on_event (Callable, optional):
+			Observer called with progress events (dicts): depth_start, leaf_done,
+			admit and depth_end (see TreeMessagePatching). Admissions are emitted
+			after the per-depth pruning, when the survivors are attached.
 
 	Returns:
 		Node:
@@ -323,16 +356,25 @@ def TreeMessagePatching_LimitedLevelWidth(
 		depth = 0
 		while frontier:
 			_tlog.debug(f"--- depth {depth} --- frontier_size={len(frontier)}")
+			_emit(on_event, {"event": "depth_start", "depth": depth, "frontier_size": len(frontier)})
 			# Score every candidate extension of every leaf at this depth, then keep
 			# only the global top-`max_width` by |contribution|.
 			scored = []  # (rank_value, leaf, candidate)
-			for leaf in tqdm(frontier):
+			for leaf_idx, leaf in enumerate(tqdm(frontier)):
 				suffix = get_path(leaf)
 				for candidate in leaf.get_expansion_candidates(model.cfg, include_head=True):
 					score = evaluate_path([candidate] + suffix, metric)
 					if include_negative or score >= 0:
 						rank_value = abs(score.item()) if include_negative else score.item()
+						# A zero isolated contribution means the patch has no effect at
+						# all (e.g. an embedding at a position where the clean and
+						# counterfactual tokens coincide) — never spend beam slots on it.
+						if rank_value == 0:
+							continue
+						candidate.contribution = float(score)
 						scored.append((rank_value, leaf, candidate))
+				_emit(on_event, {"event": "leaf_done", "depth": depth,
+								 "leaf": leaf_idx + 1, "n_leaves": len(frontier)})
 			if not scored:
 				break
 
@@ -342,10 +384,14 @@ def TreeMessagePatching_LimitedLevelWidth(
 				leaf.children.add(candidate)
 				if candidate.__class__.__name__ != 'EMBED_Node':
 					next_frontier.append(candidate)
+				_emit(on_event, {"event": "admit", "depth": depth, "node": candidate,
+								 "parent": leaf, "contribution": candidate.contribution})
 			_tlog.info(
 				f"=== depth {depth} done === scored={len(scored)} admitted={len(survivors)} "
 				f"next_frontier_size={len(next_frontier)}"
 			)
+			_emit(on_event, {"event": "depth_end", "depth": depth, "scored": len(scored),
+							 "admitted": len(survivors), "next_frontier_size": len(next_frontier)})
 			frontier = next_frontier
 			depth += 1
 		_tlog.info(f"=== TreeMessagePatching_LimitedLevelWidth end === depth_reached={depth}")
@@ -359,14 +405,15 @@ def PathMessagePatching(
 	include_negative: bool = True,
 	return_all: bool = False,
 	batch_positions: bool = False,
-	batch_heads: bool = False
+	batch_heads: bool = False,
+	on_event: Callable = None
 ) -> list[tuple[torch.Tensor, list[Node]]]:
 	"""
 	Performs a Breadth-First Search (BFS) starting from a node backwards to identify
 	the most significant paths reaching it from an EMBED_Node.
 
 	Args:
-		model (HookedTransformer): 
+		model (HookedTransformer):
 			The transformer model used for evaluation. It should be an instance
 			of HookedTransformer, to ensure compatibility with cache and nodes forward methods.
 		metric (Callable): 
@@ -381,10 +428,14 @@ def PathMessagePatching(
 			If True, return all evaluated complete paths regardless of their contribution score. The search will still be guided by min_contribution.
 		batch_positions (bool, default=False): 
 			If True, when expanding nodes, first evaluates attentions without considering position-wise contributions, only later, if the attention has been deemed meaningful, it will be evaluated at all possible key-value positions.
-		batch_heads (bool, default=False): 
+		batch_heads (bool, default=False):
 			If True, when expanding nodes, first evaluates attentions without considering all heads at once, only later, if the attention as a whole has been deemed meaningful, it will evaluate all single heads.
+		on_event (Callable, optional):
+			Observer called with progress events (dicts): depth_start, leaf_done,
+			admit (a path continuation kept in the frontier) and path_complete
+			(a path that reached the embeddings).
 	Returns:
-		A list of tuples containing the contribution score and the corresponding path, 
+		A list of tuples containing the contribution score and the corresponding path,
 		sorted by contribution in descending order.
 	"""
 	with torch.no_grad():
@@ -395,12 +446,14 @@ def PathMessagePatching(
 		last_node_contribution = evaluate_path([root], metric)
 		frontier = [(last_node_contribution, [root])]
 		completed_paths = []
+		depth = 0
 		while frontier:
+			_emit(on_event, {"event": "depth_start", "depth": depth, "frontier_size": len(frontier)})
 			# Cur depth frontier contains a list of all the path continuations found in the current depth
 			# So all these paths have 1 more node than the paths in the frontier
 			cur_depth_frontier = []
 			# For each incomplete path in the frontier, find all valuable continuations
-			for _, incomplete_path in tqdm(frontier):
+			for leaf_idx, (_, incomplete_path) in enumerate(tqdm(frontier)):
 				
 				cur_path_start = incomplete_path[0]
 				cur_path_continuations = []
@@ -425,12 +478,14 @@ def PathMessagePatching(
 					# EMBED is the base case, the path is complete and after evaluation can be added to the completed paths
 					if candidate.__class__.__name__ == 'EMBED_Node':
 						candidate.position = target_position if batch_positions else candidate.position
-						
+
 						contribution = evaluate_path([candidate] + incomplete_path, metric)
-						if return_all:
+						if return_all or (contribution >= min_contribution) or (include_negative and abs(contribution) >= min_contribution):
+							candidate.contribution = float(contribution)
 							completed_paths.append((contribution, [candidate] + incomplete_path))
-						elif (contribution >= min_contribution) or (include_negative and abs(contribution) >= min_contribution):
-							completed_paths.append((contribution, [candidate] + incomplete_path))
+							_emit(on_event, {"event": "path_complete", "depth": depth,
+											 "path": [candidate] + incomplete_path,
+											 "contribution": float(contribution)})
 					
 					# ATTNs and MLPs are possible expansions of the current path to be added to the frontier
 					elif candidate.__class__.__name__ == 'MLP_Node':
@@ -450,7 +505,17 @@ def PathMessagePatching(
 								cur_path_continuations.extend(find_relevant_positions(candidate, incomplete_path, metric, min_contribution, include_negative))
 							else:
 								cur_path_continuations.append((contribution, [candidate] + incomplete_path))
+				for contribution, path in cur_path_continuations:
+					path[0].contribution = float(contribution)
+					_emit(on_event, {"event": "admit", "depth": depth, "node": path[0],
+									 "parent": path[1], "contribution": float(contribution)})
+				_emit(on_event, {"event": "leaf_done", "depth": depth,
+								 "leaf": leaf_idx + 1, "n_leaves": len(frontier)})
 				cur_depth_frontier.extend(cur_path_continuations)
+			_emit(on_event, {"event": "depth_end", "depth": depth,
+							 "admitted": len(cur_depth_frontier),
+							 "next_frontier_size": len(cur_depth_frontier)})
+			depth += 1
 			# Sort the frontier just for visualization purposes
 			frontier = sorted(cur_depth_frontier, key=lambda x: x[0], reverse=True)
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
@@ -568,21 +633,26 @@ def PathMessagePatching_LimitedLevelWidth(
 	max_width: int = 20000,
 	include_negative: bool = True,
 	batch_positions: bool = False,
-	batch_heads: bool = False
+	batch_heads: bool = False,
+	on_event: Callable = None
 ) -> list[tuple[torch.Tensor, list[Node]]]:
 	"""
 	Performs a Breadth-First Search (BFS) starting from a node backwards to identify
 	the most significant paths reaching it from an EMBED_Node.
 
 	Args:
-		model (HookedTransformer): 
+		model (HookedTransformer):
 			The transformer model used for evaluation.
-		metric (Callable): 
+		metric (Callable):
 			A function to evaluate the contribution or importance of the path.
-		root (Node): 
+		root (Node):
 			The initial node to begin the backward search from.
 		max_width (int, default=20000):
 			The maximum number of nodes to retain at each level of the search tree.
+		on_event (Callable, optional):
+			Observer called with progress events (dicts): depth_start, leaf_done,
+			admit (a continuation that survived the per-depth pruning) and
+			path_complete (a path that reached the embeddings).
 		include_negative (bool, default=False): 
 			If True, include paths with negative contributions.
 		batch_positions (bool, default=False): 
@@ -602,11 +672,13 @@ def PathMessagePatching_LimitedLevelWidth(
 
 		frontier = [(1.0, [root])]
 		completed_paths = []
-		
+		depth = 0
+
 		while frontier:
+			_emit(on_event, {"event": "depth_start", "depth": depth, "frontier_size": len(frontier)})
 			current_depth_frontier = []
-			
-			for _, path in tqdm(frontier, desc=f"Expanding level (size {len(frontier)})"):
+
+			for leaf_idx, (_, path) in enumerate(tqdm(frontier, desc=f"Expanding level (size {len(frontier)})")):
 				cur_path_start = path[0]
 				target_position = cur_path_start.position
 
@@ -631,8 +703,14 @@ def PathMessagePatching_LimitedLevelWidth(
 						if batch_positions:
 							candidate.position = target_position
 						contribution = evaluate_path([candidate] + path, metric)
-						if include_negative or contribution >= 0:
+						# Skip exact zeros: a path whose patch has no effect at all
+						# (identical clean/cf embedding) carries no information.
+						if (include_negative or contribution >= 0) and float(contribution) != 0:
+							candidate.contribution = float(contribution)
 							completed_paths.append((contribution, [candidate] + path))
+							_emit(on_event, {"event": "path_complete", "depth": depth,
+											 "path": [candidate] + path,
+											 "contribution": float(contribution)})
 
 					elif candidate.__class__.__name__ == 'MLP_Node' or candidate.__class__.__name__ == 'ATTN_Node':
 						# For batched search, position might be generic here
@@ -644,9 +722,12 @@ def PathMessagePatching_LimitedLevelWidth(
 						# Store the contribution magnitude for ranking
 						contribution_val = abs(contribution.item()) if include_negative else contribution.item()
 
-						if include_negative or contribution >= 0:
+						if (include_negative or contribution >= 0) and contribution_val != 0:
+							candidate.contribution = float(contribution)
 							current_depth_frontier.append((contribution_val, [candidate] + path))
-			
+				_emit(on_event, {"event": "leaf_done", "depth": depth,
+								 "leaf": leaf_idx + 1, "n_leaves": len(frontier)})
+
 			if not current_depth_frontier:
 				break
 
@@ -671,6 +752,7 @@ def PathMessagePatching_LimitedLevelWidth(
 							# Convert tensor contributions to floats for ranking
 							for contrib, expanded_path in expansions:
 								val = abs(contrib.item()) if include_negative else contrib.item()
+								expanded_path[0].contribution = float(contrib)
 								new_frontier.append((val, expanded_path))
 					else:
 						# Not an expandable ATTN node, keep it as is.
@@ -678,6 +760,13 @@ def PathMessagePatching_LimitedLevelWidth(
 
 				# Second Pruning: Keep the top `max_width` of the newly expanded, specific paths
 				frontier = heapq.nlargest(max_width, new_frontier, key=lambda x: x[0])
+
+			for val, path in frontier:
+				_emit(on_event, {"event": "admit", "depth": depth, "node": path[0], "parent": path[1],
+								 "contribution": getattr(path[0], "contribution", val)})
+			_emit(on_event, {"event": "depth_end", "depth": depth,
+							 "admitted": len(frontier), "next_frontier_size": len(frontier)})
+			depth += 1
 
 	return sorted(completed_paths, key=lambda x: x[0], reverse=True)
 
