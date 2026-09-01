@@ -76,6 +76,10 @@ body {
 	padding: 3px 10px;
 }
 
+/* `hidden` has to beat the author `display: grid/flex` rules below, otherwise
+ * the algorithm-specific panels leak into the sidebar when toggled off. */
+[hidden] { display: none !important; }
+
 /* ---------------------------------------------------------------- sidebar */
 #sidebar {
 	grid-area: sidebar;
@@ -95,6 +99,8 @@ body {
 	letter-spacing: 0.05em;
 }
 .hint { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--ink-muted); }
+#mode-hint { margin-top: 6px; line-height: 1.35; }
+#mode-hint.warn { color: var(--danger, #c0392b); }
 
 textarea, input[type="number"], select {
 	width: 100%;

@@ -52,13 +52,24 @@ from ipe.graph_search import (
 	TreeMessagePatching_LimitedLevelWidth,
 )
 from ipe.webutils.serialization import graph_from_paths, graph_from_tree, node_to_dict
+from ipe.webutils import acdc_bridge
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-MODELS = ["gpt2-small", "gpt2-medium", "gpt2-large", "pythia-160m", "pythia-410m"]
+# The Llama/Gemma entries are gated on HuggingFace: accept the license there and
+# `huggingface-cli login` (or set HF_TOKEN) before selecting them.
+MODELS = ["gpt2-small", "gpt2-medium", "gpt2-large", "pythia-160m", "pythia-410m",
+		  "meta-llama/Llama-3.2-1B-Instruct", "google/gemma-2-2b-it"]
 METRICS = ["logit_difference", "indirect_effect", "target_logit_percentage",
 		   "target_probability_percentage", "kl_divergence"]
+MODES = ["noising", "denoising"]
+# The vendored ACDC baseline (benchmark/Automatic-Circuit-Discovery) brings its
+# own metrics and its own (position-agnostic) notion of a circuit.
+ACDC_METRICS = acdc_bridge.ACDC_METRICS
+# ExperimentManager silently forces patch_clean_into_cf=False (i.e. noising) for
+# any other metric (experiment.py:120), so denoising is only truthful for these.
+DENOISING_METRICS = ["logit_difference", "indirect_effect"]
 
 app = FastAPI(title="IPE circuit discovery")
 
@@ -160,25 +171,72 @@ class TokenizeRequest(BaseModel):
 class SearchRequest(BaseModel):
 	model: str = "gpt2-small"
 	prompts: list[str] = Field(min_length=1)
-	targets: list[str] = Field(min_length=1)
+	# ACDC's kl_div needs no target at all; the per-method _validate below still
+	# enforces one target per prompt for every case that does need them.
+	targets: list[str] = []
 	cf_prompts: list[str] = []
 	cf_targets: list[str] = []
-	method: str = "tree"           # tree | path
+	method: str = "tree"           # tree | path | acdc
 	strategy: str = "threshold"    # threshold | topk
+	mode: str = "noising"          # noising | denoising
 	min_contribution: float = 0.05
 	max_width: int = 20000
 	metric: str = "logit_difference"
 	positional: bool = True
 	include_negative: bool = True
+	# ACDC only (method == "acdc"); the knobs above do not apply to it.
+	acdc_metric: str = "kl_div"
+	acdc_threshold: float = 0.0575
+	acdc_abs_threshold: bool = False
+
+
+def _validate_acdc(req: SearchRequest, model: HookedTransformer) -> None:
+	if req.acdc_metric not in ACDC_METRICS:
+		raise HTTPException(400, f"Unknown ACDC metric '{req.acdc_metric}'. Available: {ACDC_METRICS}")
+	if req.cf_prompts and len(req.cf_prompts) != len(req.prompts):
+		raise HTTPException(400, "cf_prompts must match prompts in number")
+
+	# ACDC always runs the prompts as one batch, so they have to tokenize to a
+	# common length whatever the (IPE-only) positional switch says.
+	ref_len = len(model.to_str_tokens(req.prompts[0], prepend_bos=True))
+	for p in req.prompts + req.cf_prompts:
+		n = len(model.to_str_tokens(p, prepend_bos=True))
+		if n != ref_len:
+			raise HTTPException(400, f"Prompt {p!r} has {n} tokens, expected {ref_len} "
+									 "(ACDC batches all prompts, so they must tokenize to "
+									 "the same length)")
+
+	if req.acdc_metric in acdc_bridge.ACDC_METRICS_NEEDING_TARGETS:
+		if len(req.targets) != len(req.prompts):
+			raise HTTPException(400, f"ACDC metric '{req.acdc_metric}' needs one target per prompt")
+	if req.acdc_metric in acdc_bridge.ACDC_METRICS_NEEDING_CF_TARGETS:
+		if len(req.cf_targets) != len(req.prompts):
+			raise HTTPException(400, f"ACDC metric '{req.acdc_metric}' needs one counterfactual "
+									 "target per prompt (it is the 'wrong' answer of the logit difference)")
+	for t in req.targets + req.cf_targets:
+		if t and len(model.to_str_tokens(t, prepend_bos=False)) != 1:
+			raise HTTPException(400, f"Target {t!r} is not a single token "
+									 "(tip: most tokens need a leading space)")
 
 
 def _validate(req: SearchRequest, model: HookedTransformer) -> None:
+	if req.method == "acdc":
+		return _validate_acdc(req, model)
 	if req.method not in ("tree", "path"):
-		raise HTTPException(400, "method must be 'tree' or 'path'")
+		raise HTTPException(400, "method must be 'tree', 'path' or 'acdc'")
 	if req.strategy not in ("threshold", "topk"):
 		raise HTTPException(400, "strategy must be 'threshold' or 'topk'")
+	if req.mode not in MODES:
+		raise HTTPException(400, f"mode must be one of {MODES}")
 	if req.metric not in METRICS:
 		raise HTTPException(400, f"Unknown metric '{req.metric}'. Available: {METRICS}")
+	if req.mode == "denoising":
+		if not req.cf_prompts:
+			raise HTTPException(400, "denoising needs counterfactual prompts to source "
+									 "clean activations from (zero patching only noises)")
+		if req.metric not in DENOISING_METRICS:
+			raise HTTPException(400, f"denoising is only supported for metrics {DENOISING_METRICS}; "
+									 f"'{req.metric}' would silently fall back to noising")
 	if req.cf_prompts and len(req.cf_prompts) != len(req.prompts):
 		raise HTTPException(400, "cf_prompts must match prompts in number")
 	if len(req.targets) != len(req.prompts):
@@ -201,6 +259,73 @@ def _validate(req: SearchRequest, model: HookedTransformer) -> None:
 
 
 # -------------------------------------------------------------------- worker
+
+def _run_acdc(job: Job, req: SearchRequest) -> None:
+	"""Body of an ACDC job. Runs under the same lock / SSE plumbing as the IPE
+	searches; only the events differ (ACDC prunes a full graph instead of
+	growing one, so there is nothing to 'admit' node by node)."""
+	last_emit = 0.0
+
+	def on_event(event: dict) -> None:
+		nonlocal last_emit
+		if job.cancel_requested:
+			raise SearchCancelled()
+		if event.get("event") == "progress":
+			# ACDC steps are cheap to report but there are ~2k of them; throttle
+			# unless the event carries a graph snapshot.
+			now = time.monotonic()
+			if "graph" not in event and now - last_emit < 0.2:
+				return
+			last_emit = now
+		job.push(event)
+
+	with _run_lock:
+		job.status = "running"
+		job.push({"event": "status", "status": "running", "message": f"Loading {req.model}..."})
+		model = get_model(req.model)
+
+		tokens = model.to_str_tokens(req.prompts[0], prepend_bos=True)
+		job.push({"event": "meta", "tokens": tokens,
+				  "n_layers": model.cfg.n_layers, "n_heads": model.cfg.n_heads,
+				  "positional": False, "layout": "head"})
+
+		graph, info = acdc_bridge.run_acdc(
+			model,
+			req.prompts, req.targets, req.cf_prompts, req.cf_targets,
+			metric_name=req.acdc_metric,
+			threshold=req.acdc_threshold,
+			abs_value_threshold=req.acdc_abs_threshold,
+			on_event=on_event,
+		)
+
+		job.result = _scrub({
+			"graph": graph,
+			"meta": {
+				"tokens": tokens,
+				"n_layers": model.cfg.n_layers,
+				"n_heads": model.cfg.n_heads,
+				"positional": False,
+				"layout": "head",
+				"method": "acdc",
+				"strategy": f"threshold {info['threshold']}",
+				"mode": f"{info['ablation']} ablation",
+				"metric": info["metric"],
+				"runtime": info["runtime"],
+				"joint_tree_contribution": None,
+				"n_nodes": len(graph["nodes"]),
+				"n_edges": len(graph["edges"]),
+				"acdc_edges": info["acdc_edges"],
+				"acdc_initial_edges": info["initial_acdc_edges"],
+				"final_metric": info["final_metric"],
+			},
+		})
+		job.status = "complete"
+		job.push({"event": "result", **job.result})
+
+		gc.collect()
+		if DEVICE.type == "cuda":
+			torch.cuda.empty_cache()
+
 
 def _run_search(job: Job, req: SearchRequest) -> None:
 	last_leaf_emit = 0.0
@@ -236,6 +361,8 @@ def _run_search(job: Job, req: SearchRequest) -> None:
 			job.push(event)
 
 	try:
+		if req.method == "acdc":
+			return _run_acdc(job, req)
 		with _run_lock:
 			job.status = "running"
 			job.push({"event": "status", "status": "running", "message": f"Loading {req.model}..."})
@@ -243,15 +370,24 @@ def _run_search(job: Job, req: SearchRequest) -> None:
 			job.push({"event": "status", "status": "running", "message": "Running clean/counterfactual forward passes..."})
 
 			has_cf = bool(req.cf_prompts)
-			# With counterfactual denoising the counterfactual prompts are fed as
-			# the clean run and vice-versa, exactly as experiments/tree_vs_path.py
-			# and experiments/MIB/run_search.py do.
+			# Prompts go in un-inverted: the user's clean run is the library's
+			# clean run. patch_clean_into_cf is then the knob, with no confusing
+			# double negation on top of a prompt swap:
+			#   denoising -> True  -> base run is the counterfactual (corrupted)
+			#                         run, clean activations are patched into it;
+			#                         we measure how much performance is restored.
+			#   noising   -> False -> base run is the clean run, counterfactual
+			#                         activations are patched into it; we measure
+			#                         how much performance is degraded.
+			# (ExperimentManager honours True only for the DENOISING_METRICS; other
+			# metrics are rejected up front in _validate so the knob never lies.)
+			denoising = req.mode == "denoising"
 			experiment = ExperimentManager(
 				model=model,
-				prompts=req.cf_prompts if has_cf else req.prompts,
-				targets=req.cf_targets if has_cf else req.targets,
-				cf_prompts=req.prompts if has_cf else None,
-				cf_targets=req.targets if has_cf else None,
+				prompts=req.prompts,
+				targets=req.targets,
+				cf_prompts=req.cf_prompts if has_cf else None,
+				cf_targets=req.cf_targets if has_cf else None,
 				algorithm="PathMessagePatching",
 				search_strategy="Threshold",
 				algorithm_params={"min_contribution": req.min_contribution,
@@ -259,7 +395,7 @@ def _run_search(job: Job, req: SearchRequest) -> None:
 				metric=req.metric,
 				positional_search=req.positional,
 				patch_type="counterfactual" if has_cf else "zero",
-				patch_clean_into_cf=has_cf,
+				patch_clean_into_cf=denoising,
 			)
 			metric = experiment.metric
 			root = experiment.root
@@ -299,6 +435,7 @@ def _run_search(job: Job, req: SearchRequest) -> None:
 					"positional": req.positional,
 					"method": req.method,
 					"strategy": req.strategy,
+					"mode": req.mode,
 					"metric": req.metric,
 					"runtime": round(runtime, 2),
 					"joint_tree_contribution": joint,
@@ -333,8 +470,14 @@ def config():
 		"models": MODELS,
 		"loaded_models": list(_model_cache),
 		"metrics": METRICS,
-		"methods": ["tree", "path"],
+		"methods": ["tree", "path", "acdc"],
 		"strategies": ["threshold", "topk"],
+		"modes": MODES,
+		"denoising_metrics": DENOISING_METRICS,
+		"acdc_metrics": ACDC_METRICS,
+		"acdc_metrics_needing_targets": acdc_bridge.ACDC_METRICS_NEEDING_TARGETS,
+		"acdc_metrics_needing_cf_targets": acdc_bridge.ACDC_METRICS_NEEDING_CF_TARGETS,
+		"acdc_available": acdc_bridge.ACDC_ROOT.is_dir(),
 		"device": str(DEVICE),
 	}
 

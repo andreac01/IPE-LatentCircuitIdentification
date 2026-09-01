@@ -36,24 +36,34 @@
 			<textarea id="cf-targets" rows="1" spellcheck="false" placeholder=" John"></textarea>
 		</section>
 
-		<section class="row2">
-			<div>
-				<label>Search</label>
-				<div class="seg" id="method-seg">
-					<button type="button" data-value="tree" class="on">Tree</button>
-					<button type="button" data-value="path">Path</button>
-				</div>
+		<section>
+			<label>Algorithm</label>
+			<div class="seg" id="method-seg">
+				<button type="button" data-value="tree" class="on">IPE tree</button>
+				<button type="button" data-value="path">IPE path</button>
+				<button type="button" data-value="acdc">ACDC</button>
 			</div>
-			<div>
-				<label>Strategy</label>
-				<div class="seg" id="strategy-seg">
-					<button type="button" data-value="threshold" class="on">Threshold</button>
-					<button type="button" data-value="topk">Top-k</button>
-				</div>
+			<div class="hint" id="method-hint"></div>
+		</section>
+
+		<section class="ipe-only">
+			<label>Strategy</label>
+			<div class="seg" id="strategy-seg">
+				<button type="button" data-value="threshold" class="on">Threshold</button>
+				<button type="button" data-value="topk">Top-k</button>
 			</div>
 		</section>
 
-		<section class="row2">
+		<section class="ipe-only">
+			<label>Patching direction</label>
+			<div class="seg" id="mode-seg">
+				<button type="button" data-value="noising" class="on">Noising</button>
+				<button type="button" data-value="denoising">Denoising</button>
+			</div>
+			<div class="hint" id="mode-hint"></div>
+		</section>
+
+		<section class="row2 ipe-only">
 			<div id="min-contribution-field">
 				<label for="min-contribution">Min contribution</label>
 				<input type="number" id="min-contribution" value="0.05" step="0.01">
@@ -68,9 +78,25 @@
 			</div>
 		</section>
 
-		<section class="checks">
+		<section class="checks ipe-only">
 			<label class="check"><input type="checkbox" id="positional" checked> positional search</label>
 			<label class="check"><input type="checkbox" id="include-negative" checked> include negative</label>
+		</section>
+
+		<section class="row2 acdc-only" hidden>
+			<div>
+				<label for="acdc-threshold">Threshold &tau;</label>
+				<input type="number" id="acdc-threshold" value="0.0575" step="0.005" min="0">
+			</div>
+			<div>
+				<label for="acdc-metric">Metric</label>
+				<select id="acdc-metric"></select>
+			</div>
+		</section>
+
+		<section class="checks acdc-only" hidden>
+			<label class="check"><input type="checkbox" id="acdc-abs-threshold"> threshold on |effect|</label>
+			<div class="hint" id="acdc-hint"></div>
 		</section>
 
 		<section class="actions">
@@ -100,7 +126,8 @@
 			</div>
 			<div class="legend-row"><span class="swatch complete"></span> complete branch (reaches EMB)</div>
 			<div class="legend-row"><span class="swatch dashed"></span> pruned branch (never reached EMB)</div>
-			<div class="legend-row"><span class="swatch jog"></span> horizontal jog = K/V read at an earlier position</div>
+			<div class="legend-row ipe-only"><span class="swatch jog"></span> horizontal jog = K/V read at an earlier position</div>
+			<div class="legend-row acdc-only" hidden>x axis = attention head (ACDC is position-agnostic)</div>
 		</section>
 	</aside>
 

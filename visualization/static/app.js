@@ -27,6 +27,7 @@ const state = {
 	threshold: 0,
 	method: "tree",
 	strategy: "threshold",
+	mode: "noising",
 	jobId: null,
 	es: null,
 	running: false,
@@ -234,7 +235,22 @@ function rowKeyFor(n) {
 	return `${n.kind}${n.layer}`;
 }
 
+/* Two x-axis layouts. The IPE searches are positional, so the columns are token
+ * positions. ACDC is position-agnostic but head-resolved, so laying its result
+ * out by token would pile all 144 heads into one column: there the columns are
+ * head indices instead, plus a trailing column for the head-less components
+ * (MLP / EMB / FINAL). */
+function byHead() {
+	return state.meta.layout === "head";
+}
+
 function colList() {
+	if (byHead()) {
+		const cols = [];
+		for (let h = 0; h < state.meta.n_heads; h++) cols.push({ p: h, label: "head" });
+		cols.push({ p: null, label: "mlp / emb" });
+		return cols;
+	}
 	if (!state.meta.positional) return [{ p: null, label: "any" }];
 	const cols = state.meta.tokens.map((t, i) => ({ p: i, label: t }));
 	for (const n of state.nodes.values()) {
@@ -244,6 +260,12 @@ function colList() {
 		}
 	}
 	return cols;
+}
+
+/* Which column a node sits in, under the active layout. */
+function colKeyFor(n) {
+	const v = byHead() ? n.head : n.position;
+	return v === undefined ? null : v;
 }
 
 function nodeVisible(n) {
@@ -315,7 +337,7 @@ function render() {
 	const cells = new Map(); // "rowKey|colIdx" -> [node,...]
 	for (const n of visible) {
 		const ri = rowIdx.get(rowKeyFor(n));
-		const ci = colIdx.get(n.position === undefined ? null : n.position);
+		const ci = colIdx.get(colKeyFor(n));
 		if (ri === undefined || ci === undefined) continue;
 		const key = `${ri}|${ci}`;
 		if (!cells.has(key)) cells.set(key, []);
@@ -463,7 +485,7 @@ function onHoverNode(n, ev) {
 	if (n.kv_positions && n.kv_positions.length) {
 		rowsOut.push(`K/V read at: ${n.kv_positions.map((p) => `${p} ${JSON.stringify((tokens[p] ?? "").trim())}`).join(", ")}`);
 	}
-	if (n.merged > 1) rowsOut.push(`<span class="tt-dim">${n.merged} tree nodes merged</span>`);
+	if (n.merged > 1 && !byHead()) rowsOut.push(`<span class="tt-dim">${n.merged} tree nodes merged</span>`);
 	if (n.complete === false) rowsOut.push(`<span class="tt-dim">on a pruned branch (never reached EMB)</span>`);
 	showTooltip(rowsOut.join("<br>"), ev);
 }
@@ -473,8 +495,14 @@ function onHoverEdge(e, ev) {
 	applyHighlight();
 	const s = state.nodes.get(e.source), t = state.nodes.get(e.target);
 	const rows = [`<div class="tt-title">${s ? nodeLabel(s) : e.source} &rarr; ${t ? nodeLabel(t) : e.target}</div>`];
-	if (e.contribution !== null && e.contribution !== undefined) rows.push(`strongest branch: <b>${fmt(e.contribution)}</b>`);
-	if (e.count > 1) rows.push(`<span class="tt-dim">${e.count} tree edges merged</span>`);
+	if (e.contribution !== null && e.contribution !== undefined) {
+		rows.push(byHead()
+			? `strongest effect of cutting it: <b>${fmt(e.contribution)}</b>`
+			: `strongest branch: <b>${fmt(e.contribution)}</b>`);
+	}
+	if (e.count > 1) {
+		rows.push(`<span class="tt-dim">${e.count} ${byHead() ? "hook-level" : "tree"} edges merged</span>`);
+	}
 	rows.push(e.complete
 		? `<span class="tt-dim">on a complete branch (reaches EMB)</span>`
 		: `<span class="tt-dim">pruned branch</span>`);
@@ -573,6 +601,14 @@ async function loadConfig() {
 		o.value = o.textContent = m;
 		metricSel.appendChild(o);
 	}
+	const acdcSel = $("#acdc-metric");
+	for (const m of state.config.acdc_metrics || []) {
+		const o = document.createElement("option");
+		o.value = o.textContent = m;
+		acdcSel.appendChild(o);
+	}
+	updateModeHint();
+	applyMethod();
 }
 
 const tokenizePreview = debounce(async () => {
@@ -587,6 +623,7 @@ const tokenizePreview = debounce(async () => {
 			n_layers: out.n_layers,
 			n_heads: out.n_heads,
 			positional: $("#positional").checked,
+			layout: state.method === "acdc" ? "head" : "position",
 		};
 		scheduleRender();
 	} catch (e) {
@@ -621,18 +658,51 @@ async function runSearch() {
 		cf_targets: lines($("#cf-targets").value),
 		method: state.method,
 		strategy: state.strategy,
+		mode: state.mode,
 		min_contribution: parseFloat($("#min-contribution").value) || 0.05,
 		max_width: parseInt($("#max-width").value, 10) || 20,
 		metric: $("#metric").value,
 		positional: $("#positional").checked,
 		include_negative: $("#include-negative").checked,
+		acdc_metric: $("#acdc-metric").value,
+		acdc_threshold: parseFloat($("#acdc-threshold").value) || 0,
+		acdc_abs_threshold: $("#acdc-abs-threshold").checked,
 	};
 	if (!body.prompts.length) return setStatus("Enter at least one clean prompt.");
+
+	if (state.method === "acdc") {
+		const needs = state.config ? state.config.acdc_metrics_needing_targets : [];
+		const needsCf = state.config ? state.config.acdc_metrics_needing_cf_targets : [];
+		if (needs.includes(body.acdc_metric) && body.targets.length !== body.prompts.length) {
+			$("#status").hidden = false;
+			return setStatus(`ACDC metric ${body.acdc_metric} needs one target per prompt.`);
+		}
+		if (needsCf.includes(body.acdc_metric) && body.cf_targets.length !== body.prompts.length) {
+			$("#status").hidden = false;
+			return setStatus(`ACDC metric ${body.acdc_metric} needs one counterfactual target per prompt.`);
+		}
+		return submit(body);
+	}
+
 	if (body.metric !== "kl_divergence" && body.targets.length !== body.prompts.length) {
 		$("#status").hidden = false;
 		return setStatus("Provide one target per prompt.");
 	}
+	if (body.mode === "denoising") {
+		if (!body.cf_prompts.length) {
+			$("#status").hidden = false;
+			return setStatus("Denoising needs counterfactual prompts to patch clean activations back into.");
+		}
+		if (state.config && !state.config.denoising_metrics.includes(body.metric)) {
+			$("#status").hidden = false;
+			return setStatus(`Denoising is only supported for metrics: ${state.config.denoising_metrics.join(", ")}.`);
+		}
+	}
 
+	return submit(body);
+}
+
+async function submit(body) {
 	setRunning(true);
 	setStatus("Submitting job…");
 	setProgress(0, "");
@@ -662,9 +732,17 @@ function openStream(jobId) {
 				state.meta = {
 					tokens: ev.tokens, n_layers: ev.n_layers,
 					n_heads: ev.n_heads, positional: ev.positional,
+					layout: ev.layout || "position",
 				};
 				setStatus("Searching…");
 				scheduleRender();
+				break;
+			case "progress":
+				// ACDC: one event per pruning step, occasionally carrying a
+				// snapshot of the graph as it shrinks.
+				setProgress(ev.frac ?? 0, ev.text || "");
+				if (ev.message) setStatus(ev.message);
+				if (ev.graph) loadGraph(ev.graph);
 				break;
 			case "depth_start":
 				setProgress(0, `depth ${ev.depth} · frontier ${ev.frontier_size}`);
@@ -693,6 +771,7 @@ function openStream(jobId) {
 				state.admitQueue.length = 0;
 				state.fresh.clear();
 				state.result = { graph: ev.graph, meta: ev.meta };
+				state.meta = { ...state.meta, ...ev.meta };
 				loadGraph(ev.graph);
 				showSummary(ev.meta);
 				setStatus(`Done in ${ev.meta.runtime}s.`);
@@ -718,12 +797,16 @@ function openStream(jobId) {
 
 function showSummary(meta) {
 	const bits = [
-		`<b>${meta.method}</b> search (${meta.strategy}), metric <b>${meta.metric}</b>`,
+		`<b>${meta.method}</b> search (${meta.strategy}), <b>${meta.mode}</b>, metric <b>${meta.metric}</b>`,
 		`runtime <b>${meta.runtime}s</b>`,
 		`${meta.n_nodes} grid nodes, ${meta.n_edges} edges`,
 	];
 	if (meta.joint_tree_contribution !== null && meta.joint_tree_contribution !== undefined) {
 		bits.push(`joint tree contribution <b>${fmt(meta.joint_tree_contribution)}</b>`);
+	}
+	if (meta.acdc_edges !== undefined) {
+		bits.push(`ACDC kept <b>${meta.acdc_edges}</b> of ${meta.acdc_initial_edges} hook-level edges`);
+		bits.push(`final metric <b>${meta.final_metric.toFixed(4)}</b>`);
 	}
 	$("#summary").innerHTML = bits.join("<br>");
 	const slider = $("#threshold-slider");
@@ -736,6 +819,49 @@ function showSummary(meta) {
 }
 
 /* -------------------------------------------------------------- wire up UI */
+
+function updateModeHint() {
+	const el = $("#mode-hint");
+	if (!el) return;
+	if (state.mode === "denoising") {
+		const metric = $("#metric").value;
+		const ok = !state.config || state.config.denoising_metrics.includes(metric);
+		el.textContent = "patch clean activations into the counterfactual run; "
+			+ "measures restored performance"
+			+ (ok ? "" : ` — needs metric: ${state.config.denoising_metrics.join(", ")}`);
+		el.classList.toggle("warn", !ok);
+	} else {
+		el.textContent = "patch counterfactual activations into the clean run; measures degraded performance";
+		el.classList.remove("warn");
+	}
+}
+
+/* Show only the knobs the selected algorithm actually reads. ACDC ignores the
+ * IPE strategy / patching direction / positional switches entirely: it has one
+ * threshold, one metric and one (position-agnostic) pruning pass. */
+function applyMethod() {
+	const acdc = state.method === "acdc";
+	document.querySelectorAll(".ipe-only").forEach((e) => { e.hidden = acdc; });
+	document.querySelectorAll(".acdc-only").forEach((e) => { e.hidden = !acdc; });
+	const hint = $("#method-hint");
+	if (acdc) {
+		hint.textContent = "greedy edge pruning over the whole computational graph "
+			+ "(benchmark/Automatic-Circuit-Discovery) — position-agnostic, and slow: "
+			+ "it evaluates one forward pass per candidate edge";
+		$("#acdc-hint").textContent = $("#cf-prompts").value.trim()
+			? "counterfactual ablation from the prompts above"
+			: "no counterfactual prompts → zero ablation";
+	} else {
+		hint.textContent = state.method === "tree"
+			? "grow one suffix-sharing tree of message paths back from the logits"
+			: "score complete root→embedding paths independently";
+	}
+	// Reshape the (possibly empty) preview grid to match: ACDC is drawn by head.
+	if (state.meta) {
+		state.meta.layout = acdc ? "head" : "position";
+		scheduleRender();
+	}
+}
 
 function setupSeg(id, onChange) {
 	const seg = $(id);
@@ -752,14 +878,18 @@ function init() {
 	loadConfig().catch((e) => setStatus(`Config failed: ${e.message}`));
 	setupPanZoom();
 
-	setupSeg("#method-seg", (v) => { state.method = v; });
+	setupSeg("#method-seg", (v) => { state.method = v; applyMethod(); });
 	setupSeg("#strategy-seg", (v) => {
 		state.strategy = v;
 		$("#min-contribution-field").hidden = v !== "threshold";
 		$("#max-width-field").hidden = v !== "topk";
 	});
+	setupSeg("#mode-seg", (v) => { state.mode = v; updateModeHint(); });
+	$("#metric").addEventListener("change", updateModeHint);
+	updateModeHint();
 
 	$("#prompts").addEventListener("input", tokenizePreview);
+	$("#cf-prompts").addEventListener("input", applyMethod);
 	$("#model").addEventListener("change", tokenizePreview);
 	$("#positional").addEventListener("change", () => {
 		if (state.meta) { state.meta.positional = $("#positional").checked; scheduleRender(); }
