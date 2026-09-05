@@ -782,6 +782,10 @@ def main():
     parser.add_argument("--positional", action="store_true", default=False,
                         help="Position-specific search (default: non-positional, as in run_search for IOI).")
     parser.add_argument("--include-negative", action="store_true", default=True)
+    parser.add_argument("--joint-scoring", action="store_true", default=False,
+                        help="Score each tree candidate in the context of the tree grown so far "
+                             "instead of in isolation. Only affects the tree search; the path "
+                             "search has no tree to be in the context of.")
     parser.add_argument("--circuit-report", default=None,
                         help="File to write the report to (default: <task>_report.txt).")
     args = parser.parse_args()
@@ -855,12 +859,14 @@ def main():
             model, metric, tmp_root,
             max_width=args.max_width,
             include_negative=args.include_negative,
+            joint_scoring=args.joint_scoring,
         )
     else:
         tmp_root = TreeMessagePatching(
             model, metric, tmp_root,
             min_contribution=args.min_contribution,
             include_negative=args.include_negative,
+            joint_scoring=args.joint_scoring,
         )
     tmp_time = time.time() - t0
     tmp_all = tree_nodes(tmp_root)
@@ -890,6 +896,7 @@ def main():
         "task": args.task, "model": args.model, "metric": args.metric, "batch": len(prompts),
         "seq_len": seq_len, "positional": args.positional,
         "strategy": args.strategy,
+        "tree_scoring": "joint" if args.joint_scoring else "isolated",
         "min_contribution": args.min_contribution if args.strategy == "threshold" else "n/a",
         "max_width": args.max_width if args.strategy == "topk" else "n/a",
         "path_complete_paths": len(pmp_paths), "tree_branches": len(tmp_branches),

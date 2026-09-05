@@ -1,0 +1,21 @@
+{
+    "name": "counterfactual",
+    "title": "IPE with path counterfactual",
+    "metric": "indirect_effect",
+    "min_contribution": 0.0001,
+    "cf": true,
+    "denoising": true,
+    "include_negative": false,
+    "algorithm": "PathMessagePatching",
+    "search_strategy": "Threshold",
+    "model": "gpt2-small",
+    "task": "ioi",
+    "target_length": 15,
+    "batch_size": 8,
+    "positional": false,
+    "batch_heads": true,
+    "x_max": 0.035,
+    "paths_found": 1584,
+    "time_seconds": 147.50663703097962,
+    "device": "cuda"
+}

@@ -1,0 +1,21 @@
+{
+    "name": "ablation",
+    "title": "IPE with path ablation",
+    "metric": "target_logit_percentage",
+    "min_contribution": 0.025,
+    "cf": false,
+    "denoising": false,
+    "include_negative": false,
+    "algorithm": "PathMessagePatching",
+    "search_strategy": "Threshold",
+    "model": "gpt2-small",
+    "task": "ioi",
+    "target_length": 15,
+    "batch_size": 8,
+    "positional": false,
+    "batch_heads": true,
+    "x_max": 10.0,
+    "paths_found": 37553,
+    "time_seconds": 2308.231554382015,
+    "device": "cuda"
+}

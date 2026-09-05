@@ -1,0 +1,16 @@
+23:00:17.932 | INFO    | Tree debug log initialised at /home/nicolobrunello/Documents/Projects/IPE-LatentCircuitIdentification/experiments/faithfulness_completeness/tree_search_debug.log
+23:00:17.932 | INFO    | === TreeMessagePatching_LimitedLevelWidth start === root=FINAL_Node(layer=11) max_width=80 include_negative=True scoring=joint
+23:00:17.984 | INFO    | === depth 0 done === scored=300 admitted=80 next_frontier_size=80
+23:00:31.554 | INFO    | === depth 1 done === scored=18312 admitted=80 next_frontier_size=80
+23:00:49.745 | INFO    | === depth 2 done === scored=16870 admitted=80 next_frontier_size=80
+23:01:10.226 | INFO    | === depth 3 done === scored=14002 admitted=80 next_frontier_size=80
+23:01:28.125 | INFO    | === depth 4 done === scored=8733 admitted=80 next_frontier_size=71
+23:01:39.160 | INFO    | === depth 5 done === scored=4975 admitted=80 next_frontier_size=68
+23:01:51.573 | INFO    | === depth 6 done === scored=5027 admitted=80 next_frontier_size=71
+23:02:02.100 | INFO    | === depth 7 done === scored=4158 admitted=80 next_frontier_size=59
+23:02:08.311 | INFO    | === depth 8 done === scored=2531 admitted=80 next_frontier_size=60
+23:02:12.122 | INFO    | === depth 9 done === scored=1456 admitted=80 next_frontier_size=56
+23:02:14.030 | INFO    | === depth 10 done === scored=713 admitted=80 next_frontier_size=49
+23:02:14.759 | INFO    | === depth 11 done === scored=206 admitted=80 next_frontier_size=41
+23:02:15.071 | INFO    | === depth 12 done === scored=39 admitted=39 next_frontier_size=0
+23:02:15.071 | INFO    | === TreeMessagePatching_LimitedLevelWidth end === depth_reached=13

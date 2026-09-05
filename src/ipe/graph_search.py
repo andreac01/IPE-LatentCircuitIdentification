@@ -1,7 +1,7 @@
 from transformer_lens import HookedTransformer
 import torch
 from ipe.nodes import Node, ATTN_Node
-from ipe.paths import evaluate_path, get_path
+from ipe.paths import evaluate_path, get_path, tree_messages, evaluate_tree_branch
 from ipe.miscellanea import batch_iterable
 from tqdm import tqdm
 from typing import Callable
@@ -53,6 +53,46 @@ def setup_tree_debug_log(path: str = TREE_DEBUG_LOG, level: str = "DEBUG") -> No
 # Bound logger used by the tree search; records carry the tree_debug flag so the
 # sink filter above picks them up without polluting the rest of the app's logs.
 _tlog = logger.bind(tree_debug=True)
+
+
+class _Deadline:
+	"""Wall-clock budget for a search.
+
+	`max_time=None` means unlimited, which is the behaviour every search had
+	before this existed. When the budget is exhausted the search stops and
+	returns what it has found so far: every path is scored in isolation, so a
+	partial result is a valid (just smaller) circuit rather than a corrupt one.
+
+	The verdict is recorded on the root as `timed_out`, so a caller can tell a
+	truncated run from a converged one without timing it externally.
+	"""
+
+	def __init__(self, max_time: float | None, root: Node = None, label: str = "search"):
+		self.max_time = max_time
+		self.root = root
+		self.label = label
+		self.start = time.time()
+		self.expired = False
+		if root is not None:
+			root.timed_out = False
+
+	@property
+	def elapsed(self) -> float:
+		return time.time() - self.start
+
+	def reached(self) -> bool:
+		"""True once the budget is spent. Cheap enough to call in an inner loop."""
+		if self.expired or self.max_time is None:
+			return self.expired
+		if self.elapsed >= self.max_time:
+			self.expired = True
+			logger.warning(
+				f"{self.label}: wall-clock budget of {self.max_time:g}s exhausted after "
+				f"{self.elapsed:.0f}s; returning the partial result found so far."
+			)
+			if self.root is not None:
+				self.root.timed_out = True
+		return self.expired
 
 
 def _emit(on_event: Callable | None, event: dict) -> None:
@@ -210,12 +250,86 @@ def find_relevant_heads(
 
 
 
+def _joint_scoring_context(root: Node, frontier: list[Node], metric: Callable) -> tuple[dict, dict]:
+	"""Freeze the tree for one BFS depth, so every candidate at that depth is scored in the same context.
+
+	Returns the message every node of the current tree emits, plus, for each frontier leaf, the score
+	of the tree with that leaf contributing nothing. That second quantity is the baseline a candidate
+	is measured against: attaching C under leaf L scores
+
+		evaluate_tree_branch(root, L, L.forward(C.forward(None)), ...) - baseline[id(L)]
+
+	i.e. what routing through L brings in, given every other branch of the tree. The baseline is
+	"L emits nothing" rather than "L is ablated whole": a childless node emits its *full* output
+	(see get_tree_msg), so attaching a child narrows the intervention instead of adding to it, and
+	measuring against the unattached tree would make every score past the first depth negative.
+
+	Freezing is what makes the scoring *simultaneous*: two candidates that carry the same signal are
+	both measured against a context that contains neither, so both are admitted. That redundancy is
+	wanted - a circuit missing the components that compensate for its own removals (the IOI backup
+	name movers, say) is incomplete by construction.
+
+	Args:
+		root (Node):
+			The root of the tree grown so far.
+		frontier (list[Node]):
+			The leaves about to be expanded at this depth.
+		metric (Callable):
+			A function to evaluate the contribution of the tree. It must accept a single parameter: `corrupted_resid`.
+
+	Returns:
+		tuple[dict, dict]:
+			`(messages, baselines)`, keyed by `id(node)`; see :func:`ipe.paths.tree_messages`.
+	"""
+	messages = tree_messages(root)
+	baselines = {}
+	for leaf in frontier:
+		silent = torch.zeros_like(messages[id(leaf)])
+		baselines[id(leaf)] = evaluate_tree_branch(root, leaf, silent, metric, messages)
+	return messages, baselines
+
+
+def _score_candidate(candidate: Node, leaf: Node, suffix: list[Node], root: Node, metric: Callable, joint: tuple = None) -> torch.Tensor:
+	"""Contribution of attaching `candidate` under `leaf`, isolated or joint.
+
+	Isolated (`joint is None`): the branch's own contribution, `evaluate_path([candidate, leaf, ..., root])`,
+	which depends only on the chain and so is independent of everything else in the tree.
+
+	Joint: the same branch measured in the context of the whole frozen tree, so the message merges
+	with the other subtrees' messages at every shared ancestor and at the metric.
+
+	Args:
+		candidate (Node):
+			The node whose admission is being scored.
+		leaf (Node):
+			The frontier node `candidate` would be attached to.
+		suffix (list[Node]):
+			`[leaf, parent, ..., root]`, used by the isolated scoring only.
+		root (Node):
+			The root of the tree.
+		metric (Callable):
+			A function to evaluate the contribution of the path or tree. It must accept a single parameter: `corrupted_resid`.
+		joint (tuple, optional):
+			`(messages, baselines)` from :func:`_joint_scoring_context`. If None, scores in isolation.
+
+	Returns:
+		torch.Tensor:
+			The contribution of the candidate.
+	"""
+	if joint is None:
+		return evaluate_path([candidate] + suffix, metric)
+	messages, baselines = joint
+	branch = leaf.forward(message=candidate.forward(message=None))
+	return evaluate_tree_branch(root, leaf, branch, metric, messages) - baselines[id(leaf)]
+
+
 def TreeMessagePatching(
 	model: HookedTransformer,
 	metric: Callable,
 	root: Node,
 	min_contribution: float = 0.5,
 	include_negative: bool = True,
+	joint_scoring: bool = False,
 	on_event: Callable = None,
 ) -> Node:
 	"""
@@ -229,6 +343,18 @@ def TreeMessagePatching(
 	involved, so a candidate's score depends only on C and the chain above it, not
 	on any sibling subtree.
 
+	Set `joint_scoring=True` to score each candidate in the context of the tree instead: the
+	contribution of attaching C under leaf L becomes the score of the whole tree with L relaying C's
+	message, minus the score of that same tree with L contributing nothing. The candidate's message
+	then merges with every other subtree's at the shared ancestors and at the metric, so a candidate
+	whose effect is already carried by an admitted branch scores lower, and one that only matters in
+	the presence of another scores higher. The tree is frozen for the whole depth, so candidates at a
+	depth do not suppress one another (see :func:`_joint_scoring_context`).
+
+	Note that joint scores are only valid for the tree that was in place when they were taken, so —
+	unlike isolated scores — a run at a low threshold can no longer be pruned to reproduce a run at a
+	higher one; each threshold needs its own search.
+
 	Args:
 		model (HookedTransformer):
 			The transformer model used for evaluation.
@@ -240,6 +366,10 @@ def TreeMessagePatching(
 			The minimum absolute contribution required for a candidate to be attached to the tree.
 		include_negative (bool, default=True):
 			If True, include candidates with negative contributions. The min_contribution is therefore interpreted as a threshold on the magnitude of the contribution.
+		joint_scoring (bool, default=False):
+			If True, score each candidate in the context of the tree grown so far rather than in
+			isolation. See the note above; this changes the meaning of min_contribution and disables
+			threshold pruning of a completed run.
 		on_event (Callable, optional):
 			Observer called with progress events (dicts): depth_start, leaf_done,
 			admit (carrying the admitted Node, its parent and contribution) and
@@ -252,7 +382,8 @@ def TreeMessagePatching(
 	with torch.no_grad():
 		_tlog.info(
 			f"=== TreeMessagePatching start === root={root!r} "
-			f"min_contribution={min_contribution} include_negative={include_negative}"
+			f"min_contribution={min_contribution} include_negative={include_negative} "
+			f"scoring={'joint' if joint_scoring else 'isolated'}"
 		)
 		frontier = [root]
 		depth = 0
@@ -263,6 +394,8 @@ def TreeMessagePatching(
 			_tlog.debug(f"--- depth {depth} --- frontier_size={len(frontier)}")
 			_tlog.debug(f"depth {depth} frontier: {[repr(n) for n in frontier]}")
 			_emit(on_event, {"event": "depth_start", "depth": depth, "frontier_size": len(frontier)})
+			# Frozen once per depth, so every candidate at this depth sees the same context.
+			joint = _joint_scoring_context(root, frontier, metric) if joint_scoring else None
 			next_frontier = []
 			level_scored = level_admitted = 0
 			for leaf_idx, leaf in enumerate(tqdm(frontier)):
@@ -275,8 +408,8 @@ def TreeMessagePatching(
 					f"-> {len(candidates)} candidates"
 				)
 				for candidate in candidates:
-					# Isolated contribution of the branch C -> leaf -> ... -> root.
-					score = evaluate_path([candidate] + suffix, metric)
+					# Contribution of the branch C -> leaf -> ... -> root, on its own or in context.
+					score = _score_candidate(candidate, leaf, suffix, root, metric, joint)
 					admitted = (score >= min_contribution) or (include_negative and abs(score) >= min_contribution)
 					level_scored += 1
 					_tlog.debug(
@@ -317,6 +450,7 @@ def TreeMessagePatching_LimitedLevelWidth(
 	root: Node,
 	max_width: int = 20000,
 	include_negative: bool = True,
+	joint_scoring: bool = False,
 	on_event: Callable = None,
 ) -> Node:
 	"""Beam variant of TreeMessagePatching: instead of admitting every candidate
@@ -325,6 +459,10 @@ def TreeMessagePatching_LimitedLevelWidth(
 	PathMessagePatching_LimitedLevelWidth. Candidates are still scored by their own
 	isolated branch contribution (evaluate_path([C, leaf, ..., root])), so pruning
 	across leaves is well-defined and the tree remains a trie of the same paths.
+
+	`joint_scoring=True` swaps that for the in-context score described in
+	:func:`TreeMessagePatching`; the beam then ranks candidates by what each adds given the tree
+	grown so far, with the tree frozen for the whole depth so the ranking is order-independent.
 
 	Args:
 		model (HookedTransformer):
@@ -338,6 +476,9 @@ def TreeMessagePatching_LimitedLevelWidth(
 		include_negative (bool, default=True):
 			If True, rank candidates by the magnitude of their contribution and keep
 			negatively-contributing ones; otherwise only positive contributions are kept.
+		joint_scoring (bool, default=False):
+			If True, score each candidate in the context of the tree grown so far rather than in
+			isolation. See :func:`TreeMessagePatching`.
 		on_event (Callable, optional):
 			Observer called with progress events (dicts): depth_start, leaf_done,
 			admit and depth_end (see TreeMessagePatching). Admissions are emitted
@@ -350,7 +491,8 @@ def TreeMessagePatching_LimitedLevelWidth(
 	with torch.no_grad():
 		_tlog.info(
 			f"=== TreeMessagePatching_LimitedLevelWidth start === root={root!r} "
-			f"max_width={max_width} include_negative={include_negative}"
+			f"max_width={max_width} include_negative={include_negative} "
+			f"scoring={'joint' if joint_scoring else 'isolated'}"
 		)
 		frontier = [root]
 		depth = 0
@@ -359,11 +501,13 @@ def TreeMessagePatching_LimitedLevelWidth(
 			_emit(on_event, {"event": "depth_start", "depth": depth, "frontier_size": len(frontier)})
 			# Score every candidate extension of every leaf at this depth, then keep
 			# only the global top-`max_width` by |contribution|.
+			# Frozen once per depth, so every candidate at this depth sees the same context.
+			joint = _joint_scoring_context(root, frontier, metric) if joint_scoring else None
 			scored = []  # (rank_value, leaf, candidate)
 			for leaf_idx, leaf in enumerate(tqdm(frontier)):
 				suffix = get_path(leaf)
 				for candidate in leaf.get_expansion_candidates(model.cfg, include_head=True):
-					score = evaluate_path([candidate] + suffix, metric)
+					score = _score_candidate(candidate, leaf, suffix, root, metric, joint)
 					if include_negative or score >= 0:
 						rank_value = abs(score.item()) if include_negative else score.item()
 						# A zero isolated contribution means the patch has no effect at
@@ -406,6 +550,7 @@ def PathMessagePatching(
 	return_all: bool = False,
 	batch_positions: bool = False,
 	batch_heads: bool = False,
+	max_time: float = None,
 	on_event: Callable = None
 ) -> list[tuple[torch.Tensor, list[Node]]]:
 	"""
@@ -430,6 +575,8 @@ def PathMessagePatching(
 			If True, when expanding nodes, first evaluates attentions without considering position-wise contributions, only later, if the attention has been deemed meaningful, it will be evaluated at all possible key-value positions.
 		batch_heads (bool, default=False):
 			If True, when expanding nodes, first evaluates attentions without considering all heads at once, only later, if the attention as a whole has been deemed meaningful, it will evaluate all single heads.
+		max_time (float, optional):
+			Wall-clock budget in seconds. When exhausted the search returns the paths completed so far and sets `root.timed_out`. Checked at every depth and after every expanded leaf. Defaults to None (no limit).
 		on_event (Callable, optional):
 			Observer called with progress events (dicts): depth_start, leaf_done,
 			admit (a path continuation kept in the frontier) and path_complete
@@ -439,6 +586,7 @@ def PathMessagePatching(
 		sorted by contribution in descending order.
 	"""
 	with torch.no_grad():
+		deadline = _Deadline(max_time, root, "PathMessagePatching")
 		if root.position is None:
 			print("Warning: Starting node has no position defined. Batch positions will not be used.")
 			batch_positions = False
@@ -448,13 +596,17 @@ def PathMessagePatching(
 		completed_paths = []
 		depth = 0
 		while frontier:
+			if deadline.reached():
+				break
 			_emit(on_event, {"event": "depth_start", "depth": depth, "frontier_size": len(frontier)})
 			# Cur depth frontier contains a list of all the path continuations found in the current depth
 			# So all these paths have 1 more node than the paths in the frontier
 			cur_depth_frontier = []
 			# For each incomplete path in the frontier, find all valuable continuations
 			for leaf_idx, (_, incomplete_path) in enumerate(tqdm(frontier)):
-				
+				if deadline.reached():
+					break
+
 				cur_path_start = incomplete_path[0]
 				cur_path_continuations = []
 
@@ -565,9 +717,9 @@ def PathMessagePatching_BestFirstSearch(
 
 		frontier = [(0, [root])]
 		completed_paths = []
-		start_time = time.time()
+		deadline = _Deadline(max_time, root, "PathMessagePatching_BestFirstSearch")
 		pbar = tqdm(total=top_n, desc="Completed paths")
-		while frontier and (len(completed_paths) < top_n) and (time.time() - start_time < max_time):
+		while frontier and (len(completed_paths) < top_n) and not deadline.reached():
 			# ensure the bar reflects current number of completed paths
 			pbar.n = min(len(completed_paths), top_n)
 			pbar.refresh()
@@ -634,6 +786,7 @@ def PathMessagePatching_LimitedLevelWidth(
 	include_negative: bool = True,
 	batch_positions: bool = False,
 	batch_heads: bool = False,
+	max_time: float = None,
 	on_event: Callable = None
 ) -> list[tuple[torch.Tensor, list[Node]]]:
 	"""
@@ -661,11 +814,16 @@ def PathMessagePatching_LimitedLevelWidth(
 		batch_heads (bool, default=False): 
 			If True, attention contributions are evaluated for all heads at once, and
 			only the top candidates are later expanded into single heads.
+		max_time (float, optional):
+			Wall-clock budget in seconds. When exhausted the search returns the paths
+			completed so far and sets `root.timed_out`. Checked at every depth and
+			after every expanded leaf. Defaults to None (no limit).
 	Returns:
 		A list of tuples containing the contribution score and the corresponding path, 
 		sorted by contribution in descending order.
 	"""
 	with torch.no_grad():
+		deadline = _Deadline(max_time, root, "PathMessagePatching_LimitedLevelWidth")
 		if root.position is None and batch_positions:
 			print("Warning: Starting node has no position defined. Batch positions will be disabled.")
 			batch_positions = False
@@ -675,10 +833,14 @@ def PathMessagePatching_LimitedLevelWidth(
 		depth = 0
 
 		while frontier:
+			if deadline.reached():
+				break
 			_emit(on_event, {"event": "depth_start", "depth": depth, "frontier_size": len(frontier)})
 			current_depth_frontier = []
 
 			for leaf_idx, (_, path) in enumerate(tqdm(frontier, desc=f"Expanding level (size {len(frontier)})")):
+				if deadline.reached():
+					break
 				cur_path_start = path[0]
 				target_position = cur_path_start.position
 
@@ -778,7 +940,8 @@ def PathAttributionPatching(
 	min_contribution: float = 0.5,
 	include_negative: bool = True,
 	return_all: bool = False,
-	confirm_relevance: bool = False
+	confirm_relevance: bool = False,
+	max_time: float = None
 ) -> list[tuple[torch.Tensor, list[Node]]]:
 	"""
 	Performs a Breadth-First Search (BFS) starting from a node backwards to identify
@@ -804,15 +967,22 @@ def PathAttributionPatching(
 			If True, return all evaluated paths regardless of their contribution score. The search will still be guided by min_contribution threshold.
 		confirm_relevance (bool, default=False):
 			If True, after identifying a potentially relevant component based on the linear approximation, it will also evaluate the contribution of the full path including to confirm its relevance.
+		max_time (float, optional):
+			Wall-clock budget in seconds. When exhausted the search returns the paths completed so far and sets `root.timed_out`. Checked at every depth and after every expanded node. Defaults to None (no limit).
 	Returns:
 		A list of tuples containing the contribution score and the corresponding path, sorted by contribution in descending order.
 	"""
+	deadline = _Deadline(max_time, root, "PathAttributionPatching")
 	frontier = [root]
 	completed_paths = []
 	while frontier:
+		if deadline.reached():
+			break
 		cur_depth_frontier = []
 		# Expand all paths in the frontier looking for meaningful continuations
 		for node in tqdm(frontier):
+			if deadline.reached():
+				break
 
 			grad = node.calculate_gradient(use_precomputed=True)
 			with torch.no_grad():
@@ -925,11 +1095,11 @@ def PathAttributionPatching_BestFirstSearch(
 	heapq.heappush(frontier, (0, root))
 
 	completed_paths = []
-	start_time = time.time()
+	deadline = _Deadline(max_time, root, "PathAttributionPatching_BestFirstSearch")
 
 	# Best-first loop: pop highest-priority element, expand it, push children with priority
 	pbar = tqdm(total=top_n, desc="Completed paths")
-	while frontier and (time.time() - start_time) < max_time and (len(completed_paths) < top_n):
+	while frontier and not deadline.reached() and (len(completed_paths) < top_n):
 		# ensure the bar reflects current number of completed paths
 		pbar.n = min(len(completed_paths), top_n)
 		pbar.refresh()
@@ -958,7 +1128,10 @@ def PathAttributionPatching_BestFirstSearch(
 				candidate_contributions = torch.stack(msgs_list, dim=0)
 
 				approx_contributions = torch.einsum('xbsd,bsd->x', candidate_contributions, grad)
-				approx_contributions = approx_contributions.detach().cpu().numpy()
+				# .float() before .numpy(): numpy has no bfloat16, so a bf16 model (the only way
+				# an 8B fits a 24GB card) raises "Got unsupported ScalarType BFloat16" here.
+				# The values are only used to order the heap, so the upcast is free.
+				approx_contributions = approx_contributions.detach().cpu().float().numpy()
 				for i, candidate in enumerate(candidate_batch):
 					approx_contribution = approx_contributions[i]
 					if include_negative or approx_contribution > 0:
@@ -976,6 +1149,7 @@ def PathAttributionPatching_LimitedLevelWidth(
 	root: Node,
 	max_width: int = 2000,
 	include_negative: bool = True,
+	max_time: float = None,
 ) -> list[tuple[torch.Tensor, list[Node]]]:
 	"""
 	Performs a Breadth-First Search (BFS) starting from a node backwards to identify the most significant paths reaching it from an EMBED_Node. 
@@ -997,17 +1171,26 @@ def PathAttributionPatching_LimitedLevelWidth(
 			Note that to save computation the negatively contributing paths are discarded even if incomplete.
 		max_width (int, default=20000):
 			The maximum number of nodes to retain at each level of the search tree.
+		max_time (float, optional):
+			Wall-clock budget in seconds. When exhausted the search returns the paths
+			completed so far and sets `root.timed_out`. Checked at every depth and after
+			every expanded node. Defaults to None (no limit).
 	Returns:
 		A list of tuples containing the contribution score and the corresponding path, sorted by contribution in descending order.
 	"""
 
+	deadline = _Deadline(max_time, root, "PathAttributionPatching_LimitedLevelWidth")
 	frontier = [(0, root)]
 	completed_paths = []
 	previous_level_nodes = []
 	while frontier:
+		if deadline.reached():
+			break
 		cur_depth_frontier = []
 		# Expand all paths in the frontier looking for meaningful continuations
 		for _, node in tqdm(frontier):
+			if deadline.reached():
+				break
 
 			grad = node.calculate_gradient(use_precomputed=True)
 

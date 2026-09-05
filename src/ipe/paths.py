@@ -185,3 +185,75 @@ def clean_paths(paths: list[tuple[float, list]], inplace: bool = False) -> list[
 				c = c.item()  # convert tensor to float for serialization
 			cleaned.append((c, cleaned_path))
 	return cleaned
+
+@torch.no_grad()
+def tree_messages(root: Node) -> dict[int, torch.Tensor]:
+	"""
+	Computes the message emitted by every node of a tree, keyed by object identity.
+
+	Same recursion as :func:`get_tree_msg`, but every intermediate message is retained so that a
+	change confined to a single branch can be re-propagated (see :func:`evaluate_tree_branch`)
+	without re-evaluating the whole tree.
+
+	Args:
+		root (Node):
+			The root of the tree (e.g. a FINAL_Node) whose children point backwards towards the EMBED_Nodes.
+
+	Returns:
+		dict[int, torch.Tensor]:
+			A mapping from ``id(node)`` to the message that node emits to its parent.
+
+	Notes:
+		- Object identity is the key on purpose: :meth:`Node.__hash__` hashes by component identity,
+		  so the same head appearing in two different branches would otherwise collide.
+	"""
+	messages: dict[int, torch.Tensor] = {}
+
+	def walk(node: Node) -> torch.Tensor:
+		if not node.children:
+			message = node.forward(message=None)
+		else:
+			message = node.forward(message=sum(walk(child) for child in node.children))
+		messages[id(node)] = message
+		return message
+
+	walk(root)
+	return messages
+
+@torch.no_grad()
+def evaluate_tree_branch(root: Node, node: Node, message: torch.Tensor, metric: Callable[[torch.Tensor], float], messages: dict[int, torch.Tensor]) -> torch.Tensor:
+	"""
+	Evaluates the tree when `node` emits `message` instead of the message recorded for it in
+	`messages`, every other branch being held at its recorded value.
+
+	Only the `node` -> root chain is re-evaluated: a change under `node` cannot reach the root by any
+	other route, and the siblings it meets at each ancestor are unaffected. The cost is therefore
+	O(depth) rather than O(size of the tree), which is what makes joint scoring during the search
+	affordable.
+
+	Args:
+		root (Node):
+			The root of the tree the messages in `messages` were computed from.
+		node (Node):
+			The node whose emitted message is replaced. It must belong to that tree.
+		message (torch.Tensor):
+			The message `node` emits instead of its recorded one.
+		metric (Callable):
+			A function to evaluate the contribution of the tree. It must accept a single parameter, the output of the root when the tree is removed.
+		messages (dict[int, torch.Tensor]):
+			Messages of the unmodified tree, as returned by :func:`tree_messages`.
+
+	Returns:
+		torch.Tensor:
+			The contribution score of the modified tree as determined by the metric function.
+	"""
+	current = node
+	while current is not root:
+		parent = current.parent
+		incoming = message
+		for sibling in parent.children:
+			if sibling is not current:
+				incoming = incoming + messages[id(sibling)]
+		message = parent.forward(message=incoming)
+		current = parent
+	return metric(corrupted_resid=root.forward() - message)
