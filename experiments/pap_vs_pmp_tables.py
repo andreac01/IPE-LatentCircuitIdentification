@@ -13,6 +13,15 @@ import os
 
 import pandas as pd
 
+# The grid defines the experiment, so the tables report exactly the cells it defines -- no more.
+# Sweeps run under an older grid leave their records on disk; those cells are filtered out here
+# rather than deleted, so widening `pap_vs_pmp_grid` again brings them straight back. `max_time`
+# only lands in a cell's params, never in its run_id, so any value gives the same id set.
+from pap_vs_pmp_grid import build_grid
+
+GRID_RUN_IDS = {c["run_id"] for c in build_grid(0.0)}
+GRID_SIZE = len(GRID_RUN_IDS)
+
 COLUMNS = ["model", "modality", "positional", "strategy", "hyperparam",
            "faithfulness_all", "faithfulness_attention",
            "pct_nodes_retained", "pct_heads_retained", "pct_mlps_retained",
@@ -40,7 +49,12 @@ ROUNDING = {"faith_all": 3, "faith_attn": 3, "%nodes": 2, "%heads": 2, "%mlps": 
 
 
 def load_scores(out_dir: str) -> pd.DataFrame:
-    """Every scored run on disk, one row each. Unreadable files are skipped, not fatal."""
+    """Every scored run on disk that the current grid still defines, one row each.
+
+    Unreadable files are skipped, not fatal. Off-grid cells (a hyperparameter since dropped from
+    `pap_vs_pmp_grid`) are excluded so that every model is reported over the same cell list,
+    whatever it was run under.
+    """
     root = os.path.join(out_dir, "scores")
     if not os.path.isdir(root):
         return pd.DataFrame()
@@ -61,6 +75,9 @@ def load_scores(out_dir: str) -> pd.DataFrame:
         return pd.DataFrame()
 
     df = pd.DataFrame(rows)
+    df = df[df["run_id"].isin(GRID_RUN_IDS)]
+    if df.empty:
+        return pd.DataFrame()
     df["hyperparam"] = df["params"].apply(
         lambda p: next((f"{k}={v:g}" for k, v in (p or {}).items()
                         if k in ("min_contribution", "top_n", "max_width")), ""))
@@ -85,7 +102,19 @@ def build_table(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def modality_summary(t: pd.DataFrame) -> pd.DataFrame:
-    """One row per (model, positional, modality): what it achieves and what it costs."""
+    """One row per (model, positional, modality): what it achieves and what it costs.
+
+    Each row aggregates the block's 7 hyperparameter cells (`build_grid`: 2 max_widths,
+    2 top_ns, 3 thresholds). Read the columns as coming from *different* cells: `best_*` is a
+    max, `median_pct_nodes` a median, `mean_time_s` a mean -- no single search has all three.
+
+    `mean_time_s` rather than a median because the cells span three orders of magnitude and
+    the median lands on a different cell for each modality, which makes cross-modality
+    comparison meaningless. The mean is the sweep's average cell cost; it equals
+    `total_time_s / cells` and so only adds information where blocks have unequal cell counts
+    (a model with failed cells). Where `timed_out > 0` it is a floor: a truncated search
+    records exactly its budget, not what it would have taken.
+    """
     if t.empty:
         return t
     g = t.groupby(["model", "pos", "modality"], dropna=False)
@@ -94,7 +123,7 @@ def modality_summary(t: pd.DataFrame) -> pd.DataFrame:
                 best_faith_all=("faith_all", "max"),
                 best_faith_attn=("faith_attn", "max"),
                 median_pct_nodes=("%nodes", "median"),
-                median_time_s=("time_s", "median"),
+                mean_time_s=("time_s", "mean"),
                 total_time_s=("time_s", "sum"),
                 median_peak_mb=("peak_mb", "median")).reset_index()
     return out.sort_values(["model", "pos", "modality"])
@@ -123,13 +152,79 @@ def matched_size(t: pd.DataFrame) -> pd.DataFrame:
                             observed=True, aggfunc="first")
 
 
+def load_runs(out_dir: str) -> pd.DataFrame:
+    """Every *search* on disk, scored or not, one row each.
+
+    Deliberately separate from `load_scores`: a cell that searched fine but was never scored
+    (or whose search failed) still cost wall-clock time, and the grid total has to count it.
+    """
+    root = os.path.join(out_dir, "runs")
+    if not os.path.isdir(root):
+        return pd.DataFrame()
+    rows = []
+    for model_slug in sorted(os.listdir(root)):
+        d = os.path.join(root, model_slug)
+        if not os.path.isdir(d):
+            continue
+        for fname in sorted(os.listdir(d)):
+            # `_inflight.json` is the crash marker, not a result.
+            if not fname.endswith(".json") or fname.startswith("_"):
+                continue
+            try:
+                with open(os.path.join(d, fname)) as f:
+                    rows.append(json.load(f))
+            except (json.JSONDecodeError, OSError):
+                continue
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    df = df[df["run_id"].isin(GRID_RUN_IDS)]
+    if df.empty:
+        return pd.DataFrame()
+    df["positional"] = df["positional"].astype(bool)
+    df["pos"] = df["positional"].map({True: "pos", False: "nopos"})
+    # A crashed cell records seconds=None; it burned time we cannot attribute, so count it as 0
+    # and let the `error` column say how much of the grid the total is blind to.
+    df["seconds"] = pd.to_numeric(df.get("seconds"), errors="coerce").fillna(0.0)
+    df["timed_out"] = df.get("timed_out").fillna(False).astype(bool)
+    return df
+
+
+def grid_totals(out_dir: str, grid_size: int = GRID_SIZE) -> pd.DataFrame:
+    """Wall-clock cost of the sweep itself, per model, with an `all models` total row.
+
+    Counts searches only -- the eval phase is scored separately and is not part of discovery
+    cost. `budget_h` is the share of `hours` spent in searches that hit their time budget, i.e.
+    the part of the total that is a floor rather than a measurement.
+    """
+    df = load_runs(out_dir)
+    if df.empty:
+        return pd.DataFrame()
+
+    def block(d: pd.DataFrame, label: str) -> dict:
+        return {"model": label,
+                "cells_run": len(d), "of_grid": grid_size,
+                "ok": int((d["status"] == "ok").sum()),
+                "failed": int((d["status"] != "ok").sum()),
+                "timed_out": int(d["timed_out"].sum()),
+                "hours": d["seconds"].sum() / 3600.0,
+                "budget_h": d.loc[d["timed_out"], "seconds"].sum() / 3600.0}
+
+    rows = [block(d, m) for m, d in df.groupby("model", sort=True)]
+    total = block(df, "ALL MODELS")
+    total["of_grid"] = grid_size * df["model"].nunique()
+    rows.append(total)
+    return pd.DataFrame(rows)
+
+
 def all_tables(out_dir: str) -> dict[str, pd.DataFrame]:
     """Every table, from whatever is cached."""
     scores = load_scores(out_dir)
     table = build_table(scores)
     return {"table_full": table,
             "summary_modality": modality_summary(table),
-            "summary_matched_size": matched_size(table)}
+            "summary_matched_size": matched_size(table),
+            "grid_totals": grid_totals(out_dir)}
 
 
 def save_tables(tables: dict[str, pd.DataFrame], out_dir: str) -> list[str]:

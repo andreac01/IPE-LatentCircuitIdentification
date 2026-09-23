@@ -1,0 +1,4 @@
+circuit,|C|,greedy incompl,|K*|,K*
+ground truth,26,2.056818962097168,4,"a7.h3@end, a9.h7@end, a11.h2@end, a11.h10@end"
+path @ 0.05,18,3.546968936920166,4,"a0.h1@S2, a9.h6@end, a10.h7@end, a11.h2@end"
+tree @ 0.0847,29,7.888345718383789,6,"a3.h0@S2, a9.h4@end, a10.h7@end, a11.h2@end, a11.h6@end, a11.h10@end"

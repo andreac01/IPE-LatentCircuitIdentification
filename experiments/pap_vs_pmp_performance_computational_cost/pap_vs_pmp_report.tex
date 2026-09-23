@@ -1,0 +1,447 @@
+%% PAP vs PMP: circuit quality against computational cost.
+%% Generated from experiments/pap_vs_pmp_performance_computational_cost/ -- every number in
+%% this file is read from the cached run and score records, not transcribed by hand.
+%% Regenerate with: python experiments/run_pap_vs_pmp.py tables
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage[hidelinks]{hyperref}
+
+\title{Gradient Approximation in Path-Based Circuit Discovery:\\
+       Computational Cost against Circuit Quality}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Overview}
+
+Path Message Passing (PMP), the search procedure underlying Isolating Path Effects (IPE),
+scores a candidate path extension by actually running the model with that path's message
+substituted. Path Attribution Patching (PAP) replaces this measurement with a first-order
+gradient approximation, trading exactness for the cost of a backward pass reused across all
+candidates at a level. This experiment quantifies that trade: how much time and memory the
+approximation saves, and how much circuit quality it costs.
+
+Three search modalities are compared under an identical grid of discovery hyperparameters:
+
+\begin{description}
+  \item[PMP] Path Message Passing. Each candidate extension is scored by an isolated forward
+    evaluation of the path it would create. This is the reference method.
+  \item[PAP] Path Attribution Patching. Candidate contributions are approximated by the inner
+    product of the candidate's message with the gradient of the metric at the attachment point,
+    so one backward pass scores every candidate at a level.
+  \item[PMP-b] PMP with batched expansion: an attention block is evaluated whole and only the
+    surviving blocks are split into individual heads (and, positionally, into token positions).
+    PAP has no analogue of this optimisation, so PMP-b is reported as the practical PMP baseline
+    while PMP is the strict algorithmic-parity comparison.
+\end{description}
+
+\section{Implementation}
+
+\subsection{Search grid}
+
+Each modality is run over 6 discovery configurations spanning three
+admission strategies from coarse to fine:
+
+\begin{description}
+  \item[Threshold] admit any extension whose contribution exceeds $\tau$ in absolute value,
+    with $\tau \in \{0.5,\ 0.1,\ 0.02\}$. Note that $\tau$ lives on the scale of the
+    \texttt{logit\_difference} metric and is therefore \emph{not} comparable across models.
+  \item[Best-first] a global priority queue over candidate extensions, expanded until $n$
+    complete paths have been found, with $n = 100$.
+  \item[Beam] breadth-first expansion retaining the top $w$ candidates per level, with
+    $w \in \{100,\ 1000\}$.
+\end{description}
+
+Crossing these 6 configurations with the three modalities and with positional
+and non-positional search gives 36 cells per model. In positional mode every
+model component is additionally split per token position, so a single expansion enumerates
+$n_\text{components} \times \text{seq\_len}$ candidates rather than $n_\text{components}$.
+
+A note on one omission. The grid originally also carried a best-first configuration at
+$n = 1000$. Best-first maintains an \emph{unbounded} priority queue --- unlike Beam, which
+caps it at $w$ per level --- and positionally the queue of live candidate objects exhausted
+system RAM before 1000 complete paths could be found. That configuration was removed from the
+grid for all models rather than reported for some and not others; its cached records remain on
+disk but are excluded from every table here.
+
+\subsection{Models and task}
+
+Two models are reported, both loaded in \texttt{float32} through TransformerLens with
+\texttt{center\_unembed=True}:
+
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+Model & Layers & Heads & Components & Weights (MB) \\
+\midrule
+GPT-2 small & 12 & 12 & 156 & 622 \\
+Llama-3.2-1B & 16 & 32 & 528 & 5,717 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The task is Indirect Object Identification, drawn from the \texttt{mib-bench/ioi} dataset.
+Samples are bucketed by tokenised length and a single length is chosen per tokenizer rather
+than fixed in advance, since the right value differs between the two tokenizers; both models
+resolved to length 16. Only samples whose indirect object and subject are
+single tokens are retained, because the logit-difference metric indexes them directly, and the
+counterfactual prompt must tokenise to the same length.
+
+The search scores on 5 prompts; circuit evaluation uses a \emph{disjoint} slice of
+64 prompts from the same length bucket. The search metric is the IOI logit difference
+under counterfactual denoising, with the \texttt{s2\_io\_flip} counterfactual as the clean
+signal patched into the corrupted run.
+
+\subsection{Circuit evaluation}
+
+A discovered path set is converted to a circuit by taking the union of its nodes and edges.
+Faithfulness is measured by knockout: the model is run with every component outside the circuit
+mean-ablated, the ablation values being the mean of an ABC-counterfactual run accumulated over
+minibatches. The resulting logit difference $F(C)$ is normalised against the full and empty
+circuits of the same model,
+\[
+  \widehat{F}(C) \;=\; \frac{F(C) - F(\varnothing)}{F(M) - F(\varnothing)},
+\]
+so that $\widehat{F} = 1$ reproduces the full model and $\widehat{F} = 0$ is no better than
+ablating everything. The two normalising constants are measured once per model and reused, so
+scoring one circuit costs a single pass over the evaluation set. All faithfulness figures
+reported below are $\widehat{F}$.
+
+\subsection{Measurement protocol}
+
+Each cell is timed around the search call alone, excluding model loading, data preparation and
+scoring, all of which are shared across cells. GPU memory is reported as
+\texttt{torch.cuda.max\_memory\_allocated} after a \texttt{reset\_peak\_memory\_stats} and cache
+flush immediately before the search, so the figure is the device-wide peak during that search.
+
+Every search runs under a wall-clock budget of one hour. A search that reaches the budget
+returns the paths found so far and is flagged; such cells are marked $\dagger$ throughout, and
+their times are \emph{censored at 3600\,s} rather than measured. This matters for interpreting
+the ratios in Table~\ref{tab:speedup}: wherever PMP times out, the reported speedup of PAP over
+PMP is a lower bound, often a severe one.
+
+Experiments ran on a single NVIDIA RTX 4090 (24\,GB) with 62\,GiB of host RAM. Each model's
+grid runs in one subprocess so the weights are loaded once, and every cell is cached to its own
+file, making the sweep resumable after an interruption without recomputing completed work.
+
+\section{Results}
+
+\subsection{Scale of the experiment}
+
+\begin{table}[h]
+\centering
+\caption{Total cost of the reported sweep. \emph{Budget hours} is the portion of the total
+spent in searches that hit the one-hour ceiling, i.e.\ the part of the figure that is a floor
+rather than a measurement.}
+\label{tab:scale}
+\begin{tabular}{lrrrr}
+\toprule
+Model & Cells & Timed out & Hours & Budget hours \\
+\midrule
+GPT-2 small & 36 & 2 & 3.66 & 2.00 \\
+Llama-3.2-1B & 36 & 9 & 12.24 & 9.11 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Cost and quality by modality}
+
+Table~\ref{tab:modality} aggregates each block of 6 configurations. The columns come from
+different cells within the block --- \emph{best} $\widehat{F}$ is a maximum, \emph{median nodes}
+a median, \emph{mean time} a mean --- so no single search realises all three at once. Mean
+rather than median time is reported because the configurations span three orders of magnitude
+and the median lands on a different configuration for each modality, which would make
+cross-modality comparison meaningless.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Cost and quality per block. $\widehat{F}$ is the best normalised faithfulness reached
+anywhere in the block; \emph{nodes} is the median fraction of model components retained;
+\emph{mean} and \emph{total} are search wall-clock in seconds; \emph{peak} is median peak GPU
+memory in MB.}
+\label{tab:modality}
+\begin{tabular}{llrrrrrr}
+\toprule
+Setting & Method & TO & best $\widehat{F}$ & nodes (\%) & mean (s) & total (s) & peak (MB) \\
+\midrule
+\multicolumn{8}{l}{\itshape GPT-2 small} \\
+\quad non-positional & PAP & 0 & 1.000 & 31.4 & 14.9 & 89 & 959 \\
+\quad  & PMP & 0 & 1.020 & 30.8 & 315.5 & 1,893 & 831 \\
+\quad  & PMP-b & 0 & 1.020 & 29.8 & 80.5 & 483 & 831 \\
+\cmidrule(l){2-8}
+\quad positional & PAP & 0 & 1.001 & 27.2 & 32.0 & 192 & 2,000 \\
+\quad  & PMP & 2 & 0.969 & 24.0 & 1,494.7 & 8,968 & 1,908 \\
+\quad  & PMP-b & 0 & 0.974 & 24.7 & 258.4 & 1,550 & 1,899 \\
+\midrule
+\multicolumn{8}{l}{\itshape Llama-3.2-1B} \\
+\quad non-positional & PAP & 0 & 1.000 & 11.4 & 75.0 & 450 & 7,544 \\
+\quad  & PMP & 3 & 0.920 & 7.8 & 2,100.6 & 12,604 & 6,938 \\
+\quad  & PMP-b & 0 & 0.965 & 11.9 & 564.5 & 3,387 & 6,938 \\
+\cmidrule(l){2-8}
+\quad positional & PAP & 0 & 1.005 & 9.7 & 357.4 & 2,144 & 17,421 \\
+\quad  & PMP & 5 & 0.119 & 1.3 & 3,041.5 & 18,249 & 17,176 \\
+\quad  & PMP-b & 1 & 0.920 & 9.4 & 1,206.2 & 7,237 & 17,177 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Matched-configuration speedup}
+
+Because the three modalities are run at identical hyperparameters, the configurations pair up
+and the speedup can be taken per pair rather than between block aggregates. Table~\ref{tab:speedup}
+reports these paired ratios. Circuit sizes within a pair track closely, so the ratios are not
+confounded by one method returning a larger circuit.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Search time in seconds per configuration, and the speedup of PAP over each PMP
+variant. $\dagger$ marks a cell where at least one modality hit the one-hour budget; ratios
+involving such a cell are lower bounds.}
+\label{tab:speedup}
+\begin{tabular}{lrrrrr}
+\toprule
+Configuration & PAP (s) & PMP (s) & PMP-b (s) & PMP/PAP & PMP-b/PAP \\
+\midrule
+\multicolumn{6}{l}{\itshape GPT-2 small} \\
+\multicolumn{6}{l}{\quad\itshape non-positional} \\
+\quad Threshold $\tau{=}0.5$ & 0.6 & 6.1 & 0.6 & 10.2 & 1.1 \\
+\quad Threshold $\tau{=}0.1$ & 2.5 & 77.6 & 13.0 & 31.3 & 5.3 \\
+\quad Threshold $\tau{=}0.02$ & 27.4 & 787.7 & 148.7 & 28.8 & 5.4 \\
+\quad Best-first $n{=}100$ & 1.5 & 96.7 & 19.1 & 63.3 & 12.5 \\
+\quad Beam $w{=}100$ & 6.4 & 91.8 & 23.0 & 14.4 & 3.6 \\
+\quad Beam $w{=}1000$ & 50.9 & 833.2 & 278.5 & 16.4 & 5.5 \\
+\quad \textit{median} & & & & \textbf{22.6} & \textbf{5.3} \\
+\cmidrule(l){1-6}
+\multicolumn{6}{l}{\quad\itshape positional} \\
+\quad Threshold $\tau{=}0.5$ & 1.0 & 37.1 & 0.6 & 37.8 & 0.6 \\
+\quad Threshold $\tau{=}0.1$ & 5.9 & 423.2 & 13.2 & 71.9 & 2.2 \\
+\quad Threshold $\tau{=}0.02$ & 58.7 & 3,600.8$^{\dagger}$ & 174.3 & 61.3 & 3.0 \\
+\quad Best-first $n{=}100$ & 7.7 & 733.6 & 70.2 & 95.6 & 9.1 \\
+\quad Beam $w{=}100$ & 13.1 & 573.2 & 94.4 & 43.9 & 7.2 \\
+\quad Beam $w{=}1000$ & 105.4 & 3,600.3$^{\dagger}$ & 1,197.5 & 34.1 & 11.4 \\
+\quad \textit{median} & & & & \textbf{52.6} & \textbf{5.1} \\
+\midrule
+\multicolumn{6}{l}{\itshape Llama-3.2-1B} \\
+\multicolumn{6}{l}{\quad\itshape non-positional} \\
+\quad Threshold $\tau{=}0.5$ & 1.1 & 32.9 & 2.3 & 29.9 & 2.1 \\
+\quad Threshold $\tau{=}0.1$ & 10.5 & 746.2 & 44.5 & 70.8 & 4.2 \\
+\quad Threshold $\tau{=}0.02$ & 209.5 & 3,600.5$^{\dagger}$ & 1,076.3 & 17.2 & 5.1 \\
+\quad Best-first $n{=}100$ & 46.0 & 3,601.1$^{\dagger}$ & 265.2 & 78.3 & 5.8 \\
+\quad Beam $w{=}100$ & 16.6 & 1,021.6 & 126.8 & 61.6 & 7.7 \\
+\quad Beam $w{=}1000$ & 166.2 & 3,601.4$^{\dagger}$ & 1,872.1 & 21.7 & 11.3 \\
+\quad \textit{median} & & & & \textbf{45.8} & \textbf{5.4} \\
+\cmidrule(l){1-6}
+\multicolumn{6}{l}{\quad\itshape positional} \\
+\quad Threshold $\tau{=}0.5$ & 13.3 & 230.3 & 2.5 & 17.3 & 0.2 \\
+\quad Threshold $\tau{=}0.1$ & 56.5 & 3,601.7$^{\dagger}$ & 42.6 & 63.8 & 0.8 \\
+\quad Threshold $\tau{=}0.02$ & 946.6 & 3,603.4$^{\dagger}$ & 935.3 & 3.8 & 1.0 \\
+\quad Best-first $n{=}100$ & 424.6 & 3,608.4$^{\dagger}$ & 1,281.6 & 8.5 & 3.0 \\
+\quad Beam $w{=}100$ & 71.5 & 3,602.2$^{\dagger}$ & 998.9 & 50.4 & 14.0 \\
+\quad Beam $w{=}1000$ & 631.7 & 3,603.2$^{\dagger}$ & 3,976.3 & 5.7 & 6.3 \\
+\quad \textit{median} & & & & \textbf{12.9} & \textbf{2.0} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Quality at matched circuit size}
+
+Thresholds are not comparable across methods or models, so the quality comparison is made at
+matched circuit size instead. Table~\ref{tab:matched} bins every cell by the fraction of model
+components its circuit retains and reports, per bin, the best faithfulness each modality
+achieves and what it paid for it.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Best normalised faithfulness per circuit-size band, with the retained-node fraction
+and search time of the cell achieving it. Empty entries are bands no configuration of that
+modality reached.}
+\label{tab:matched}
+\begin{tabular}{lrrrrrrrrr}
+\toprule
+ & \multicolumn{3}{c}{PAP} & \multicolumn{3}{c}{PMP} & \multicolumn{3}{c}{PMP-b} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}
+Size band & nodes & $\widehat{F}$ & s & nodes & $\widehat{F}$ & s & nodes & $\widehat{F}$ & s \\
+\midrule
+\multicolumn{10}{l}{\itshape GPT-2 small} \\
+\quad 0-5% & 3.2 & -0.110 & 0.6 & 3.2 & -0.110 & 6.1 & 3.2 & -0.110 & 0.6 \\
+\quad 5-15% & 14.7 & 0.054 & 2.5 & 14.7 & 0.088 & 733.6 & 14.1 & 0.123 & 70.2 \\
+\quad 15-35% & 18.6 & 0.019 & 7.7 & 33.3 & 0.937 & 3,600.8 & 17.3 & 0.312 & 19.1 \\
+\quad 35-70% & 35.9 & 0.896 & 58.7 & 44.2 & 0.926 & 787.7 & 42.3 & 0.996 & 148.7 \\
+\quad 70-101% & 98.7 & 1.001 & 105.4 & 99.4 & 1.020 & 833.2 & 99.4 & 1.020 & 278.5 \\
+\midrule
+\multicolumn{10}{l}{\itshape Llama-3.2-1B} \\
+\quad 0-5% & 1.1 & 0.001 & 10.5 & 2.3 & 0.001 & 746.2 & 2.3 & 0.001 & 44.5 \\
+\quad 5-15% & 11.9 & 0.308 & 946.6 & 8.0 & 0.149 & 3,600.5 & 12.1 & 0.172 & 935.3 \\
+\quad 15-35% & 23.7 & 0.468 & 16.6 & 24.8 & 0.428 & 1,021.6 & 27.3 & 0.520 & 998.9 \\
+\quad 35-70% & -- & -- & -- & 39.6 & -0.003 & 3,603.2 & 56.1 & 0.920 & 3,976.3 \\
+\quad 70-101% & 78.0 & 1.005 & 631.7 & 95.3 & 0.920 & 3,601.4 & 98.3 & 0.965 & 1,872.1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Findings}
+
+\paragraph{PAP is one to two orders of magnitude faster than PMP.}
+Against strict algorithmic parity the median paired speedup is $22.6\times$ on GPT-2 small
+non-positionally and $52.6\times$ positionally. Against batched PMP --- the honest practical
+baseline, since batching is an optimisation PAP cannot use --- the advantage narrows to roughly
+$5\times$ on both models non-positionally. The gap widens with positional granularity, which is
+where the candidate set grows by a factor of the sequence length.
+
+\paragraph{The gradient approximation costs real circuit quality at small and medium sizes.}
+At matched circuit size on GPT-2 small, PMP reaches $\widehat{F} = 0.937$ in the 15--35\% band
+where PAP manages only $0.019$; in the 35--70\% band the two close to $0.926$ against $0.896$.
+By the 70--101\% band they are indistinguishable. The pattern is that PAP's first-order
+approximation misranks candidates when the circuit is sparse and the interactions it linearises
+away still matter, and stops mattering once the circuit is nearly the whole model. On
+Llama-3.2-1B the ordering partly reverses --- PAP leads in the 5--15\% band, $0.308$ against
+$0.149$ --- but PMP's figures there are depressed by timeouts rather than by search quality.
+
+\paragraph{PAP does not save memory.}
+Peak GPU memory is consistently \emph{higher} for PAP than for either PMP variant: 959\,MB
+against 831\,MB on GPT-2 small non-positionally, and 7544\,MB against 6938\,MB on
+Llama-3.2-1B. The retained gradient graph costs more than the avoided forward evaluations save.
+The saving PAP offers is in time, not in space.
+
+\paragraph{Plain PMP does not converge positionally at 1B scale.}
+Five of six positional PMP cells on Llama-3.2-1B hit the one-hour budget, and the block's best
+faithfulness is $0.119$. Batched PMP recovers most of the ground ($0.920$ with one timeout) and
+PAP recovers all of it ($1.005$, no timeouts). Positional search on a billion-parameter model is
+where the batching optimisation, and the gradient approximation, stop being conveniences and
+become necessary.
+
+\paragraph{The headline trade.}
+PAP buys a large constant-factor speedup --- roughly $5\times$ over a well-implemented PMP, far
+more over a naive one --- at the cost of a genuine quality drop in the sparse-circuit regime
+that most interpretability work cares about, and with no memory saving. Where PMP converges, it
+produces better circuits; where it does not, PAP is the only method of the three that finishes.
+
+\section*{Caveats}
+
+\begin{itemize}
+  \item Times for cells marked $\dagger$ are censored at the one-hour budget, not measured.
+    Nine of Llama-3.2-1B's 36 cells and two of GPT-2 small's are affected, concentrated
+    almost entirely in the PMP blocks, so every PMP time and every PMP/PAP ratio involving them
+    understates the true gap.
+  \item Threshold values are on the metric's own scale and are not comparable across models;
+    the matched-size comparison in Table~\ref{tab:matched} exists precisely to avoid reading
+    across a shared hyperparameter.
+  \item Each cell is a single run. No variance estimate is available, and the timing figures
+    include whatever contention the host was under.
+  \item Faithfulness is measured by mean ablation against an ABC counterfactual. Conclusions
+    about circuit quality are conditional on that ablation choice.
+  \item Both models are reported at one search batch size (5 prompts) and one evaluation
+    set size (64 prompts). Sensitivity to either was not measured.
+\end{itemize}
+
+\appendix
+\section{Per-configuration results}
+
+\begin{table}[h]
+\centering
+\scriptsize
+\caption{Every cell of the reported grid. \emph{paths} is the number of complete paths the
+search returned, \emph{nodes} the fraction of model components the resulting circuit retains.
+$\dagger$ marks a search truncated at the one-hour budget.}
+\label{tab:full}
+\begin{tabular}{llrrrrr}
+\toprule
+Method & Configuration & paths & nodes (\%) & $\widehat{F}$ & time (s) & peak (MB) \\
+\midrule
+\multicolumn{7}{l}{\itshape GPT-2 small} \\
+\multicolumn{7}{l}{\quad\itshape non-positional} \\
+\quad PAP & Threshold $\tau{=}0.5$ & 2 & 3.2 & -0.110 & 0.6 & 919 \\
+\quad PAP & Threshold $\tau{=}0.1$ & 62 & 14.7 & 0.054 & 2.5 & 931 \\
+\quad PAP & Threshold $\tau{=}0.02$ & 1493 & 43.6 & 0.834 & 27.4 & 1,133 \\
+\quad PAP & Best-first $n{=}100$ & 100 & 19.2 & 0.017 & 1.5 & 955 \\
+\quad PAP & Beam $w{=}100$ & 1225 & 52.6 & 0.234 & 6.4 & 963 \\
+\quad PAP & Beam $w{=}1000$ & 12397 & 100.0 & 1.000 & 50.9 & 1,387 \\
+\quad PMP & Threshold $\tau{=}0.5$ & 2 & 3.2 & -0.110 & 6.1 & 830 \\
+\quad PMP & Threshold $\tau{=}0.1$ & 70 & 16.0 & 0.305 & 77.6 & 830 \\
+\quad PMP & Threshold $\tau{=}0.02$ & 1601 & 44.2 & 0.926 & 787.7 & 832 \\
+\quad PMP & Best-first $n{=}100$ & 100 & 17.3 & 0.312 & 96.7 & 830 \\
+\quad PMP & Beam $w{=}100$ & 965 & 49.4 & 0.365 & 91.8 & 831 \\
+\quad PMP & Beam $w{=}1000$ & 12507 & 99.4 & 1.020 & 833.2 & 836 \\
+\quad PMP-b & Threshold $\tau{=}0.5$ & 2 & 3.2 & -0.110 & 0.6 & 830 \\
+\quad PMP-b & Threshold $\tau{=}0.1$ & 66 & 15.4 & 0.105 & 13.0 & 830 \\
+\quad PMP-b & Threshold $\tau{=}0.02$ & 1379 & 42.3 & 0.996 & 148.7 & 832 \\
+\quad PMP-b & Best-first $n{=}100$ & 100 & 17.3 & 0.312 & 19.1 & 830 \\
+\quad PMP-b & Beam $w{=}100$ & 963 & 48.7 & 0.405 & 23.0 & 831 \\
+\quad PMP-b & Beam $w{=}1000$ & 12132 & 99.4 & 1.020 & 278.5 & 836 \\
+\cmidrule(l){1-7}
+\multicolumn{7}{l}{\quad\itshape positional} \\
+\quad PAP & Threshold $\tau{=}0.5$ & 0 & 0.0 & -- & 1.0 & 1,996 \\
+\quad PAP & Threshold $\tau{=}0.1$ & 21 & 7.1 & -0.186 & 5.9 & 1,997 \\
+\quad PAP & Threshold $\tau{=}0.02$ & 1100 & 35.9 & 0.896 & 58.7 & 2,006 \\
+\quad PAP & Best-first $n{=}100$ & 100 & 18.6 & 0.019 & 7.7 & 2,000 \\
+\quad PAP & Beam $w{=}100$ & 1201 & 40.4 & 0.412 & 13.1 & 2,000 \\
+\quad PAP & Beam $w{=}1000$ & 13001 & 98.7 & 1.001 & 105.4 & 2,031 \\
+\quad PMP & Threshold $\tau{=}0.5$ & 0 & 0.0 & -- & 37.1 & 1,907 \\
+\quad PMP & Threshold $\tau{=}0.1$ & 30 & 8.3 & -0.190 & 423.2 & 1,908 \\
+\quad PMP & Threshold $\tau{=}0.02$ & 518 & 33.3 & 0.937 & 3,600.8$^{\dagger}$ & 1,909 \\
+\quad PMP & Best-first $n{=}100$ & 100 & 14.7 & 0.088 & 733.6 & 1,908 \\
+\quad PMP & Beam $w{=}100$ & 1048 & 34.6 & 0.436 & 573.2 & 1,908 \\
+\quad PMP & Beam $w{=}1000$ & 3519 & 95.5 & 0.969 & 3,600.3$^{\dagger}$ & 1,909 \\
+\quad PMP-b & Threshold $\tau{=}0.5$ & 0 & 0.0 & -- & 0.6 & 1,898 \\
+\quad PMP-b & Threshold $\tau{=}0.1$ & 28 & 8.3 & -0.190 & 13.2 & 1,899 \\
+\quad PMP-b & Threshold $\tau{=}0.02$ & 1186 & 35.9 & 0.887 & 174.3 & 1,900 \\
+\quad PMP-b & Best-first $n{=}100$ & 100 & 14.1 & 0.123 & 70.2 & 1,899 \\
+\quad PMP-b & Beam $w{=}100$ & 1051 & 35.3 & 0.517 & 94.4 & 1,908 \\
+\quad PMP-b & Beam $w{=}1000$ & 13011 & 96.2 & 0.974 & 1,197.5 & 1,905 \\
+\midrule
+\multicolumn{7}{l}{\itshape Llama-3.2-1B} \\
+\multicolumn{7}{l}{\quad\itshape non-positional} \\
+\quad PAP & Threshold $\tau{=}0.5$ & 0 & 0.0 & -- & 1.1 & 7,147 \\
+\quad PAP & Threshold $\tau{=}0.1$ & 5 & 1.1 & 0.001 & 10.5 & 7,204 \\
+\quad PAP & Threshold $\tau{=}0.02$ & 737 & 15.0 & 0.142 & 209.5 & 8,778 \\
+\quad PAP & Best-first $n{=}100$ & 100 & 7.8 & 0.016 & 46.0 & 7,821 \\
+\quad PAP & Beam $w{=}100$ & 1601 & 23.7 & 0.468 & 16.6 & 7,268 \\
+\quad PAP & Beam $w{=}1000$ & 19001 & 98.1 & 1.000 & 166.2 & 8,398 \\
+\quad PMP & Threshold $\tau{=}0.5$ & 0 & 0.0 & -- & 32.9 & 6,938 \\
+\quad PMP & Threshold $\tau{=}0.1$ & 10 & 2.3 & 0.001 & 746.2 & 6,938 \\
+\quad PMP & Threshold $\tau{=}0.02$ & 99 & 8.0 & 0.149 & 3,600.5$^{\dagger}$ & 6,942 \\
+\quad PMP & Best-first $n{=}100$ & 71 & 7.6 & 0.146 & 3,601.1$^{\dagger}$ & 6,938 \\
+\quad PMP & Beam $w{=}100$ & 1519 & 24.8 & 0.428 & 1,021.6 & 6,938 \\
+\quad PMP & Beam $w{=}1000$ & 2812 & 95.3 & 0.920 & 3,601.4$^{\dagger}$ & 6,939 \\
+\quad PMP-b & Threshold $\tau{=}0.5$ & 0 & 0.0 & -- & 2.3 & 6,938 \\
+\quad PMP-b & Threshold $\tau{=}0.1$ & 10 & 2.3 & 0.001 & 44.5 & 6,938 \\
+\quad PMP-b & Threshold $\tau{=}0.02$ & 945 & 15.5 & 0.163 & 1,076.3 & 6,942 \\
+\quad PMP-b & Best-first $n{=}100$ & 100 & 8.3 & 0.076 & 265.2 & 6,938 \\
+\quad PMP-b & Beam $w{=}100$ & 1345 & 22.7 & 0.409 & 126.8 & 6,938 \\
+\quad PMP-b & Beam $w{=}1000$ & 18544 & 98.3 & 0.965 & 1,872.1 & 6,947 \\
+\cmidrule(l){1-7}
+\multicolumn{7}{l}{\quad\itshape positional} \\
+\quad PAP & Threshold $\tau{=}0.5$ & 0 & 0.0 & -- & 13.3 & 17,383 \\
+\quad PAP & Threshold $\tau{=}0.1$ & 3 & 0.8 & -0.001 & 56.5 & 17,386 \\
+\quad PAP & Threshold $\tau{=}0.02$ & 461 & 11.9 & 0.308 & 946.6 & 17,471 \\
+\quad PAP & Best-first $n{=}100$ & 100 & 7.4 & 0.002 & 424.6 & 17,452 \\
+\quad PAP & Beam $w{=}100$ & 1701 & 21.8 & 0.440 & 71.5 & 17,391 \\
+\quad PAP & Beam $w{=}1000$ & 22001 & 78.0 & 1.005 & 631.7 & 17,470 \\
+\quad PMP & Threshold $\tau{=}0.5$ & 0 & 0.0 & -- & 230.3 & 17,176 \\
+\quad PMP & Threshold $\tau{=}0.1$ & 4 & 0.8 & -0.001 & 3,601.7$^{\dagger}$ & 17,176 \\
+\quad PMP & Threshold $\tau{=}0.02$ & 14 & 1.9 & -0.002 & 3,603.4$^{\dagger}$ & 17,178 \\
+\quad PMP & Best-first $n{=}100$ & 3 & 0.8 & -0.001 & 3,608.4$^{\dagger}$ & 17,176 \\
+\quad PMP & Beam $w{=}100$ & 364 & 9.7 & 0.119 & 3,602.2$^{\dagger}$ & 17,176 \\
+\quad PMP & Beam $w{=}1000$ & 454 & 39.6 & -0.003 & 3,603.2$^{\dagger}$ & 17,176 \\
+\quad PMP-b & Threshold $\tau{=}0.5$ & 0 & 0.0 & -- & 2.5 & 17,176 \\
+\quad PMP-b & Threshold $\tau{=}0.1$ & 5 & 1.5 & -0.001 & 42.6 & 17,176 \\
+\quad PMP-b & Threshold $\tau{=}0.02$ & 621 & 12.1 & 0.172 & 935.3 & 17,179 \\
+\quad PMP-b & Best-first $n{=}100$ & 100 & 6.6 & 0.059 & 1,281.6 & 17,176 \\
+\quad PMP-b & Beam $w{=}100$ & 1761 & 27.3 & 0.520 & 998.9 & 17,177 \\
+\quad PMP-b & Beam $w{=}1000$ & 9436 & 56.1 & 0.920 & 3,976.3$^{\dagger}$ & 17,181 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

@@ -1,11 +1,27 @@
 # The Tree Extension of IPE
 
 This document is the reference description of the tree-based circuit search
-(`TreeMessagePatching`): the formalism it operates in, the two scoring rules it supports, the
-properties each one has, and how the resulting circuits are evaluated. It is written to be read on
-its own; the accompanying code is `src/ipe/paths.py`, `src/ipe/graph_search.py`, the comparison
-driver `experiments/tree_vs_path.py`, and the evaluation notebook
-`experiments/faithfulness_completeness.ipynb`.
+(`TreeMessagePatching`): why the extension exists, the formalism it operates in, the two scoring
+rules it supports, the properties each one has, and how the resulting circuits are evaluated. It is
+written to be read on its own and is the source material for the tree-extension chapter.
+
+Code: `src/ipe/paths.py`, `src/ipe/graph_search.py`, the comparison driver
+`experiments/tree_vs_path.py`, the evaluation notebook
+`experiments/faithfulness_completeness_v2.ipynb`, and the interactive demo under `visualization/`.
+
+> **A note on units.** Two evaluation conventions appear in this document and they are *not*
+> interchangeable.
+>
+> * **v2 / Wang parity** (Sections 5–6, all figures) — positional `(head, position)` circuits, MLPs
+>   never ablated, raw logit differences with no normalisation. This is the protocol of Wang et al.
+>   (2023), verified against their code, and it is what the results chapter reports.
+> * **v1 / strict knockout** (Sections 4.4–4.5) — non-positional component circuits with *everything*
+>   outside the circuit ablated, MLPs included, scores normalised so `1.0` is the full model and
+>   `0.0` the empty circuit. This is the convention MIB's CPR/CMD uses, and it is the convention the
+>   joint-scoring diagnosis was measured in.
+>
+> Every number below is tagged with the convention that produced it. Numbers from the two are never
+> compared directly.
 
 Appendix A records the development history, including two design decisions that were later found to
 be wrong and the corrections that replaced them.
@@ -14,19 +30,71 @@ be wrong and the corrections that replaced them.
 
 ## 1. Motivation
 
-`PathMessagePatching` returns a circuit as a *set of independent root-to-embedding paths*
-`[EMBED, …, FINAL]`, each scored by its own isolated effect. Many of those paths share long suffixes
-toward the root — hundreds may end in `… → A9H9 → FINAL` — and the path search re-derives each such
-suffix from scratch. Two questions follow:
+### 1.1 A set of paths cannot represent self-repair
 
-1. **Representation.** Can the search grow a *single tree rooted at FINAL* that shares those suffixes,
-   turning a redundant path set into a trie with one explicit parent per node?
+`PathMessagePatching` returns a circuit as a *set of independent root-to-embedding paths*
+`[EMBED, …, FINAL]`, each scored by its own isolated effect. That representation has a structural
+limit, and it is the reason for this extension.
+
+In the message formalism of Section 2, a node plays one of two roles: a **leaf** is *being ablated*
+and its message is frozen, while an **internal** node is *reacting* — its message is how its own
+output changes when its children's contributions are removed from its input. Compensation between
+components is therefore carried **only by internal nodes**.
+
+In a set of root-to-output paths every component of interest is a leaf on its own path. Such a
+structure can say "A matters" and "B matters", but it cannot express *"A's effect, as modified by
+B"*, because that requires B to sit **above** A on a shared branch. A trie can express it; a path set
+cannot.
+
+This is not hypothetical. Section 4.6 measures it directly on the IOI name movers and their backups
+(gpt2-small, v1 conventions, `logit_difference`, counterfactual denoising):
+
+| topology | `𝔽` |
+|---|---|
+| name movers `A` as direct children of FINAL (flat, the path-set view) | +9.526 |
+| `A` direct **plus** `FINAL ← backup_i ← A` for all 14 layer-legal routing edges | **+6.993** |
+| **difference** | **−2.533 (−27%)** |
+
+Accounting for the fact that removing the name movers *changes what the backups output* cancels 27%
+of the damage. That is self-repair, measured inside the formalism — and it is invisible to a flat
+topology, where the same two sets are additive to within 0.4%.
+
+Self-repair is not a curiosity. It is exactly the phenomenon **completeness** is defined around
+(Section 5.2): a circuit is incomplete when components *outside* it compensate for removals from it.
+A representation that cannot express compensation cannot be diagnosed for it.
+
+### 1.2 Why a trie, specifically
+
+Given that the circuit should be a graph, the trie is the cheapest graph that solves the problem.
+Many of the path search's paths share long suffixes toward the root — hundreds may end in
+`… → A9H9 → FINAL` — and the path search re-derives each such suffix from scratch. Growing a single
+tree rooted at FINAL shares those suffixes, gives every node one explicit parent, and makes the
+per-candidate scoring cost `O(depth)` rather than `O(|T|)` (Section 3.8).
+
+It also removes a practical failure mode of the path search: a path only enters the output if it
+**reaches the embeddings**. Frontier nodes that never complete a path are discarded. At a high
+threshold this means the path search returns *nothing at all* while the tree still returns a usable
+circuit — measured in Section 6.4.
+
+### 1.3 Why this makes the method comparable to the literature
+
+ACDC (Conmy et al., 2023) and the MIB benchmark both operate on and evaluate **edge-level** circuits.
+A set of independent root-to-output paths is not directly comparable to either. A trie is a graph
+with named parents, so it converts to the same object those methods produce, which is what makes the
+side-by-side comparison of Section 7 possible at all.
+
+### 1.4 Two separable questions
+
+The extension raises two questions, and the implementation deliberately keeps them separate:
+
+1. **Representation.** Can the search grow a single tree rooted at FINAL that shares suffixes, turning
+   a redundant path set into a trie with one explicit parent per node?
 2. **Objective.** Once a tree exists, can a candidate be scored *in the context of the branches
    already admitted* rather than in isolation — and does that find a different circuit?
 
-The two questions are separable, and the implementation keeps them separate: the tree is always a
-trie, and the scoring rule is a flag (`joint_scoring`). Section 4.1 shows that under isolated scoring
-the answer to (2) is "no by construction" — the tree is then exactly the path set, re-materialised.
+The tree is always a trie; the scoring rule is a flag (`joint_scoring`). Section 4.1 shows that under
+isolated scoring the answer to (2) is "no by construction" — the tree is then exactly the path set,
+re-materialised — which is what makes the path-vs-tree comparison well-posed.
 
 ---
 
@@ -80,8 +148,8 @@ semantics of the method:**
 
 An ablation's downstream consequences are therefore represented **only through internal nodes**. This
 is what makes `evaluate_tree` a *path-restricted* ablation — path patching, and the point of the
-method — rather than a full knockout in which every component in the model reacts at once. Section 4.6
-measures what that restriction does and does not cost.
+method — rather than a full knockout in which every component in the model reacts at once. It is also
+the fact Section 1.1 rests on. Section 4.6 measures what the restriction does and does not cost.
 
 ### 2.4 The non-additivity everything rests on
 
@@ -178,30 +246,77 @@ What joint scoring still buys, then, is **context across depths**: a candidate w
 already carried by a branch admitted at a shallower depth scores lower, and one that matters only in
 the presence of such a branch scores higher.
 
-Section 4.5 shows that this residual cross-depth suppression is not harmless: it is what makes the
-joint tree drop the early MLP block on IOI, at a cost of −0.72 normalised faithfulness. Simultaneity
-protects redundancy *within* a depth but cannot protect it *across* depths, and on a serial stack like
-GPT-2's MLPs that is where the damage happens.
+Section 4.5 shows that this residual cross-depth suppression is not harmless, and Section 6.7 shows
+it survives into the positional setting.
 
-### 3.5 Admission rules
+### 3.5 Admission rule 1 — threshold
 
-Both admission strategies exist for both searches, so the comparison can be run under either budget:
-
-| strategy | path search | tree search | rule |
-|---|---|---|---|
-| `threshold` | `PathMessagePatching` | `TreeMessagePatching` | admit any candidate with contribution ≥ `min_contribution` (or `|contribution|` ≥ it, with `include_negative`) |
-| `topk` | `PathMessagePatching_LimitedLevelWidth` | `TreeMessagePatching_LimitedLevelWidth` | at each depth score all candidate extensions of all leaves, keep the global top `max_width` by `|contribution|` |
-
-`include_negative` is unchanged by the scoring rule, because rule B preserves rule A's sign
+Admit any candidate whose contribution clears `min_contribution`; with `include_negative=True` the
+test is on `|contribution|`, so it admits negative-effect components such as the IOI negative name
+movers. `include_negative` is unchanged by the scoring rule, because rule B preserves rule A's sign
 convention. Its reading under joint scoring is *"admit `C` if routing through `L` changes the tree's
-score by at least `t`, in either direction"*, which still admits negative-effect components such as
-the IOI negative name movers. Setting `include_negative=False` turns joint scoring into literal
-greedy maximisation of `𝔽` and drops them.
+score by at least `t`, in either direction"*. Setting `include_negative=False` turns joint scoring
+into literal greedy maximisation of `𝔽` and drops them.
 
-`topk` compares the two searches at a matched *width* budget rather than a matched threshold, which
-matters because the threshold means slightly different things when path counts differ.
+A threshold is the natural rule for a *sweep*, because under isolated scoring it is downward-closed
+and a single run reproduces every higher threshold by pruning (Section 4.2). Its weakness is that it
+does not bound the work: the number of admissions at a depth is whatever clears the bar, so runtime
+at a low threshold is unpredictable.
 
-### 3.6 Complexity
+### 3.6 Admission rule 2 — limited level width (the beam)
+
+`TreeMessagePatching_LimitedLevelWidth` (and its path counterpart
+`PathMessagePatching_LimitedLevelWidth`) replaces the threshold with a **width budget**: at each
+depth, score every candidate extension of *every* frontier leaf, then keep the global top `max_width`
+by `|contribution|` and attach only those.
+
+Three design points, each of which could have gone the other way:
+
+* **The budget is global across leaves, not per leaf.** A per-leaf budget spends the same effort on a
+  branch carrying almost no signal as on the dominant one, and on IOI the contribution distribution
+  across leaves at a given depth spans orders of magnitude. A global top-k lets one strong leaf take
+  most of the level's width and starves the rest, which is the intended behaviour.
+* **Ranking is by `|contribution|`**, matching `include_negative`, so negative components compete on
+  equal terms rather than being ranked last.
+* **The width is per depth, not per tree.** The tree therefore grows at most `max_width` nodes per
+  level and its total size is bounded by `max_width × depth`, which is the property that makes the
+  runtime predictable enough for an interactive demo (Section 7).
+
+The practical consequence is that the beam converts an open-ended search into a **fixed budget**: the
+cost of a level is `(number of leaves) × (candidates per leaf)` scoring calls regardless of how many
+survive, and the number of leaves is capped. This is the strategy the interactive demo uses, and it
+is why a usable IOI circuit comes back in tens of seconds rather than tens of minutes.
+
+`topk` also compares the two searches at a matched *width* budget rather than a matched threshold,
+which matters because a threshold means slightly different things when path counts differ.
+
+### 3.7 Positional search
+
+With `positional_search=True` the root is pinned to the final token (`FINAL_Node.position = len − 1`)
+and every candidate carries position information. Two distinct indices are involved and the
+distinction matters for everything downstream:
+
+| field | meaning |
+|---|---|
+| `position` | the **query** position — where the component *writes*, i.e. which token of the residual stream its output lands on |
+| `keyvalue_position` | for the key/value branch only, the position the component *reads from* |
+
+`get_expansion_candidates` emits a candidate either for the query branch (`patch_query=True`,
+`keyvalue_position=None`) or for the key/value branch (`patch_key`/`patch_value`, with an explicit
+`keyvalue_position`), so a node's own patch flags say which of *its* inputs its children feed.
+
+**A circuit element is `(layer, head, position)` — the query position.** That is the object Wang et
+al.'s knockout replaces: their hook overwrites `attn.hook_result` at the kept token, which is where
+the head writes. It is also what makes the ground-truth comparison possible at the resolution the
+ground truth is actually specified at (Section 5.2).
+
+The cost is the reason v1 was non-positional: at a 15-token prompt a node expands to roughly
+`12 × (1 MLP + 15×12 key/value + 12 query) ≈ 2320` candidates instead of `≈ 300`. Measured on the
+runs in Section 6, that is 17 minutes for a single path search at `t = 0.05`. `PathMessagePatching`
+has a two-stage `batch_positions` shortcut (score the head non-positionally, then expand the survivors
+over positions) that amortises this; **the tree has no such shortcut**, so parity runs must disable it.
+
+### 3.8 Complexity
 
 Naively, one joint score costs a full `𝔽` over the tree — `O(|T|)` forward calls, fatal once `T` has
 thousands of nodes. It is not necessary: attaching a candidate under `L` invalidates the messages
@@ -215,8 +330,9 @@ and the siblings it meets at each ancestor are unaffected. Two helpers exploit t
 
 Because `T` is frozen for a whole depth (Section 3.4) the cache is built **once per depth** and never
 invalidated during scoring. One joint score therefore costs `O(depth)` forward calls — the same order
-as `evaluate_path`. Measured on GPT-2 small / IOI (threshold 0.5, 3 prompts): **7.9 s joint vs 8.0 s
-isolated** for the whole search.
+as `evaluate_path`. Measured on GPT-2 small / IOI (threshold 0.5, 3 prompts, non-positional):
+**7.9 s joint vs 8.0 s isolated** for the whole search. Joint scoring is essentially free; its cost is
+paid elsewhere, in that a threshold sweep needs one search per threshold (Section 4.2).
 
 ---
 
@@ -234,13 +350,7 @@ One asymmetry survives and is intrinsic to the algorithms rather than to the sco
 only *returns* paths that reached the embeddings, discarding frontier nodes that never completed a
 path, whereas the tree keeps every admitted node. At a matched threshold the tree's circuit is
 therefore systematically the larger of the two, and comparisons should be read at a matched *budget*.
-
-That is a statement about *node sets*. The trie also has a capability the path set does not, and
-Section 4.6 measures it: because compensation is carried by **internal** nodes (Section 2.3), a
-structure recording only paths-to-output cannot express "A's effect, as modified by B" — B has to be
-*on* the path, above A. Self-repair is representable in a trie and not in a set of independent
-root-to-embedding paths. This is the strongest argument for the tree representation, and it holds
-under either scoring rule.
+Section 6.4 shows this asymmetry has teeth: above `t = 0.7` the path search returns nothing at all.
 
 ### 4.2 Threshold monotonicity, and when a sweep is derivable from one run
 
@@ -259,8 +369,8 @@ Under **joint** scoring this fails. A score is only valid for the tree that exis
 taken, and that tree depends on the threshold: lowering it admits more shallow branches, which changes
 the context every deeper candidate is scored against. A threshold sweep under joint scoring therefore
 requires **one full search per threshold**. The extra cost is milder than it looks — the lowest
-threshold dominates and higher ones are progressively cheaper (measured: 7 s / 4 s / 2 s at
-0.5 / 1.0 / 2.0) — so a whole sweep costs roughly twice a single run at the base threshold.
+threshold dominates and higher ones are progressively cheaper — but it is real: the positional sweep
+of Section 6 cost 31 minutes across eight tree runs against 17 minutes for one path run.
 
 ### 4.3 Where the two rules actually diverge
 
@@ -283,17 +393,21 @@ nodes** — that is, exactly where the tree representation is doing something a 
 > this metric; every ratio computed there is a rounded quantisation artefact rather than a
 > measurement. `test/test_joint_scoring.py` documents this.
 
-### 4.4 Faithfulness is not monotone in circuit size
+### 4.4 Faithfulness is not monotone in circuit size *(v1 / strict knockout)*
 
-It is natural to expect that keeping more components makes a circuit more faithful — the circuit is
-"closer to the model", so it should behave more like it. **This is false**, and on IOI it fails
-dramatically enough to invert the trend of a whole threshold sweep.
+> **Scope.** This section and the next are measured under the **v1 strict knockout**: non-positional
+> component circuits with everything outside the circuit ablated, MLPs included, normalised so `1.0`
+> is the full model. That is *not* Wang et al.'s faithfulness — they never ablate an MLP — so these
+> numbers do not appear in the results chapter. They are retained because the effect is real, it is
+> the convention MIB's CPR uses, and it is the diagnosis behind the recommendation in Section 4.5.
 
-The sweep below is the tree search under joint scoring, node granularity, scope `all` (everything
-outside the circuit ablated). Configuration: gpt2-small, IOI, `logit_difference` with counterfactual
-denoising, `batch=5`, `target_length=15`, non-positional, `include_negative=True`,
-`base_min_contribution=0.05`; evaluated by ABC mean-ablation knockout over 64 held-out IOI prompts.
-`F(M) = +3.169`, `F(∅) = +0.058`, normaliser `3.111`.
+It is natural to expect that keeping more components makes a circuit more faithful. **This is false**,
+and under the strict knockout it fails dramatically enough to invert the trend of a whole sweep.
+
+Configuration: gpt2-small, IOI, `logit_difference` with counterfactual denoising, `batch=5`,
+`target_length=15`, non-positional, `include_negative=True`, `base_min_contribution=0.05`; ABC
+mean-ablation knockout over 64 held-out IOI prompts. `F(M) = +3.169`, `F(∅) = +0.058`, normaliser
+`3.111`. Tree search, joint scoring.
 
 | threshold | comps | heads | MLPs | branches | `F(C)` | faithfulness |
 |---|---|---|---|---|---|---|
@@ -307,8 +421,7 @@ denoising, `batch=5`, `target_length=15`, non-positional, `include_negative=True
 | 2.000 | 5 | 5 | 0 | 11 | +0.067 | +0.003 |
 
 Faithfulness *rises* as the circuit shrinks from 41 components to 5, and the largest circuit is the
-only one that scores **below the empty circuit**. The path search on the same axis does not invert —
-0.828 at `t=0.05` (27 comps) down to 0.012 at `t=0.143` (13 comps) — so this is not the harness.
+only one that scores **below the empty circuit**.
 
 **The mechanism is a partially ablated serial stack.** Holding the tree's 33 heads at `t=0.05` fixed
 and varying only which MLPs are kept:
@@ -321,11 +434,10 @@ and varying only which MLPs are kept:
 | tree @0.05 + m1, m2, m3, m4 | all 12 | +1.005 | **+0.304** |
 
 Keeping **eight** MLPs scores far worse than keeping **none**. Ablation replaces a component's output
-with its ABC-mean, which is a roughly neutral value; keeping m5–m11 while m1–m4 are ablated instead
-lets the late MLPs compute on a *corrupted* early residual and propagate the corruption forward. A
-broken prefix of a serial stack is worse than no stack. The rising trend in the sweep is therefore not
-"smaller is more faithful" — it is the harmful partial-MLP configuration disappearing as the tree
-sheds its MLPs entirely (8 → 5 → 5 → 2 → 0 → 0).
+with its ABC-mean, a roughly neutral value; keeping m5–m11 while m1–m4 are ablated lets the late MLPs
+compute on a *corrupted* early residual and propagate the corruption forward. A broken prefix of a
+serial stack is worse than no stack. The rising trend is therefore not "smaller is more faithful" —
+it is the harmful partial-MLP configuration disappearing as the tree sheds its MLPs (8→5→5→2→0).
 
 The same four MLPs move the path circuit by almost exactly as much, in the opposite direction:
 
@@ -335,19 +447,18 @@ The same four MLPs move the path circuit by almost exactly as much, in the oppos
 | path @0.05 − m1, m2, m3, m4 | 0, 9, 10 | −0.020 | **−0.025** |
 
 Adding four components swings the tree by **+0.72**; removing the same four swings the path by
-**−0.85**. Everything else — heads, edges, thresholds, evaluation set — is held fixed. The early MLP
-block is load-bearing for IOI under this knockout, which is consistent with the standard observation
-that MLP0 in GPT-2 small acts as an extension of the token embedding, with m1–m4 continuing to build
-the name representation the attention circuit then reads.
+**−0.85**, everything else held fixed. The early MLP block is load-bearing for IOI under this
+knockout, consistent with the standard observation that MLP0 in GPT-2 small acts as an extension of
+the token embedding, with m1–m4 continuing to build the name representation the attention circuit
+reads.
 
-**How to read the tables in light of this.** Faithfulness is a property of the *ablated model*, not a
-monotone score over subsets, so a faithfulness curve that falls with circuit size is not by itself
-evidence of a bug — but it is always worth asking which components entered or left. Two consequences:
-a faithfulness ranking is only meaningful between circuits that are not differently broken; and a
-circuit can be penalised far more for a missing *bridge* component than rewarded for many correct
-ones.
+**Why this does not appear in the results chapter.** Wang et al. never ablate an MLP, so under the v2
+protocol a partially ablated MLP stack cannot arise and this failure mode is structurally absent.
+Under the v2 protocol the MLPs a search discovers are recorded and reported but play no part in
+`F(C)`. The effect above is a property of the *strict* knockout, and should be presented as such —
+it is directly relevant to anyone reporting CPR/CMD, and not at all to a Wang-parity table.
 
-### 4.5 Joint scoring drops components the isolated rule keeps
+### 4.5 Joint scoring drops components the isolated rule keeps *(v1 / strict knockout)*
 
 Section 4.4 leaves a question: why did the tree miss m1–m4 when the path search found them? It is not
 the tree representation, and it is not reachability. It is the scoring rule. At `t = 0.05`, same
@@ -362,8 +473,7 @@ configuration, same batch:
 (`a3.h0`, `a5.h5`, `a6.h9`, `a8.h6`, `m3`, `m4`, `m5`, `m7`), **six are present in the joint tree**, so
 m1–m4 were generated as candidates there and rejected on their score.
 
-**Why they were rejected is a threshold crossing.** Compare m0, the one early MLP that survives, across
-the two runs — same component, same tree, only the rule differs:
+**Why they were rejected is a threshold crossing.** Compare m0, the one early MLP that survives:
 
 | m0 | occurrences | depths | max \|contribution\| |
 |---|---|---|---|
@@ -372,14 +482,12 @@ the two runs — same component, same tree, only the rule differs:
 
 Joint scoring rescaled m0 by 4.7×, and m0 survived only because it had ~16× headroom over the `0.05`
 threshold. In the isolated run m1–m4 peak at **0.113 / 0.123 / 0.110 / 0.110** — barely 2.2× above the
-bar. A comparable rescaling puts them under it, and they vanish entirely. Nothing about the rule
-"rejects redundant components"; it rescales, and the marginal ones fall through.
+bar. A comparable rescaling puts them under it.
 
-**Measured, and the answer is two answers.** Section 12 of
-`experiments/faithfulness_completeness.ipynb` recovers the rejected scores directly: it rebuilds the
-joint tree from its cache as live `Node`s, truncates it to depth `k` (which reproduces the frozen
-context the BFS saw when it expanded that depth, exactly rather than approximately), and re-scores
-m1–m4 under every placement the joint tree offered, with both rules. The failures split:
+**Measured, and the answer is two answers.** The re-scoring diagnostic rebuilds the joint tree from
+its cache as live `Node`s, truncates it to depth `k` (reproducing the frozen context the BFS saw when
+it expanded that depth, exactly rather than approximately), and re-scores m1–m4 under every placement
+the joint tree offered, with both rules. The failures split:
 
 | candidate | best isolated *in the joint tree* | best joint | best in the isolated *run* | |
 |---|---|---|---|---|
@@ -388,27 +496,21 @@ m1–m4 under every placement the joint tree offered, with both rules. The failu
 | m2 | 0.010 | 0.015 | 0.123 | **structural** |
 | m4 | 0.019 | 0.019 | 0.110 | **structural** |
 
-For m1 and m3 the account above holds: the placement existed and cleared `0.05` under the isolated
-rule but not the joint one. For **m2 and m4 it does not** — the joint tree never offered a placement
-either rule would have admitted, although the isolated run admitted them at 0.123 and 0.110. They were
-lost with the branches that carried them, further up the tree.
+For m1 and m3 the account above holds. For **m2 and m4 it does not** — the joint tree never offered a
+placement either rule would have admitted. They were lost with the branches that carried them, further
+up the tree. The two rules do not merely disagree candidate-by-candidate; they grow **structurally
+different trees**, and the disagreement compounds with depth. It also sets the bar for a fix: a repair
+applied at the point of rejection is not enough.
 
-That distinction matters more than the original finding. The two rules do not merely disagree
-candidate-by-candidate; they grow **structurally different trees**, and the disagreement compounds with
-depth, because a different shallow structure means different chains and therefore different scores for
-the same component under the same parent *component*. It also sets the bar for a fix: a repair applied
-at the point of rejection is not enough.
+**The rescaling factor is not a redundancy measure.** Two measurements, scoring candidates both ways
+in one frozen context:
 
-**What the rescaling factor is has not been established, and it is not redundancy.** Two measurements,
-scoring candidates both ways in one frozen context:
+*Distribution* — over the 14 candidates of a real frontier whose isolated score clears `0.25 × t`,
+the ratio |isolated| / |joint| runs from **0.46 to 3.02**, median 0.88 — a 6.6× spread, and ratios
+below 1 are common, so joint scoring **amplifies** about as often as it attenuates.
 
-*Distribution* — over the 14 candidates of a real frontier whose isolated score clears `0.25 × t`
-(anything smaller is fp32 noise; see the caveat in Section 4.3), the ratio |isolated| / |joint| runs
-from **0.46 to 3.02**, median 0.88 — a 6.6× spread, so not a uniform rescaling. But ratios *below* 1
-are common: joint scoring **amplifies** about as often as it attenuates.
-
-*Controlled test* — one candidate (`m0` under `a5.h5` under `a9.h9`), varying only which sibling sits
-beside the leaf, so the two messages merge at `a9.h9`'s input:
+*Controlled test* — one candidate (`m0` under `a5.h5` under `a9.h9`), varying only the sibling beside
+the leaf:
 
 | sibling | sibling size | ratio |
 |---|---|---|
@@ -420,24 +522,24 @@ beside the leaf, so the two messages merge at `a9.h9`'s input:
 | `a7.h9` — unrelated | 1.192 | **0.97** |
 | `a11.h2` — unrelated | 0.021 | 0.93 |
 
-An unrelated MLP attenuates the candidate *more* than its own literal duplicate does, and a sibling 27×
-the duplicate's size attenuates it not at all. **There is no separation between duplicate and control**,
-so the joint/isolated ratio is not a redundancy measure and must not be reported as one. Note also that
-both branches in that test are *leaves* — neither reacts (Section 2.3) — so the test sits in the regime
-where redundancy cannot show up at all. Section 4.6 covers the regime where it does.
+An unrelated MLP attenuates the candidate *more* than its own literal duplicate does. **There is no
+separation between duplicate and control**, so the joint/isolated ratio must not be reported as a
+redundancy measure. Note also that both branches in that test are *leaves* — neither reacts — so the
+test sits in the regime where redundancy cannot show up at all.
 
 Whatever the mechanism, the consequence for the metric is not in doubt:
 
 > **"Adds little in context" is not the same as "can be ablated harmlessly."**
-> Joint scoring admits on the first; ablation-based faithfulness measures the second. The two came
-> apart here by −0.72 of normalised faithfulness, against the ≈0.1 head-F1 that joint scoring costs on
-> ground-truth overlap.
+> Joint scoring admits on the first; ablation-based faithfulness measures the second.
 
-**Consequence.** For the headline path-vs-tree tables, run with `joint_scoring=False`. That is the
+**Recommendation.** For headline path-vs-tree tables, run with `joint_scoring=False`. That is the
 well-posed comparison anyway (Section 4.1: matched scoring, so differences are attributable to the
-representation), it restores the derivable threshold sweep (Section 4.2), and it avoids this artefact.
-Joint scoring belongs in the chapter as a **negative result** with the diagnosis above — which is
-stronger evidence for the isolated design than the head-overlap numbers of Section 5.3.
+representation), and it restores the derivable threshold sweep (Section 4.2). Joint scoring belongs
+in the chapter as a **documented negative result**.
+
+> **Open action.** The v2 positional runs of Section 6 were executed with `tree_joint_scoring=True`,
+> i.e. against this recommendation. Section 6.7 reports what that appears to cost in the positional
+> setting; the isolated re-run is the first thing the chapter still needs.
 
 ### 4.6 What a path-restricted ablation can and cannot see
 
@@ -446,8 +548,7 @@ consequence through the real nonlinearities of every node the perturbation passe
 restricts is *where* the consequence may travel: along the tree's own edges, and nowhere else. A
 component the tree does not contain keeps its clean output no matter what happens upstream.
 
-The practical question is whether that restriction hides **self-repair** — a component compensating for
-another's removal, which is the phenomenon completeness is defined around. It does not, provided the
+The practical question is whether that restriction hides **self-repair**. It does not, provided the
 edge is there. Two experiments on the IOI name movers `A = {a9.h9, a9.h6, a10.h0}` and their backups
 `B = {a10.h10, a10.h6, a10.h2, a10.h1, a11.h2, a9.h7, a9.h0, a11.h9}`, gpt2-small, batch 5,
 non-positional, `logit_difference` with counterfactual denoising.
@@ -462,8 +563,8 @@ non-positional, `logit_difference` with counterfactual denoising.
 | sum of the separate scores | +11.215 |
 | **deviation** | **−0.041** (0.4%) |
 
-Additive to within `ln_final`'s contribution (Section 4.3's 2–5% for branches meeting only at the
-root). The marginal of `B` given `A` is +1.648 against +1.689 alone — ×0.98. No trace of redundancy.
+Additive to within `ln_final`'s contribution. The marginal of `B` given `A` is +1.648 against +1.689
+alone — ×0.98. No trace of redundancy.
 
 **Routed topology — the backups as internal nodes above the name movers:**
 
@@ -475,16 +576,14 @@ root). The marginal of `B` given `A` is +1.648 against +1.689 alone — ×0.98. 
 
 The routed branches carry an opposite-signed message: accounting for the fact that removing the name
 movers *changes what the backups output* cancels 27% of the damage. **That is self-repair, measured
-inside the message formalism.**
-
-The two results together give the rule:
+inside the message formalism**, and it is the result Section 1.1 is built on.
 
 > A leaf is being ablated and is frozen; an internal node is reacting. Compensation is captured
 > **exactly along the edges the tree contains**, and not at all for components that are only ever
 > leaves. A flat set of root-attached components cannot express it; a trie can.
 
-This also explains why the flat comparison showed no redundancy signature where a full knockout shows a
-large one. Under a knockout (`F`, everything recomputes) the same two sets give:
+This also explains why the flat comparison showed no redundancy signature where a full knockout shows
+a large one. Under a knockout (`F`, everything recomputes) the same two sets give:
 
 | | drop `A` | drop `B` | drop both | sum | super-additivity |
 |---|---|---|---|---|---|
@@ -496,13 +595,13 @@ tree is not blind to the phenomenon — the flat topology simply measures a diff
 
 **The search does find these edges.** Both real trees at `t = 0.05` contain **8** name-mover → backup
 routing edges (`a9.h9→a10.h10`, `a9.h9→a11.h2`, `a9.h6→a10.h6`, `a9.h6→a11.h2`, …) out of 229 unique
-edges (115 head→head) for the isolated run and 177 (98 head→head) for the joint one. Whether a circuit's
-incompleteness tracks how much of this routing it captured is an obvious thing to test and has not been.
-
+edges (115 head→head) for the isolated run and 177 (98 head→head) for the joint one. Whether a
+circuit's incompleteness tracks how much of this routing it captured is an obvious thing to test and
+has not been.
 
 ---
 
-## 5. Evaluation
+## 5. Evaluation protocol
 
 ### 5.1 Structural comparison — `experiments/tree_vs_path.py`
 
@@ -515,9 +614,9 @@ discovered, the runtime, and the overlap. Flags: `--task {ioi,greater-than}`,
 **IOI.** Setup mirrors `experiments/MIB/run_search.py`: `mib-bench/ioi` prompts with the
 `s2_io_flip_counterfactual`, counterfactual (denoising) patching, and the `run_search` convention of
 feeding counterfactual prompts as the clean run and vice-versa; batches are bucketed to a single
-tokenised length. Ground truth is the Wang et al. (2022) 26-head set grouped by functional role; the
-report marks each known head `[PT]`/`[P-]`/…, lists off-circuit heads and the MLP layers found (IOI
-has no canonical MLP ground truth, so these are descriptive only), and draws the tree.
+tokenised length. Ground truth is the Wang et al. (2023) 26-head set grouped by functional role; the
+report marks each known head `[PT]`/`[P-]`/…, lists off-circuit heads and the MLP layers found, and
+draws the tree.
 
 **Greater-than.** Ground truth here is a full circuit *graph*, not a head set, so `GREATER_THAN_EDGES`
 encodes the published data-flow edges and `build_ground_truth_tree` parses them into the same `Node`
@@ -525,119 +624,368 @@ structure the search produces. The report compares tree against tree: branches s
 ground-truth-only / tree-only / incomplete, plus ASCII drawings and, for positional runs, a
 layer × token-position DAG grid.
 
-### 5.2 Causal comparison — `experiments/faithfulness_completeness.ipynb`
+### 5.2 Causal comparison — `experiments/faithfulness_completeness_v2.ipynb`
 
 Structural overlap with a head set says nothing about whether a circuit *does the work*. The notebook
-evaluates both searches by **knockout**, in the sense of Wang et al. (2023, §3): given a circuit `C`,
-run the model with everything outside `C` mean-ablated over the ABC distribution and read the IOI
-logit difference `F(C)`.
+evaluates both searches by **knockout**, in the sense of Wang et al. (2023, §3), and — unlike its v1
+predecessor — it computes their quantities rather than quantities inspired by them. The protocol was
+established by reading their released code (`Easy-Transformer/easy_transformer/`) rather than the
+paper text, and four things had to change.
 
-- **Faithfulness** — `F(C) ≈ F(M)`; reported normalised so `1.0` is the full model and `0.0` the empty
-  circuit.
-- **Completeness** — for every `K ⊆ C`, `F(C\K) ≈ F(M\K)`; estimated over randomly sampled `K`, mean
-  and max, normalised the same way.
+| | v1 | v2 (this protocol) | their code |
+|---|---|---|---|
+| circuit element | attention head `(l, h)` | **`(l, h, position)`** | `ioi_circuit_extraction.py:205` — `RELEVANT_TOKENS` keeps each head at *one* token |
+| MLPs | ablated | **never ablated**, only recorded | `mlps_to_remove={}` at all twelve call sites |
+| faithfulness | `(F(C) − F(∅)) / (F(M) − F(∅))` | **raw `F(C)`, and the ratio `F(C)/F(M)`** | no normalisation exists in their code |
+| `F(M\K)` | `K` ablated at **all** positions | **`K` ablated only at `K`'s own positions** | `completeness.py:228` |
+| incompleteness | normalised | **raw `\|F(C\K) − F(M\K)\|`** | `completeness.py:457` — `difference_eval` |
+| `K` sampling | `\|K\| ~ U{1..\|C\|/2}` | **Bernoulli(½)**, + per-class, + greedy adversarial | `completeness.py:625`, `:503` |
+
+The **positional element** is the important one. Wang et al.'s circuit is 26 `(head, token)` nodes,
+not 26 heads: 17 at `end`, 7 at `S2`, 2 at `S+1`. Read non-positionally it is `26 × 15 = 390`
+elements, a circuit 15× larger than the one they specify. Both readings are scored below; the
+positional one is theirs.
+
+The **MLP** point removes the awkward convention v1 needed. v1 reported two "scopes" because ablating
+all 12 MLP sublayers destroys the model on its own, so every head-only circuit scored ≈ 0. That
+problem was self-inflicted: Wang et al. simply never ablate an MLP. Under v2 there is one scope, it is
+theirs, and the MLPs each search discovers are recorded to `discovered_mlps_v2.csv` and reported
+descriptively.
+
+Definitions actually computed, with every `(head, position)` not in `C` replaced by its mean over the
+ABC counterfactual distribution and MLPs/embeddings/biases/LayerNorms left intact:
+
+* **Faithfulness** — `F(C)` against `F(M)`, in raw logit-difference units.
+* **Incompleteness** — `|F(C\K) − F(M\K)|`, raw, over three families of `K`: random (Bernoulli ½),
+  the seven circuit classes one at a time, and their greedy adversarial search for the worst `K`.
 
 The evaluation is deliberately independent of the discovery signal: a *different* intervention (ABC
-mean-ablation, not counterfactual denoising) on a *different, larger* prompt set. Circuits are read
-off at two granularities — components, and `(source → destination, stream)` edges with
-stream ∈ `q/k/v/mlp/resid` — with the edge stream recovered from the destination's own patch flags.
-Wang et al.'s circuit, the full model, the empty circuit and size-matched random circuits are scored
-alongside as references, each recomputed by the same harness rather than quoted.
+mean-ablation, not counterfactual denoising) on a *different, larger* prompt set.
 
-> **The ground-truth baseline keeps the MLPs, and must.** Wang et al. specify their circuit as a set
-> of *attention heads*; the MLPs are outside the specification, not outside the circuit. Applying the
-> knockout rule literally — ablate everything not in `C` — deletes all 12 MLP sublayers, and that
-> alone destroys the model: keeping **all 144 attention heads** with the MLPs ablated scores a
-> faithfulness of **−0.19**, below the empty circuit. Under that reading every head set scores ≈ 0
-> regardless of quality (26 heads: 0.03), which silently flatters anything compared against it. With
-> the MLPs kept the same 26 heads score **1.55**. Both rows are reported; the MLP-keeping one is the
-> target. The comparison is still not like-for-like, in the other direction: the ground-truth circuit
-> is handed its MLPs while the searches must discover theirs, and no choice of convention fixes that.
+**Two deviations remain, and both are stated in the notebook.** (1) `ExperimentManager` hardcodes
+`prepend_bos=True` while Wang et al. run with no BOS; search and evaluation must agree, so BOS stays,
+which shifts `F(M)` and every ablation value relative to their published numbers. (2) A positional
+element is a raw index, so an index must mean the same thing in every prompt; both the search batch
+and the evaluation set are drawn from a **single token-layout group**. Wang et al. use mixed templates
+with the ablation mean taken *within* each template group, so restricted to one group the two
+coincide — the cost is template diversity, not correctness.
 
-Because of Section 4.2 the notebook's sweep is asymmetric: the path search runs once and is pruned
-across thresholds, while the tree search runs once per threshold whenever `CFG.tree_joint_scoring` is
-on. Setting it to `False` restores the single-run behaviour.
-
-### 5.3 Recorded results
-
-> Report files (`ioi_circuit_report.txt`, `greater_than_report.txt`) are overwritten by every run, so
-> each result below is stated with the configuration that produced it.
-
-**IOI head recovery** (gpt2-small, `topk`, `max_width=20`, batch 4, positional, `logit_difference`,
-isolated scoring): path and tree recover the **same 17/26 known heads** — all 3 Name Movers, both
-Negative Name Movers, 4/8 Backup Name Movers, 3/4 S-Inhibition, 2/4 Induction, 3/3 Duplicate Token,
-0/2 Previous Token. Path produced 161 complete paths / 70 unique nodes; the tree 90 branches / 65
-unique nodes. This is the expected outcome under matched scoring (Section 4.1).
-
-**Joint vs isolated scoring — structural** (gpt2-small, `threshold=0.5`, batch 3, non-positional,
-`logit_difference`) — a single coarse run:
-
-| scoring | nodes | branches | ground-truth heads |
-|---|---|---|---|
-| isolated | 49 | 35 | **13** |
-| joint | 43 | 34 | **11** |
-
-Joint scoring dropped the induction heads `(5,5)` and `(6,9)`, whose effect is already carried by the
-S-inhibition branches above them — the rule working as designed, at a small cost in ground-truth
-recall. Both settings kept the negative name movers.
-
-**Joint vs isolated scoring — causal** (gpt2-small, `base_min_contribution=0.05`, batch 5, eval on 64
-held-out prompts, node granularity, scope `all`): the head-overlap cost above is the small part. Joint
-scoring also drops the early MLP block m1–m4, which costs **−0.72 normalised faithfulness** at
-`t = 0.05` (−0.419 as found, +0.304 with m1–m4 restored). Section 4.5 has the diagnosis and Section 4.4
-the mechanism. **Joint scoring is worse on both axes measured so far**; the isolated rule is the one to
-use for the headline tables.
-
-**Greater-than** (Llama-3.2-1B-Instruct, `topk`, `max_width=10`, batch 20, positional): the ground
-truth expands to 812 branches; the tree search found 15 complete branches (26 incomplete) with **0**
-in common. Branch-level recall is very low at this width budget, and the caveats below apply.
-
-**Known caveats of the greater-than setup** (against the official `gpt2-greater-than` repo), in order
-of importance:
-
-1. **Metric mismatch.** The official metric is the probability difference
-   `Σ P(YY' > YY) − Σ P(YY' ≤ YY)` over all valid two-digit year tokens; the experiment uses a
-   single-token `logit_difference` proxy (`yy+1` good vs `yy−1` bad). The published circuit was
-   discovered under prob-diff, so the proxy weakens the comparison.
-2. **Effectively unbalanced batch.** Candidates are generated noun-outer / YY-inner and bucketed by
-   token length, so the default batch is one noun with the smallest YYs. The official dataset
-   balances YY uniformly over 2–98 across 120 nouns.
-3. **Century fixed at 17**; the official pool spans centuries 10–18 filtered through
-   `get_valid_years`.
-4. A hand-picked 14-noun list instead of the official `cache/potential_nouns.txt`.
+Edge-level knockout, which v1 had, is **not** carried into v2: Wang et al. evaluate at head level and
+there is nothing to compare an edge-level score against. Positional nodes restore part of the
+resolution it provided — a path set and a tree touching the same heads at *different* tokens are now
+distinguishable — but not all of it.
 
 ---
 
-## 6. Granularity and limitations
+## 6. Results
+
+### 6.1 Setup
+
+gpt2-small / IOI, `mib-bench/ioi`, one 15-token layout group; search batch 5 prompts, evaluation on 64
+disjoint held-out prompts; `logit_difference` with counterfactual denoising for discovery, ABC
+mean-ablation knockout for evaluation; **positional**, per-head and per-position expansion for both
+searches (`batch_heads=False`, `batch_positions=False`), `include_negative=True`,
+`base_min_contribution=0.05`, threshold strategy. Path search: isolated scoring, one run pruned across
+the sweep. Tree search: **joint scoring**, one run per threshold — see the open action in Section 4.5.
+
+Reference values: `F(M) = 3.120`, `F(∅) = 0.176` (every head ablated, MLPs intact).
+
+### 6.2 `F(C)` is not a quality score
+
+The first thing to internalise before reading any of these numbers:
+
+> **`F(GT) = 4.533` against `F(M) = 3.120`.** Wang et al.'s own circuit scores **145%** of the full
+> model's logit difference.
+
+Mean-ablating the 2134 non-circuit `(head, position)` slots removes a great deal of *net-negative*
+contribution, so the surviving circuit outperforms the intact model. The per-class table below makes
+the mechanism explicit: removing the Negative Name Movers from the circuit takes it to **8.24**.
+
+Two consequences for how results are presented:
+
+1. **Higher `F(C)` is not better.** The target is `F(C)` *close to* `F(M)`, so the quantity to plot is
+   the **faithfulness gap** `|F(C) − F(M)|`, lower being better. A plot of `F(C)` with a ground-truth
+   reference line above the full-model line invites exactly the wrong reading.
+2. **Incompleteness contains the faithfulness gap.** At `K = ∅`, `|F(C\K) − F(M\K)| = |F(C) − F(M)|`
+   by definition — the per-class table's `none` row is `1.413`, which is precisely the ground truth's
+   own faithfulness gap. The two metrics are not independent, and an unfaithful circuit is
+   automatically "incomplete" on this measure.
+
+### 6.3 Headline table
+
+Raw logit-difference units throughout. `incompl` is the mean over 20 Bernoulli(½) subsets; `greedy` is
+the worst `K` found by Wang et al.'s adversarial search (3 runs × 6 iterations × 8 samples).
+
+| circuit | \|C\| | `F(C)` | `F(C)/F(M)` | **\|F(C)−F(M)\|** | **incompl** | greedy | prec | rec | **F1** |
+|---|---|---|---|---|---|---|---|---|---|
+| **Wang et al.** (positional) | 26 | 4.533 | 145% | 1.413 | 0.592 | 2.06 | 1.000 | 1.000 | 1.000 |
+| Wang et al. (all positions) | 390 | 4.245 | 136% | 1.125 | 0.598 | — | 0.067 | 1.000 | 0.125 |
+| **path @ 0.05** | 18 | 2.160 | 69% | **0.959** | **0.610** | 3.55 | 0.889 | 0.615 | **0.727** |
+| path @ 0.085 | 14 | 0.807 | 26% | 2.313 | 1.195 | — | **1.000** | 0.538 | 0.700 |
+| tree @ 0.085 | 29 | 0.688 | 22% | 2.431 | **0.711** | 7.89 | 0.655 | 0.731 | 0.691 |
+| **tree @ 0.143** | 22 | 0.582 | 19% | 2.538 | 1.555 | — | 0.773 | 0.654 | **0.708** |
+| tree @ 0.697 | 12 | 0.463 | 15% | 2.657 | 1.980 | — | **1.000** | 0.462 | 0.632 |
+| random, size-matched | ~26 | 0.176 | 6% | 2.94 | 2.95–3.06 | — | 0.000 | 0.000 | 0.000 |
+| empty | 0 | 0.176 | 6% | 2.944 | — | — | — | — | — |
+
+Four things are worth saying about this table.
+
+**(a) On Wang's own scalar, the path circuit is the closer one.** `path @ 0.05` has a faithfulness gap
+of **0.96** against the ground truth's **1.41**, with 18 elements against 26. This should be stated
+carefully rather than claimed as a win: the path circuit *undershoots* `F(M)` while the ground truth
+*overshoots* it, and the path circuit contains only 16 of the 26 ground-truth elements. What it shows
+is that a smaller, partially-correct circuit can land closer to the model on this metric than the
+hand-built one — which is a fact about the metric as much as about the circuit.
+
+**(b) Completeness is where the searches look genuinely good.** `path @ 0.05` scores **0.610** against
+the ground truth's **0.592** — indistinguishable — and the best tree, `tree @ 0.085`, scores **0.711**.
+The size-matched random floor is **~3.0**, so both searches are roughly **5× better than chance** at
+the property that is hardest to get by accident.
+
+**(c) Precision is essentially perfect; recall is what separates the methods.** Every element the path
+search returns at `t ≥ 0.085` is a ground-truth element (precision 1.000), and the same is true of the
+tree at `t ≥ 0.697`. Neither search hallucinates off-circuit components at these thresholds — they
+simply find fewer of them. The tree buys recall (0.769 at `t = 0.05`) at the cost of precision
+(0.513); the path search does the reverse.
+
+**(d) The greedy adversarial `K` is far worse than the random mean, for everything.** Ground truth
+2.06 against a random-mean 0.59; `path @ 0.05` 3.55 against 0.61; `tree @ 0.085` 7.89 against 0.71.
+A mean over random subsets badly understates incompleteness, which is exactly why Wang et al. run the
+greedy search. Any table that reports only the random mean should say so.
+
+### 6.4 Agreement is far more stable for the tree
+
+![element F1 against the ground truth, as a function of the admission threshold](img/f1_vs_threshold.png)
+
+This is the tree extension's clearest result. Path-search agreement peaks at **0.727** and then decays
+steeply — 0.595, 0.424, 0.207 — and above `t = 0.697` the path search **returns nothing at all**,
+because it only emits paths that reached the embeddings and no path completes at that bar. The tree
+holds **F1 ≈ 0.62–0.71 across a 14× range of thresholds**, and still returns a 12-element circuit at
+precision 1.000 where the path search returns the empty set.
+
+That is the asymmetry of Section 4.1 turning into a practical property: **the tree keeps every
+admitted node, so it degrades gracefully as the threshold rises, while the path search falls off a
+cliff.** For a method whose only free parameter is a threshold, robustness to that parameter is worth
+as much as peak quality.
+
+### 6.5 Faithfulness gap and incompleteness against circuit size
+
+![faithfulness gap and incompleteness as a function of circuit size](img/gap_and_incompleteness.png)
+
+Both panels are in raw logit-difference units and both read "lower is better", with the empty circuit
+(2.94) and the size-matched random baseline as floors.
+
+The left panel shows the path search improving sharply with size and overtaking the ground truth at
+its largest setting, while the tree sits on a near-flat plateau at ≈ 2.5 — better than empty, but only
+just. The right panel is the more favourable one for both searches: incompleteness falls with size for
+both, the best points sit at or below the ground truth, and the random baseline is pinned at ≈ 3.0
+across every size, confirming that neither metric is being satisfied by circuit size alone.
+
+The tree's flat faithfulness plateau in the left panel is the clearest symptom of the joint-scoring
+problem of Section 4.5 — see 6.7.
+
+### 6.6 Which parts of the circuit the ground truth itself fails on
+
+![completeness of the ground-truth circuit, by circuit class](img/completeness_by_class.png)
+
+This is Wang et al.'s completeness figure, reproduced by our harness on their circuit: remove one
+circuit class `K` and plot the broken circuit against the cobbled-together model. A complete circuit
+sits on the diagonal.
+
+The reading is a good sanity check on the whole pipeline. Most classes sit close to the diagonal. The
+outlier is the **Negative Name Movers**: removing them raises the circuit to 8.24 and the model to
+6.73 — both move up sharply and *together*, which is the signature of a class whose effect is real,
+large, and correctly attributed. The classes furthest below the diagonal (`Name Mover`,
+`Backup Name Mover`, `none`) are those where the circuit retains more of the behaviour than the model
+does once the class is gone — i.e. where components outside the circuit are *not* compensating.
+
+Note the `none` point at (4.53, 3.12): its distance from the diagonal is the ground truth's own
+faithfulness gap, which is the offset every other point inherits (Section 6.2).
+
+### 6.7 Positional agreement, and what joint scoring appears to cost
+
+**Every ground-truth head either search recovers, it recovers at the correct token.** `element_recall`
+equals `head_recall` at every threshold in the sweep, for both searches. Collapsing positions away
+therefore gains nothing: the searches are not finding the right heads at the wrong places. Both
+searches also concentrate on **2–3 distinct token positions** (the ground truth uses 3: `end`, `S2`,
+`S+1`) where the size-matched random baseline spreads over 15. This is the positional extension
+earning its cost, and it is invisible in any non-positional table.
+
+Neither search recovers the two Previous Token heads at `S+1`, which is consistent with the
+non-positional structural reports.
+
+**MLPs discovered at the base threshold** (recorded, never ablated):
+
+| search | MLPs found, by position |
+|---|---|
+| path (isolated) | `m0@S2, m1@S2, m3@S2, m4@S2, m10@end` |
+| tree (joint) | `m0@S2, m1@S2, m5@S2, m6@S2, m7@S2, m8@end, m9@end, m10@end, m10@p11, m11@end` |
+
+This partially replicates Section 4.5 in the positional setting: the isolated path search finds the
+early block `m0, m1, m3, m4`, while the joint tree keeps `m0, m1` and **drops `m3` and `m4`** in favour
+of the late block `m5–m11`. The pattern that motivated the `joint_scoring=False` recommendation is
+still visible, now with position labels attached.
+
+Since MLPs are never ablated under this protocol, that difference cannot show up in `F(C)` — but the
+tree's flat faithfulness plateau (Section 6.5) and its worse greedy incompleteness (7.89 against the
+path's 3.55) are both consistent with the joint rule growing a structurally different, worse-calibrated
+tree. **This is suggestive, not established**: the isolated-scoring tree run has not been done under
+the v2 protocol, and until it is, "tree" and "path" in the tables above differ in *both* representation
+and objective, which is precisely the confound Section 4.1 exists to avoid.
+
+### 6.8 Cost
+
+| run | wall clock |
+|---|---|
+| path search, one run at `t = 0.05` (pruned across the sweep) | **17.3 min** |
+| tree search, eight runs — the joint-scoring sweep | **31.4 min** total |
+| — of which `t = 0.05` | 15.2 min |
+| — `t = 0.41` | 67 s |
+| — `t = 0.70` | **41 s** |
+| — `t = 2.0` | 12 s |
+
+The last rows are the ones that matter for the demo. **A 12-element circuit at precision 1.000 and
+F1 0.632 comes back in 41 seconds**, at a threshold where the path search returns nothing. Under
+isolated scoring the whole sweep would collapse to a single run (Section 4.2), roughly halving the
+total.
+
+### 6.9 What is not yet measured
+
+Stated plainly, because an exploratory chapter should be explicit about its gaps:
+
+* **No isolated-scoring tree run under v2.** Section 4.5's own recommendation. This is the first gap
+  to close and it makes the path-vs-tree comparison well-posed.
+* **No `topk` run under v2.** The demo's headline claim rests on limited level width; the quantitative
+  table uses the threshold strategy.
+* **No ACDC row.** ACDC is vendored and runs in the demo, but it does not appear in any table
+  (Section 7).
+* **No greater-than causal evaluation.** Structural comparison only, with the caveats below.
+* **One layout group, one task, one model.** 64 evaluation prompts of a single template.
+
+**Greater-than, structural** (Llama-3.2-1B-Instruct, `topk`, `max_width=10`, batch 20, positional): the
+ground truth expands to 812 branches; the tree search found 15 complete branches (26 incomplete) with
+**0** in common. Branch-level recall is very low at this width budget, and four setup caveats apply
+before the number means anything: (1) the official metric is a probability difference over all valid
+two-digit year tokens, not the single-token `logit_difference` proxy used here, and the published
+circuit was discovered under the former; (2) candidates are bucketed by token length so the default
+batch is effectively one noun with the smallest years, where the official dataset balances years
+uniformly over 2–98 across 120 nouns; (3) the century is fixed at 17 against an official pool spanning
+10–18; (4) a hand-picked 14-noun list instead of the official `cache/potential_nouns.txt`. **The
+greater-than result should be presented as a setup-limited negative, or the setup should be fixed
+first.**
+
+---
+
+## 7. The interactive demo: tree search against ACDC
+
+`visualization/` is a local web UI that runs either IPE search — path or tree, threshold or top-k —
+or the **ACDC** baseline vendored under `benchmark/Automatic-Circuit-Discovery`, on the same prompts,
+and draws the result on the same stylised model grid: token positions along x, layers up y (FINAL at
+the top, MLP above ATTN per layer, EMB at the bottom), the whole model as faint placeholder cells, and
+discovered components as head-level chips coloured by signed contribution. Branches reaching an
+embedding are drawn as thick edges; pruned branches stay dashed. Search progress is streamed live over
+SSE, so admitted nodes appear one at a time and a run can be cancelled mid-way.
+
+The ACDC checkout is used **read-only**: `src/ipe/webutils/acdc_bridge.py` calls
+`TLACDCExperiment.step()` and translates the resulting `TLACDCCorrespondence` into our graph JSON.
+ACDC's own graphviz rendering is disabled, so no system graphviz install is required.
+
+### 7.1 Three things to say before showing the pictures
+
+The two panels are not drawn in the same coordinates, and a reader will misread them if this is not
+stated first:
+
+* **ACDC's x axis is the attention head, not the token position.** `TLACDCExperiment` is
+  position-agnostic and raises if positions are passed, so all 144 gpt2-small heads would otherwise
+  pile into a single column. Layers still run up y; MLP/EMB/FINAL sit in a trailing column. **This is
+  itself a finding**: the IPE panel is showing a distinction ACDC cannot express.
+* **One grid node per component.** ACDC works on the hook graph, where a head is up to seven nodes
+  (`hook_{q,k,v}`, `hook_{q,k,v}_input`, `hook_result`); these collapse into one chip, and which of
+  Q/K/V survived is in the tooltip. The summary reports both grid edges and the hook-level edges ACDC
+  itself counts.
+* **"Contribution" means different things.** For IPE it is the message-patching contribution; for ACDC
+  it is the effect of *cutting* the edge (`evaluated_metric − old_metric`). ACDC minimises its metric,
+  so positive/blue means "removing it hurts" in both panels — the same reading, arrived at differently.
+
+### 7.2 The comparison
+
+<!-- Screenshots: drop the two PNGs at these paths. -->
+
+![Tree search on IOI / gpt2-small, limited level width](img/demo_tree.png)
+
+*Tree search, `TreeMessagePatching_LimitedLevelWidth`. Fill in: `max_width`, wall clock, node and
+branch counts, and which ground-truth roles the chips correspond to.*
+
+![ACDC on the same prompts](img/demo_acdc.png)
+
+*ACDC, τ = 0.0575 (the paper's KL value), `kl_div`. Fill in: wall clock, node and edge counts.*
+
+The claim this pair is meant to support is that **the tree search returns a comparable circuit in a
+small fraction of ACDC's runtime**, because a width-bounded beam does `max_width × candidates` scoring
+calls per level while ACDC evaluates one forward pass per candidate edge over a 32.9k-edge graph. Its
+cost is strongly τ-dependent — a high τ disconnects nodes early and prunes the work away — but at the
+paper's τ it is slow.
+
+The supporting number that exists today is from Section 6.8: the *threshold* tree search returns a
+12-element circuit at precision 1.000 and F1 0.632 in **41 seconds**. That is the right order of
+magnitude for the claim, but it is not the beam, and it is not measured against ACDC.
+
+> **This section cannot ship on screenshots alone.** Two numbers are missing and both are cheap:
+>
+> 1. **ACDC's wall clock and its circuit quality on the same evaluation set.** The v2 harness scores
+>    any set of elements, so an ACDC circuit needs only converting to `("attn", l, h, pos)` form. ACDC
+>    is position-agnostic, so its heads must be scored under the all-positions convention — the same
+>    asymmetry Section 5.2 notes for the ground truth, and it must be stated when the numbers are put
+>    side by side.
+> 2. **A `topk` tree run** at the width the demo actually uses, scored the same way, so the table and
+>    the screenshots describe the same object.
+>
+> With those two rows the section becomes a result. Without them it is an illustration, and should be
+> labelled as one.
+
+---
+
+## 8. Granularity and limitations
 
 - Both searches expand attention at the **per-head** level
   (`get_expansion_candidates(..., include_head=True)`); MLPs are per-block.
-- The path search's `batch_heads` two-stage block-then-head shortcut is **not** implemented for the
-  tree, so runtime comparisons should disable it (`batch_heads=False`) for parity.
+- The path search's `batch_heads` and `batch_positions` two-stage shortcuts are **not** implemented for
+  the tree, so runtime comparisons must disable them (`batch_heads=False`, `batch_positions=False`)
+  for parity. This is the single largest unfairness in any runtime comparison between the two.
 - Both searches are **greedy threshold-gated BFS**: a strong deep node sitting behind a weak
   intermediate node is never reached, at any threshold. A threshold sweep faithfully reproduces what
   the algorithm finds at each threshold; it does not find the best circuit of a given size.
-- Joint scoring is defined against the whole frozen tree. A cheaper siblings-only variant (accounting
-  for interaction at `L`'s input but not at the ancestors above it) is *not* implemented; it would be
-  an approximation of the implemented rule, not an alternative semantics.
-- Joint scoring suppresses serially redundant components across depths and should not be used for
-  faithfulness tables (Sections 4.4–4.5). It remains available as a documented negative result.
+- Joint scoring is defined against the whole frozen tree. A cheaper siblings-only variant is *not*
+  implemented; it would be an approximation of the implemented rule, not an alternative semantics.
+- Joint scoring suppresses serially redundant components across depths (Sections 4.4–4.5) and should
+  not be used for headline tables. It remains available as a documented negative result.
 - Faithfulness under knockout is **not monotone in circuit size** (Section 4.4), so circuits should not
   be ranked by it without checking that they are not differently broken.
+- Under the v2 protocol, `F(C)` can exceed `F(M)` — the ground truth reaches 145% — so `F(C)` must be
+  read as a distance from `F(M)`, never as a quality score (Section 6.2).
+- Incompleteness is not independent of faithfulness: at `K = ∅` it *is* the faithfulness gap
+  (Section 6.2).
+- The v2 evaluation uses one task, one model, one token layout and 64 prompts. Nothing here has been
+  replicated on a second ground truth.
 
 ---
 
-## 7. Implementation map
+## 9. Implementation map
 
 | file | role |
 |---|---|
 | `src/ipe/paths.py` | `evaluate_path`; `get_tree_msg` / `evaluate_tree` (joint ablation); `tree_messages` and `evaluate_tree_branch` (the per-depth message cache and `O(depth)` re-propagation) |
-| `src/ipe/graph_search.py` | `TreeMessagePatching` (threshold), `TreeMessagePatching_LimitedLevelWidth` (top-k beam), both with `joint_scoring`; `_joint_scoring_context` and `_score_candidate`; the path-search counterparts; `setup_tree_debug_log` |
+| `src/ipe/graph_search.py` | `TreeMessagePatching` (threshold), `TreeMessagePatching_LimitedLevelWidth` (top-k beam), both with `joint_scoring`; `_joint_scoring_context` and `_score_candidate`; `find_relevant_positions` / `find_relevant_heads`; the path-search counterparts; `setup_tree_debug_log` |
+| `src/ipe/nodes.py` | `Node.get_expansion_candidates` (per-head, per-position candidate generation); the `position` / `keyvalue_position` distinction of Section 3.7 |
 | `experiments/tree_vs_path.py` | driver: batch loading (IOI / greater-than), invariant check, both searches, overlap stats, ground-truth reports, ASCII tree and position-grid rendering; `--joint-scoring` |
-| `experiments/faithfulness_completeness.ipynb` | knockout harness (node and edge granularity), faithfulness / completeness sweep, comparison tables and LaTeX export |
+| `experiments/faithfulness_completeness_v2.ipynb` | **the current evaluation**: positional knockout harness, Wang-parity faithfulness and completeness, greedy adversarial `K`, comparison tables and LaTeX export |
+| `experiments/faithfulness_completeness.ipynb` | v1, superseded — retained only for the strict-knockout results of Sections 4.4–4.5 |
+| `experiments/faithfulness_completeness_v2/` | generated CSVs, LaTeX tables and figures |
+| `img/` | figures used by this document |
+| `visualization/` | the interactive demo (Section 7); `src/ipe/webutils/acdc_bridge.py` is the ACDC adapter |
+| `benchmark/Automatic-Circuit-Discovery/` | vendored ACDC, used read-only |
+| `Easy-Transformer/` | vendored Wang et al. reference implementation, used read-only; the authority for Section 5.2 |
 | `test/test_joint_scoring.py` | the cache/re-propagation identities, the depth-0 reduction, the divergence under a shared ancestor, and simultaneity |
-| `ioi_circuit_report.txt`, `greater_than_report.txt` | latest generated reports (overwritten per run) |
-| `tree_search_debug.log` | per-depth trace of the last tree run |
 
 ---
 
@@ -654,8 +1002,7 @@ dominated by already-discovered branches and cannot discriminate an individual c
 narrows an ablation instead of adding one, so the difference is positive at depth 0 and systematically
 negative afterwards. The observation that "the metric grows monotonically with the ablated mass" holds
 only for attachments *to the root*; the direction reverses for every deeper attachment. The current
-joint rule (Section 3.3) replaces the baseline with "`L` contributes nothing", which is comparable
-across depths.
+joint rule replaces the baseline with "`L` contributes nothing", which is comparable across depths.
 
 ### A.2 The empty-tree baseline bug (`0e8f934`, 2026-06-16)
 
@@ -668,60 +1015,66 @@ which in turn is what makes the joint rule reduce to the isolated one at depth 0
 
 Scoring one candidate by re-evaluating the whole tree is `O(|T|)` forwards. `refresh_tree_messages`
 and `candidate_message` cached each node's outgoing and summed-incoming messages and recomputed only
-the `leaf → root` chain. The idea was sound and survives: `tree_messages` /
-`evaluate_tree_branch` (Section 3.6) are its current form.
+the `leaf → root` chain. The idea was sound and survives as `tree_messages` / `evaluate_tree_branch`.
 
 ### A.4 v2 — isolated branch contribution (`6a3e1d6`, 2026-06-17)
 
-The marginal rule was dropped entirely in favour of the isolated branch contribution, on the grounds
-that a candidate's admission should not depend on which sibling subtrees happened to be discovered
-first, and that the path search scores every path in isolation — so under the marginal rule the two
-searches were optimising different objectives and their differences could not be attributed to the
-tree structure. The sibling caching was removed from the scoring loop, and `evaluate_tree` was
-retained for *reporting* the joint ablation of the finished tree.
+The marginal rule was dropped in favour of the isolated branch contribution, on the grounds that a
+candidate's admission should not depend on which sibling subtrees happened to be discovered first, and
+that the path search scores every path in isolation — so under the marginal rule the two searches were
+optimising different objectives and their differences could not be attributed to the tree structure.
 
 ### A.5 Current — both rules, behind a flag
 
-Joint scoring was reinstated as `joint_scoring`, defaulting to off, with the corrected baseline
-(A.1), the simultaneous within-depth policy of Section 3.4, and the caching of A.3 restored as
-`tree_messages` / `evaluate_tree_branch`. Both objectives are now reachable from one code path:
-`joint_scoring=False` keeps the well-posed path-vs-tree comparison of A.4 and the derivable threshold
-sweep of Section 4.2; `joint_scoring=True` scores in context at the cost of one search per threshold.
+Joint scoring was reinstated as `joint_scoring`, defaulting to off, with the corrected baseline (A.1),
+the simultaneous within-depth policy of Section 3.4, and the caching of A.3. Both objectives are
+reachable from one code path: `joint_scoring=False` keeps the well-posed path-vs-tree comparison and
+the derivable threshold sweep; `joint_scoring=True` scores in context at the cost of one search per
+threshold.
+
+### A.6 Evaluation v1 → v2 (2026-09)
+
+The evaluation notebook was rebuilt after auditing Wang et al.'s released code. v1's faithfulness was
+normalised against an empty-circuit baseline that does not exist in their work, ablated MLPs they
+never ablate, scored non-positional circuits against a positional ground truth, and computed `F(M\K)`
+by ablating `K` at every position rather than at `K`'s own. Section 5.2 has the full comparison. The
+v1 numbers survive in Sections 4.4–4.5 as strict-knockout results and are labelled as such.
 
 ---
 
 ## Appendix B: Open questions
 
-- **Does joint scoring help?** ~~Open~~ — answered, negatively, on IOI: it costs ~0.1 head-F1
-  (Section 5.3) and −0.72 normalised faithfulness (Sections 4.4–4.5), because it prunes serially
-  redundant components that ablation-based faithfulness requires to be present. What remains open is
-  whether the failure is specific to serial stacks like GPT-2's early MLPs, or general. A cheap test:
-  re-run the sweep on a task whose circuit has no comparable bridge component and see whether the two
-  rules converge.
-- **Why exactly were m1–m4 rejected?** ~~Open~~ — answered in Section 4.5 by the re-scoring diagnostic
-  (notebook §12): m1 and m3 are threshold crossings, m2 and m4 are structural losses further up the
-  tree. What remains open is whether the structural divergence is generic or particular to this run.
+Ordered by what the chapter most needs.
+
+- **Re-run the v2 sweep with `joint_scoring=False`.** Section 4.5's own recommendation, not yet
+  carried out under the v2 protocol. Until it is, the "tree" and "path" columns of Section 6.3 differ
+  in both representation *and* objective. It is also cheaper: one run instead of eight.
+- **Put ACDC in the table.** It is vendored and running in the demo but appears in no quantitative
+  result. Needs its wall clock and its circuit scored by the v2 harness, under the all-positions
+  convention its position-agnosticism forces.
+- **Run `topk` under v2**, at the width the demo uses, so Section 7's claim and Section 6's table
+  describe the same configuration.
 - **Does captured routing predict completeness?** Section 4.6 shows compensation is represented exactly
   along the edges the tree holds, and that the search finds 8 such edges on IOI. If a circuit's
   incompleteness falls as it captures more of the compensating routing, that is both an explanation of
-  the completeness score and a lever for improving it.
+  the completeness score and a lever for improving it. The v2 harness now makes this directly testable.
 - **Union admission.** Admitting on *either* rule has a guarantee the structural failures of
-  Section 4.5 demand: at depth 0 the two rules coincide (Section 3.3), and if the union tree contains
-  the isolated tree at depth `k` then every isolated-admitted placement at `k+1` exists and scores
-  identically (the isolated score is context-free), so it is admitted too. By induction **the isolated
-  tree is always a subgraph of the union tree**, so no component the isolated rule finds can be lost —
-  including the m2/m4 cases a post-hoc repair cannot reach. Both scores are `O(depth)`, so the cost is
-  2×. Note this guarantees containment, not a better score: faithfulness is not monotone in circuit
-  size (Section 4.4), so the improvement has to be measured.
+  Section 4.5 demand: at depth 0 the two rules coincide, and if the union tree contains the isolated
+  tree at depth `k` then every isolated-admitted placement at `k+1` exists and scores identically (the
+  isolated score is context-free), so it is admitted too. By induction **the isolated tree is always a
+  subgraph of the union tree**, so no component the isolated rule finds can be lost — including the
+  m2/m4 cases a post-hoc repair cannot reach. Both scores are `O(depth)`, so the cost is 2×. Note this
+  guarantees containment, not a better score: faithfulness is not monotone in circuit size.
+- **Is the joint-scoring failure specific to serial stacks?** A cheap test: re-run on a task whose
+  circuit has no comparable bridge component and see whether the two rules converge.
 - **Greater-than fidelity.** Implement the prob-diff metric over the valid-year token indices and
-  balance the batch across YY and nouns before length-bucketing, so the ground-truth comparison is
-  faithful to Hanna et al. (2023).
-- **Runtime parity.** Port the `batch_heads` block-then-head expansion shortcut to the tree search, so
+  balance the batch across years and nouns before length-bucketing, so the ground-truth comparison is
+  faithful to Hanna et al. (2023). Until then the greater-than result is setup-limited.
+- **Runtime parity.** Port the `batch_heads` and `batch_positions` shortcuts to the tree search, so
   path-vs-tree runtime is measured at equal expansion cost.
 - **Redundancy without losing completeness.** Greedy re-ranking prunes redundant siblings but destroys
   the property completeness measures (Section 3.4). Whether a rule exists that reports redundancy
   without suppressing it — for instance admitting redundant siblings but *labelling* them as mutually
   substitutable — is open.
-- **Other ground truths.** IOI is currently the only task with a head-level ground truth in use; ACDC
-  is not yet vendored under `benchmark/Automatic-Circuit-Discovery`, and the notebook has a section
-  ready for it.
+- **A second ground truth, and mixed templates.** Everything in Section 6 is one task, one model, one
+  token layout, 64 prompts.

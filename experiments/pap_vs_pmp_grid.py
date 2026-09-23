@@ -12,7 +12,14 @@ from __future__ import annotations
 # denoising, so these values are NOT comparable across models: read the final table at matched
 # circuit size, not at matched hyperparameter.
 THRESHOLDS = [0.5, 0.1, 0.02]
-TOP_NS = [100, 1000]
+# `top_n=1000` was removed after it OOM'd the host (not the GPU) on positional searches.
+# BestFirstSearch keeps an *unbounded* heap frontier -- unlike LimitedLevelWidth, which caps it
+# with `heapq.nlargest(max_width, ...)` -- so positionally, where each expansion enumerates
+# n_components x seq_len candidates, the frontier of live Node objects outgrows system RAM
+# before 1000 complete paths are found. `top_n=100` terminates long before that.
+# Cached `*_n1000` records from earlier sweeps stay on disk but are excluded from the tables,
+# which report whatever `build_grid` currently defines. Restore the value here to bring them back.
+TOP_NS = [100]
 MAX_WIDTHS = [100, 1000]
 
 # PMP can batch the expansion (evaluate an attention block whole, then only split the winners
@@ -26,6 +33,9 @@ MODELS = [
     # (name, worker flags)
     ("gpt2-small",                 ["--dtype", "float32",  "--eval-minibatch", "16"]),
     ("Qwen/Qwen2.5-0.5B",          ["--dtype", "float32",  "--eval-minibatch", "16"]),
+    # Added after Meta-Llama-3-8B could not fit a positional search on a 24GB card: at 5.7GB of
+    # float32 weights this one can, and float32 keeps it comparable with the two models above.
+    ("meta-llama/Llama-3.2-1B",    ["--dtype", "float32",  "--eval-minibatch", "16"]),
     # 8B x 4 bytes does not fit a 24GB card, so bf16; smaller eval minibatch because the
     # knockout needs use_attn_result, i.e. [batch, pos, n_heads, d_model] per layer.
     ("meta-llama/Meta-Llama-3-8B", ["--dtype", "bfloat16", "--eval-minibatch", "4"]),
